@@ -1,6 +1,6 @@
 name: localsend_app
 description: Cross-platform LAN file sharing and transfer (AnyShare)
-homepage: https://github.com/localsend/localsend # AnyShare TODO: switch to fork repo
+homepage: https://github.com/sunmerx/AnyShare
 publish_to: "none"
 resolution: workspace
 
