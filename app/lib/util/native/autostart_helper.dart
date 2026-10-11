@@ -107,7 +107,7 @@ Future<bool> isAutoStartHidden() async {
   }
 }
 
-const _windowsRegistryKeyValue = 'LocalSend';
+const _windowsRegistryKeyValue = 'AnyShare';
 
 RegistryKey _getWindowsRegistryKey() {
   return Registry.openPath(

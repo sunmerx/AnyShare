@@ -33,7 +33,7 @@ class AboutPage extends StatelessWidget {
           const SizedBox(height: 20),
           const LocalSendLogo(withText: true),
           Text(
-            '© ${DateTime.now().year} Tien Do Nam',
+            '© ${DateTime.now().year} AnyShare · Based on LocalSend by Tien Do Nam (Apache-2.0)',
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 10),
@@ -42,7 +42,7 @@ class AboutPage extends StatelessWidget {
               onPressed: () async {
                 await launchUrl(Uri.parse('https://localsend.org'));
               },
-              child: const Text('localsend.org'),
+              child: const Text('localsend.org (upstream)'),
             ),
           ),
           const SizedBox(height: 10),

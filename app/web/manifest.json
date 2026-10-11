@@ -1,6 +1,6 @@
 {
-  "name": "localsend_app",
-  "short_name": "localsend_app",
+  "name": "anyshare_app",
+  "short_name": "anyshare_app",
   "start_url": ".",
   "display": "standalone",
   "background_color": "#0175C2",

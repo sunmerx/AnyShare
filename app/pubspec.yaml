@@ -1,6 +1,6 @@
 name: localsend_app
-description: An open source cross-platform alternative to AirDrop
-homepage: https://localsend.org/
+description: Cross-platform LAN file sharing and transfer (AnyShare)
+homepage: https://github.com/localsend/localsend # AnyShare TODO: switch to fork repo
 publish_to: "none"
 resolution: workspace
 
