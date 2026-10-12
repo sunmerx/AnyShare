@@ -44,6 +44,12 @@ class PendingPairing {
   final DateTime createdAt;
   bool aborted = false;
 
+  /// Completes when the local user taps "codes match" (true) or
+  /// "codes differ" / closes (false). The remote confirm request waits on
+  /// this gate, so pairing only finishes if BOTH users accepted the SAS
+  /// comparison — a one-sided accept cannot complete the pairing.
+  final Completer<bool> userGate = Completer<bool>();
+
   PendingPairing({
     required this.sessionId,
     required this.code,
@@ -78,8 +84,9 @@ class ExtensionServerService extends ReduxNotifier<ExtensionServerState> {
 
   @override
   ExtensionServerState init() {
-    // ignore: discarded_futures
-    ref.redux(extensionServerProvider).dispatchAsync(StartExtensionServerAction());
+    // Starting happens via [StartExtensionServerAction] dispatched from
+    // preInit — dispatching to this provider from inside init() recurses
+    // into init() forever (refena initializes the notifier on dispatch).
     return const ExtensionServerState();
   }
 
@@ -104,7 +111,9 @@ class StartExtensionServerAction extends AsyncReduxAction<ExtensionServerService
       return state;
     }
     try {
-      final server = await HttpServer.bind(InternetAddress.anyIPv4, kExtensionPort, shared: true);
+      // Dual-stack: anyIPv6 with v6Only=false (default) also accepts IPv4,
+      // so peers that discovered us via link-local IPv6 can still pair.
+      final server = await HttpServer.bind(InternetAddress.anyIPv6, kExtensionPort, shared: true);
       _logger.info('Extension server listening on $kExtensionPort');
       // ignore: discarded_futures
       server.listen((request) async {
@@ -131,6 +140,9 @@ class AbortPendingPairingAction extends ReduxAction<ExtensionServerService, Exte
     final pending = state.pending;
     if (pending != null) {
       pending.aborted = true;
+      if (!pending.userGate.isCompleted) {
+        pending.userGate.complete(false);
+      }
     }
     return ExtensionServerState(server: state.server, port: state.port);
   }
@@ -146,14 +158,19 @@ class AcceptPendingPairingAction extends AsyncReduxAction<ExtensionServerService
     if (pending == null || pending.aborted) {
       return state;
     }
+    if (!pending.userGate.isCompleted) {
+      pending.userGate.complete(true);
+    }
     await notifier.ref.redux(favoritesProvider).dispatchAsync(
           AddFavoriteAction(
+            // Pairing must NOT default to full trust: temp asks the user on
+            // every transfer until they raise the level deliberately.
             FavoriteDevice.fromValues(
               fingerprint: pending.peerFingerprint,
               ip: pending.ip,
               port: pending.peerPort,
               alias: pending.peerAlias,
-            ),
+            ).copyWith(trustLevel: TrustLevel.temp),
           ),
         );
     return ExtensionServerState(server: state.server, port: state.port);
@@ -226,7 +243,7 @@ extension ExtensionServerHandler on ExtensionServerService {
         code: code,
         peerFingerprint: (body['fingerprint'] as String?) ?? '',
         peerAlias: (body['alias'] as String?) ?? '???',
-        ip: request.connectionInfo!.remoteAddress.address,
+        ip: request.connectionInfo!.remoteAddress.address.replaceAll('::ffff:', ''),
         peerPort: (body['port'] as num?)?.toInt() ?? 53317,
         peerHttps: body['https'] == true,
         ephKeyPair: keyPair,
@@ -263,6 +280,20 @@ extension ExtensionServerHandler on ExtensionServerService {
         return;
       }
 
+      // Wait for the LOCAL user to accept the SAS comparison (30s grace so
+      // the initiator's confirm does not race the responder's tap).
+      final bool accepted;
+      try {
+        accepted = await pending.userGate.future.timeout(const Duration(seconds: 30));
+      } on TimeoutException {
+        await _json(request, {'error': 'not_confirmed'}, status: 409);
+        return;
+      }
+      if (!accepted || pending.aborted) {
+        await _json(request, {'error': 'not_confirmed'}, status: 409);
+        return;
+      }
+
       final localOwner = ref.read(ownerProvider);
       await _json(request, {
         'ok': true,
@@ -271,8 +302,8 @@ extension ExtensionServerHandler on ExtensionServerService {
         'alias': alias,
         'fingerprint': ref.read(securityProvider).certificateHash,
       });
-      // The local user may not have tapped "codes match" yet; persist now
-      // with temp trust (adjustable in the device details page).
+      // Persist the peer with temp trust and the initiator's owner identity
+      // (required by the same-owner rule, PRD F-PAIR-09).
       await ref.redux(favoritesProvider).dispatchAsync(
             AddFavoriteAction(
               FavoriteDevice.fromValues(
@@ -280,6 +311,10 @@ extension ExtensionServerHandler on ExtensionServerService {
                 ip: pending.ip,
                 port: pending.peerPort,
                 alias: pending.peerAlias,
+              ).copyWith(
+                trustLevel: TrustLevel.temp,
+                ownerId: (body['ownerId'] as String?) ?? '',
+                ownerName: (body['ownerName'] as String?) ?? '',
               ),
             ),
           );

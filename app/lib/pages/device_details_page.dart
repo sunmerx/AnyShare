@@ -101,12 +101,20 @@ class _DeviceDetailsPageState extends State<DeviceDetailsPage> with Refena {
                 label: t.deviceDetailsPage.pairing.start,
                 filled: false,
                 width: 120,
-                onTap: () async => await showInitiatorPairingDialog(
-                  context,
-                  host: device.ip ?? '',
-                  extPort: 53318,
-                  onPaired: (_) => setState(() {}),
-                ),
+                onTap: () async {
+                  // Prefer an IPv4 channel when pairing (IPv6 link-local
+                  // needs matching scopes and is more fragile on LANs).
+                  final String pairHost = device.channels
+                      .whereType<HttpChannel>()
+                      .map((c) => c.host)
+                      .firstWhere((h) => !h.contains(':'), orElse: () => device.ip ?? '');
+                  await showInitiatorPairingDialog(
+                    context,
+                    host: pairHost,
+                    extPort: 53318,
+                    onPaired: (_) => setState(() {}),
+                  );
+                },
               ),
             ],
           ),

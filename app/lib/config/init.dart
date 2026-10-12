@@ -14,6 +14,7 @@ import 'package:localsend_app/pages/whats_new_page.dart';
 import 'package:localsend_app/provider/animation_provider.dart';
 import 'package:localsend_app/provider/app_arguments_provider.dart';
 import 'package:localsend_app/provider/device_info_provider.dart';
+import 'package:localsend_app/provider/network/extension_server_provider.dart';
 import 'package:localsend_app/provider/network/nearby_devices_provider.dart';
 import 'package:localsend_app/provider/network/server/server_provider.dart';
 import 'package:localsend_app/provider/network/webrtc/signaling_provider.dart';
@@ -188,6 +189,16 @@ Future<RefenaContainer> preInit(List<String> args) async {
   );
 
   await container.redux(parentIsolateProvider).dispatchAsync(IsolateSetupAction());
+
+  // AnyShare modification (2026-10-12): start the extension server eagerly —
+  // nothing watches its provider, so lazy init would never fire. Must run in
+  // preInit: postInit runs before refena's global defaultRef exists and a
+  // first-time provider instantiation there throws LateInitializationError.
+  try {
+    await container.redux(extensionServerProvider).dispatchAsync(StartExtensionServerAction());
+  } catch (e, st) {
+    _logger.warning('Starting extension server failed: $e $st');
+  }
 
   return container;
 }

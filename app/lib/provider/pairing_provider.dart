@@ -65,7 +65,11 @@ class PairingResult {
 /// HTTP helpers for the extension protocol. Plain HTTP by design (SAS binds
 /// the key exchange; see sas.dart docs).
 extension PairingClient on Ref {
-  Uri _extUri(String host, int port, String path) => Uri.parse('http://$host:$port/api/anyshare/v1/$path');
+  Uri _extUri(String host, int port, String path) {
+  // IPv6 (incl. link-local with %scope) must be bracketed; '%' escapes to %25.
+  final String hostPart = host.contains(':') ? '[${host.replaceAll('%', '%25')}]' : host;
+  return Uri.parse('http://$hostPart:$port/api/anyshare/v1/$path');
+}
 
   Future<dynamic> _post(String host, int port, String path, Map<String, dynamic> body) async {
     try {
@@ -126,11 +130,14 @@ extension PairingClient on Ref {
     if (response['session'] is! String || response['eph'] is! String || response['code'] is! String) {
       throw const PairingException(PairingError.protocol);
     }
+    // The transcript MUST use the peer fingerprint from the register
+    // response — a stale/empty one yields a different SAS code on both
+    // sides (the mismatch is then correctly treated as an attack indicator).
     return PairingSession(
       sessionId: response['session'] as String,
       code: response['code'] as String,
       peerAlias: response['alias'] as String? ?? '???',
-      peerFingerprint: peerFingerprint,
+      peerFingerprint: (response['fingerprint'] as String?) ?? peerFingerprint,
       ephKeyPair: keyPair,
       peerEphPub: base64Decode(response['eph'] as String),
     );
