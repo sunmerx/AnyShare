@@ -74,6 +74,7 @@ class Translations with BaseTranslations<AppLocale, Translations> {
   late final Translations$web$en web = Translations$web$en.internal(_root);
   late final Translations$assetPicker$en assetPicker = Translations$assetPicker$en.internal(_root);
   late final Translations$sendHistoryPage$en sendHistoryPage = Translations$sendHistoryPage$en.internal(_root);
+  late final Translations$pairingIncoming$en pairingIncoming = Translations$pairingIncoming$en.internal(_root);
 }
 
 // Path: general
@@ -408,6 +409,7 @@ class Translations$deviceDetailsPage$en {
   late final Translations$deviceDetailsPage$info$en info = Translations$deviceDetailsPage$info$en.internal(_root);
   late final Translations$deviceDetailsPage$logs$en logs = Translations$deviceDetailsPage$logs$en.internal(_root);
   late final Translations$deviceDetailsPage$trust$en trust = Translations$deviceDetailsPage$trust$en.internal(_root);
+  late final Translations$deviceDetailsPage$pairing$en pairing = Translations$deviceDetailsPage$pairing$en.internal(_root);
 }
 
 // Path: verifyPage
@@ -964,6 +966,27 @@ class Translations$sendHistoryPage$en {
   String get empty => 'No sent files yet.';
 }
 
+// Path: pairingIncoming
+class Translations$pairingIncoming$en {
+  Translations$pairingIncoming$en.internal(this._root);
+
+  final Translations _root; // ignore: unused_field
+
+  // Translations
+
+  /// en: 'Pairing request'
+  String get title => 'Pairing request';
+
+  /// en: '{name} wants to pair. Verify both screens show the same code:'
+  String body({required Object name}) => '${name} wants to pair. Verify both screens show the same code:';
+
+  /// en: 'Codes match'
+  String get match => 'Codes match';
+
+  /// en: 'Codes differ'
+  String get mismatch => 'Codes differ';
+}
+
 // Path: receiveTab.infoBox
 class Translations$receiveTab$infoBox$en {
   Translations$receiveTab$infoBox$en.internal(this._root);
@@ -1438,6 +1461,54 @@ class Translations$deviceDetailsPage$trust$en {
 
   /// en: 'Percentage of the destination disk'
   String get percentHint => 'Percentage of the destination disk';
+}
+
+// Path: deviceDetailsPage.pairing
+class Translations$deviceDetailsPage$pairing$en {
+  Translations$deviceDetailsPage$pairing$en.internal(this._root);
+
+  final Translations _root; // ignore: unused_field
+
+  // Translations
+
+  /// en: 'Pair (AnyShare)'
+  String get start => 'Pair (AnyShare)';
+
+  /// en: 'This device does not respond as AnyShare. You can still favorite it for auto-accept.'
+  String get notSupported => 'This device does not respond as AnyShare. You can still favorite it for auto-accept.';
+
+  /// en: 'Contacting device…'
+  String get probing => 'Contacting device…';
+
+  /// en: 'Verify both screens show the same code'
+  String get codeTitle => 'Verify both screens show the same code';
+
+  /// en: 'Waiting for the other device…'
+  String get waitingPeer => 'Waiting for the other device…';
+
+  /// en: 'Codes match'
+  String get match => 'Codes match';
+
+  /// en: 'Codes differ'
+  String get mismatch => 'Codes differ';
+
+  /// en: 'Paired with {name}. Trust level: temporary (change it below).'
+  String done({required Object name}) => 'Paired with ${name}. Trust level: temporary (change it below).';
+
+  /// en: 'The device is not an AnyShare app.'
+  String get errorNotAnyShare => 'The device is not an AnyShare app.';
+
+  /// en: 'The device could not be reached.'
+  String get errorUnreachable => 'The device could not be reached.';
+
+  /// en: 'The device is busy with another pairing.'
+  String get errorBusy => 'The device is busy with another pairing.';
+
+  /// en: 'Pairing was rejected.'
+  String get errorRejected => 'Pairing was rejected.';
+
+  /// en: 'Unexpected pairing response.'
+  String get errorProtocol => 'Unexpected pairing response.';
 }
 
 // Path: progressPage.total

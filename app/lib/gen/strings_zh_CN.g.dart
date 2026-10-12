@@ -97,6 +97,8 @@ class TranslationsZhCn extends Translations with BaseTranslations<AppLocale, Tra
   late final Translations$assetPicker$zh_CN assetPicker = Translations$assetPicker$zh_CN.internal(_root);
   @override
   late final Translations$sendHistoryPage$zh_CN sendHistoryPage = Translations$sendHistoryPage$zh_CN.internal(_root);
+  @override
+  late final Translations$pairingIncoming$zh_CN pairingIncoming = Translations$pairingIncoming$zh_CN.internal(_root);
 }
 
 // Path: general
@@ -367,6 +369,8 @@ class Translations$deviceDetailsPage$zh_CN extends Translations$deviceDetailsPag
   late final Translations$deviceDetailsPage$logs$zh_CN logs = Translations$deviceDetailsPage$logs$zh_CN.internal(_root);
   @override
   late final Translations$deviceDetailsPage$trust$zh_CN trust = Translations$deviceDetailsPage$trust$zh_CN.internal(_root);
+  @override
+  late final Translations$deviceDetailsPage$pairing$zh_CN pairing = Translations$deviceDetailsPage$pairing$zh_CN.internal(_root);
 }
 
 // Path: verifyPage
@@ -857,6 +861,23 @@ class Translations$sendHistoryPage$zh_CN extends Translations$sendHistoryPage$en
   String get empty => '暂无发送记录';
 }
 
+// Path: pairingIncoming
+class Translations$pairingIncoming$zh_CN extends Translations$pairingIncoming$en {
+  Translations$pairingIncoming$zh_CN.internal(TranslationsZhCn root) : this._root = root, super.internal(root);
+
+  final TranslationsZhCn _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get title => '配对请求';
+  @override
+  String body({required Object name}) => '${name} 请求配对。请核对两台设备显示相同的校验码:';
+  @override
+  String get match => '码一致';
+  @override
+  String get mismatch => '码不一致';
+}
+
 // Path: receiveTab.infoBox
 class Translations$receiveTab$infoBox$zh_CN extends Translations$receiveTab$infoBox$en {
   Translations$receiveTab$infoBox$zh_CN.internal(TranslationsZhCn root) : this._root = root, super.internal(root);
@@ -1221,6 +1242,41 @@ class Translations$deviceDetailsPage$trust$zh_CN extends Translations$deviceDeta
   String get usage => '已用量';
   @override
   String get percentHint => '占接收盘总容量的百分比';
+}
+
+// Path: deviceDetailsPage.pairing
+class Translations$deviceDetailsPage$pairing$zh_CN extends Translations$deviceDetailsPage$pairing$en {
+  Translations$deviceDetailsPage$pairing$zh_CN.internal(TranslationsZhCn root) : this._root = root, super.internal(root);
+
+  final TranslationsZhCn _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get start => '配对(AnyShare)';
+  @override
+  String get notSupported => '对方未响应 AnyShare 配对,仍可收藏以便自动接收。';
+  @override
+  String get probing => '正在联系设备…';
+  @override
+  String get codeTitle => '请核对两台设备显示相同的校验码';
+  @override
+  String get waitingPeer => '等待对方操作…';
+  @override
+  String get match => '码一致';
+  @override
+  String get mismatch => '码不一致';
+  @override
+  String done({required Object name}) => '已与 ${name} 配对。信任级别:临时(可在下方修改)。';
+  @override
+  String get errorNotAnyShare => '对方不是 AnyShare 应用。';
+  @override
+  String get errorUnreachable => '无法连接对方设备。';
+  @override
+  String get errorBusy => '对方正在处理其他配对请求。';
+  @override
+  String get errorRejected => '配对被拒绝。';
+  @override
+  String get errorProtocol => '配对响应异常。';
 }
 
 // Path: progressPage.total

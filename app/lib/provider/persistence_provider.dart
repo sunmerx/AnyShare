@@ -57,6 +57,8 @@ const _stunServers = 'ls_stun_servers';
 const _receiveHistory = 'ls_receive_history';
 const _trustUsage = 'ls_trust_usage'; // AnyShare modification
 const _sendHistory = 'ls_send_history'; // AnyShare modification
+const _ownerId = 'ls_owner_id'; // AnyShare modification
+const _ownerName = 'ls_owner_name'; // AnyShare modification
 
 // Favorites
 const _favorites = 'ls_favorites';
@@ -292,6 +294,14 @@ class PersistenceService {
     final raw = entries.map((entry) => jsonEncode(entry.toJson())).toList();
     await _prefs.setStringList(_sendHistory, raw);
   }
+
+  String? getOwnerId() => _prefs.getString(_ownerId);
+
+  Future<void> setOwnerId(String id) => _prefs.setString(_ownerId, id);
+
+  String getOwnerName() => _prefs.getString(_ownerName) ?? '';
+
+  Future<void> setOwnerName(String name) => _prefs.setString(_ownerName, name);
 
   List<FavoriteDevice> getFavorites() {
     final favoritesRaw = _prefs.getStringList(_favorites) ?? [];

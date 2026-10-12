@@ -53,6 +53,17 @@
 - `pubspec.lock`:8 个 build 工具链传递依赖小版本再解析(archive/build_config/build_daemon 等,仅 codegen 使用;官方源解析,运行时依赖零漂移)
 - `app/pubspec.yaml`:description 重写、homepage → github.com/sunmerx/AnyShare
 
+### SAS 配对与扩展服务器批次(2026-10-12,Stage 2-C)
+
+- `app/pubspec.yaml`:新增依赖 `cryptography 2.7.0`(X25519+HKDF,纯 Dart)与 dev `convert`(测试 hex 解码)
+- `app/lib/util/sas.dart`(新增):SAS 派生(临时 X25519 + HKDF-SHA256 + 6 位码,transcript 绑定)
+- `app/lib/provider/owner_provider.dart`(新增)+ `persistence_provider.dart`(`ls_owner_id/ls_owner_name`):本机归属者身份
+- `app/lib/provider/network/extension_server_provider.dart`(新增):53318 扩展服务器(capabilities/pair/register/pair/confirm,IP 限速 5 次分,pending 5 分钟 TTL)
+- `app/lib/provider/pairing_provider.dart`(新增):发起方客户端(探测/register/confirm)
+- `app/lib/widget/dialogs/pairing_dialog.dart`(新增)、`app/lib/pages/device_details_page.dart`:配对对话框(双端 SAS 码比对)与详情页入口
+- `app/assets/i18n/en.json`、`app/assets/i18n/zh-CN.json`:配对文案
+- 协议安全:纯 HTTP + SAS 绑定(设计文档 §2 修订);LocalSend 互操作零影响(通告与 53317 主服务未动)
+
 ### 信任 UI 与发送历史批次(2026-10-12,Stage 2-B)
 
 - `app/lib/widget/trust_settings_section.dart`(新增):设备详情页信任区块(等级切换/拉黑/单文件上限/容量限额/用量显示与显式重置)

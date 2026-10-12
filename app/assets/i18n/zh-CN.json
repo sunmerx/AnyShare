@@ -242,6 +242,21 @@
       "resetUsageConfirm": "确定重置该设备已记录的接收用量?",
       "usage": "已用量",
       "percentHint": "占接收盘总容量的百分比"
+    },
+    "pairing": {
+      "start": "配对(AnyShare)",
+      "notSupported": "对方未响应 AnyShare 配对,仍可收藏以便自动接收。",
+      "probing": "正在联系设备…",
+      "codeTitle": "请核对两台设备显示相同的校验码",
+      "waitingPeer": "等待对方操作…",
+      "match": "码一致",
+      "mismatch": "码不一致",
+      "done": "已与 {name} 配对。信任级别:临时(可在下方修改)。",
+      "errorNotAnyShare": "对方不是 AnyShare 应用。",
+      "errorUnreachable": "无法连接对方设备。",
+      "errorBusy": "对方正在处理其他配对请求。",
+      "errorRejected": "配对被拒绝。",
+      "errorProtocol": "配对响应异常。"
     }
   },
   "verifyPage": {
@@ -597,5 +612,11 @@
   "sendHistoryPage": {
     "title": "发送记录",
     "empty": "暂无发送记录"
+  },
+  "pairingIncoming": {
+    "title": "配对请求",
+    "body": "{name} 请求配对。请核对两台设备显示相同的校验码:",
+    "match": "码一致",
+    "mismatch": "码不一致"
   }
 }

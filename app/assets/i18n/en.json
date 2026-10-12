@@ -244,6 +244,21 @@
       "resetUsageConfirm": "Reset the recorded receive usage for this device?",
       "usage": "Usage",
       "percentHint": "Percentage of the destination disk"
+    },
+    "pairing": {
+      "start": "Pair (AnyShare)",
+      "notSupported": "This device does not respond as AnyShare. You can still favorite it for auto-accept.",
+      "probing": "Contacting device…",
+      "codeTitle": "Verify both screens show the same code",
+      "waitingPeer": "Waiting for the other device…",
+      "match": "Codes match",
+      "mismatch": "Codes differ",
+      "done": "Paired with {name}. Trust level: temporary (change it below).",
+      "errorNotAnyShare": "The device is not an AnyShare app.",
+      "errorUnreachable": "The device could not be reached.",
+      "errorBusy": "The device is busy with another pairing.",
+      "errorRejected": "Pairing was rejected.",
+      "errorProtocol": "Unexpected pairing response."
     }
   },
   "verifyPage": {
@@ -600,5 +615,11 @@
   "sendHistoryPage": {
     "title": "Sent Files",
     "empty": "No sent files yet."
+  },
+  "pairingIncoming": {
+    "title": "Pairing request",
+    "body": "{name} wants to pair. Verify both screens show the same code:",
+    "match": "Codes match",
+    "mismatch": "Codes differ"
   }
 }

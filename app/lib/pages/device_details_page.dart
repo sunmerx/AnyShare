@@ -8,6 +8,7 @@ import 'package:localsend_app/util/system_date_time_formatter.dart';
 import 'package:localsend_app/widget/big_button.dart';
 import 'package:localsend_app/widget/dialogs/favorite_delete_dialog.dart';
 import 'package:localsend_app/widget/dialogs/favorite_edit_dialog.dart';
+import 'package:localsend_app/widget/dialogs/pairing_dialog.dart';
 import 'package:localsend_app/widget/responsive_list_view.dart';
 import 'package:localsend_app/widget/trust_settings_section.dart';
 import 'package:localsend_isolates/isolate.dart';
@@ -91,6 +92,20 @@ class _DeviceDetailsPageState extends State<DeviceDetailsPage> with Refena {
                   () => VerifyPage(
                     fingerprint: CombinedFingerprint.load(context, device.fingerprint),
                   ),
+                ),
+              ),
+              const SizedBox(width: 20),
+              // AnyShare modification (2026-10-12): SAS pairing entry.
+              BigButton(
+                icon: Icons.link,
+                label: t.deviceDetailsPage.pairing.start,
+                filled: false,
+                width: 120,
+                onTap: () async => await showInitiatorPairingDialog(
+                  context,
+                  host: device.ip ?? '',
+                  extPort: 53318,
+                  onPaired: (_) => setState(() {}),
                 ),
               ),
             ],
