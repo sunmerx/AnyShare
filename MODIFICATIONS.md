@@ -42,6 +42,17 @@
 - `app/ios/Runner/Runner.entitlements`、`app/ios/ShareExtension/ShareExtension.entitlements`:iOS app group `group.org.localsend.localsendApp` → `group.io.anyshare.app`
 - `support/scripts/*`(Inno/DMG/AppImage/APK 打包脚本):产物名与品牌字段同步(产物名 `AnyShare-*`;上游脚本的仓库目录名假设等将在 Stage 5 重做)
 
+### 构建修复与工具链批次(2026-10-12,代码审查后补登)
+
+- `app/windows/localsend_app.exe.manifest` → `anyshare_app.exe.manifest`(随 BINARY_NAME;品牌批次补全)
+- `app/windows/CMakeLists.txt`:`localsend_msix_helper.msix` 改为存在才安装(MSIX 分发暂缓,该文件不随源码仓库;含代码内注释)
+- `app/android/.../kotlin/io/anyshare/app/`:全部 4 个 .kt(QuickTileService/FastDocumentFile/FileOpener 等)package 统一 `io.anyshare.app`(品牌批次只迁了 MainActivity,此为补全修复)
+- `app/android/gradle.properties`:Flutter migrator 自动追加 `android.builtInKotlin=false`、`android.newDsl=false`(3.41.9 与 AGP 8.12 兼容开关)
+- `app/analysis_options.yaml`、`packages/localsend_isolates/analysis_options.yaml`:pub get 自动追加平台目录排除(android/ios/web/windows/macos/linux/build)
+- `.gitignore`:追加 `app/android/build/`(上游遗漏;构建产物曾被误提交)
+- `pubspec.lock`:8 个 build 工具链传递依赖小版本再解析(archive/build_config/build_daemon 等,仅 codegen 使用;官方源解析,运行时依赖零漂移)
+- `app/pubspec.yaml`:description 重写、homepage → github.com/sunmerx/AnyShare
+
 **明确保留(不计入修改义务,均为内部标识或互操作所必需)**
 - Dart 包名 `localsend_app`(app/pubspec.yaml 的 `name`)及全部 `package:localsend_app/*` import:内部代码标识,非用户可见;保留以最小化 rebase 成本
 - 协议常量:端口 53317、`/api/localsend/v2/*` 路径、组播组 224.0.0.167 —— LocalSend protocol v2.2 互操作所必需
