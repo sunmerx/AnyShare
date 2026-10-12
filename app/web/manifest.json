@@ -1,6 +1,6 @@
 {
-  "name": "anyshare_app",
-  "short_name": "anyshare_app",
+  "name": "AnyShare",
+  "short_name": "AnyShare",
   "start_url": ".",
   "display": "standalone",
   "background_color": "#0175C2",
