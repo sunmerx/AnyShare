@@ -54,6 +54,10 @@ class _InitiatorPairingDialogState extends State<_InitiatorPairingDialog> with R
         _code = code;
         _phase = _Phase.code;
       });
+      // AnyShare ruling (2026-10-12): only the responder confirms the SAS
+      // comparison — the initiator just displays the code and waits. The
+      // confirm request blocks server-side until the responder accepts.
+      await _confirm();
     } on PairingException catch (e) {
       if (!mounted) {
         return;
@@ -116,16 +120,14 @@ class _InitiatorPairingDialogState extends State<_InitiatorPairingDialog> with R
         _Phase.failed => Text(_error ?? '', style: TextStyle(color: Theme.of(context).colorScheme.error)),
       },
       actions: [
-        if (_phase == _Phase.code) ...[
+        if (_phase == _Phase.code)
+          // Initiator cannot complete the pairing themselves; closing here
+          // aborts on their side (the responder's gate then times out).
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
             child: Text(tp.mismatch),
-          ),
-          FilledButton(
-            onPressed: _confirm,
-            child: Text(tp.match),
-          ),
-        ] else
+          )
+        else
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
             child: Text(t.general.close),

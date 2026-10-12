@@ -280,11 +280,12 @@ extension ExtensionServerHandler on ExtensionServerService {
         return;
       }
 
-      // Wait for the LOCAL user to accept the SAS comparison (30s grace so
-      // the initiator's confirm does not race the responder's tap).
+      // Wait for the LOCAL user to accept the SAS comparison (60s so the
+      // responder has time to compare both screens; the initiator's confirm
+      // request long-polls here).
       final bool accepted;
       try {
-        accepted = await pending.userGate.future.timeout(const Duration(seconds: 30));
+        accepted = await pending.userGate.future.timeout(const Duration(seconds: 60));
       } on TimeoutException {
         await _json(request, {'error': 'not_confirmed'}, status: 409);
         return;

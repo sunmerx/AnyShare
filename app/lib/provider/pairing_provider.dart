@@ -71,14 +71,15 @@ extension PairingClient on Ref {
   return Uri.parse('http://$hostPart:$port/api/anyshare/v1/$path');
 }
 
-  Future<dynamic> _post(String host, int port, String path, Map<String, dynamic> body) async {
+  Future<dynamic> _post(String host, int port, String path, Map<String, dynamic> body, {Duration? timeout}) async {
+    final Duration wait = timeout ?? _timeout;
     try {
       final client = HttpClient()..connectionTimeout = _timeout;
       final request = await client.postUrl(_extUri(host, port, path));
       request.headers.contentType = ContentType.json;
       request.write(jsonEncode(body));
-      final response = await request.close().timeout(_timeout);
-      final text = await response.transform(utf8.decoder).join().timeout(_timeout);
+      final response = await request.close().timeout(wait);
+      final text = await response.transform(utf8.decoder).join().timeout(wait);
       if (response.statusCode != 200) {
         throw const PairingException(PairingError.rejected);
       }
@@ -147,12 +148,14 @@ extension PairingClient on Ref {
   Future<PairingResult> pairConfirm({required String host, required int extPort, required PairingSession session, required String peerIp}) async {
     final owner = read(ownerProvider);
     final server = read(serverProvider);
+    // The server long-polls until the responder accepts the SAS comparison
+    // (60s) — allow for it.
     final response = await _post(host, extPort, 'pair/confirm', {
       'session': session.sessionId,
       'ownerId': owner.id,
       'ownerName': owner.name,
       'alias': server?.alias ?? '',
-    }) as Map;
+    }, timeout: const Duration(seconds: 75)) as Map;
     if (response['ok'] != true || response['ownerId'] is! String) {
       throw const PairingException(PairingError.rejected);
     }
