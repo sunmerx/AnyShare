@@ -66,6 +66,13 @@ class ReceiveHistoryEntryMapper extends ClassMapperBase<ReceiveHistoryEntry> {
     'timestamp',
     _$timestamp,
   );
+  static String? _$senderFingerprint(ReceiveHistoryEntry v) =>
+      v.senderFingerprint;
+  static const Field<ReceiveHistoryEntry, String> _f$senderFingerprint = Field(
+    'senderFingerprint',
+    _$senderFingerprint,
+    opt: true,
+  );
 
   @override
   final MappableFields<ReceiveHistoryEntry> fields = const {
@@ -78,6 +85,7 @@ class ReceiveHistoryEntryMapper extends ClassMapperBase<ReceiveHistoryEntry> {
     #fileSize: _f$fileSize,
     #senderAlias: _f$senderAlias,
     #timestamp: _f$timestamp,
+    #senderFingerprint: _f$senderFingerprint,
   };
 
   static ReceiveHistoryEntry _instantiate(DecodingData data) {
@@ -91,6 +99,7 @@ class ReceiveHistoryEntryMapper extends ClassMapperBase<ReceiveHistoryEntry> {
       fileSize: data.dec(_f$fileSize),
       senderAlias: data.dec(_f$senderAlias),
       timestamp: data.dec(_f$timestamp),
+      senderFingerprint: data.dec(_f$senderFingerprint),
     );
   }
 
@@ -174,6 +183,7 @@ abstract class ReceiveHistoryEntryCopyWith<
     int? fileSize,
     String? senderAlias,
     DateTime? timestamp,
+    String? senderFingerprint,
   });
   ReceiveHistoryEntryCopyWith<$R2, $In, $Out2> $chain<$R2, $Out2>(
     Then<$Out2, $R2> t,
@@ -199,6 +209,7 @@ class _ReceiveHistoryEntryCopyWithImpl<$R, $Out>
     int? fileSize,
     String? senderAlias,
     DateTime? timestamp,
+    Object? senderFingerprint = $none,
   }) => $apply(
     FieldCopyWithData({
       if (id != null) #id: id,
@@ -210,6 +221,7 @@ class _ReceiveHistoryEntryCopyWithImpl<$R, $Out>
       if (fileSize != null) #fileSize: fileSize,
       if (senderAlias != null) #senderAlias: senderAlias,
       if (timestamp != null) #timestamp: timestamp,
+      if (senderFingerprint != $none) #senderFingerprint: senderFingerprint,
     }),
   );
   @override
@@ -223,6 +235,10 @@ class _ReceiveHistoryEntryCopyWithImpl<$R, $Out>
     fileSize: data.get(#fileSize, or: $value.fileSize),
     senderAlias: data.get(#senderAlias, or: $value.senderAlias),
     timestamp: data.get(#timestamp, or: $value.timestamp),
+    senderFingerprint: data.get(
+      #senderFingerprint,
+      or: $value.senderFingerprint,
+    ),
   );
 
   @override

@@ -24,6 +24,12 @@ class ReceiveHistoryEntry with ReceiveHistoryEntryMappable {
   final String senderAlias;
   final DateTime timestamp;
 
+  /// AnyShare modification (2026-10-12): mTLS certificate fingerprint of the
+  /// sender; the per-device receive quota is summed over history entries with
+  /// a matching fingerprint. Null in entries persisted before this change
+  /// (they are excluded from quota sums).
+  final String? senderFingerprint;
+
   const ReceiveHistoryEntry({
     required this.id,
     required this.fileName,
@@ -34,6 +40,7 @@ class ReceiveHistoryEntry with ReceiveHistoryEntryMappable {
     required this.fileSize,
     required this.senderAlias,
     required this.timestamp,
+    this.senderFingerprint,
   });
 
   /// Format string using the system date and time format.

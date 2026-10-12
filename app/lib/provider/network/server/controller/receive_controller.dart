@@ -17,14 +17,17 @@ import 'package:localsend_app/provider/logging/discovery_logs_provider.dart';
 import 'package:localsend_app/provider/network/send_provider.dart';
 import 'package:localsend_app/provider/network/server/server_provider.dart';
 import 'package:localsend_app/provider/network/server/server_utils.dart';
+import 'package:localsend_app/model/persistence/favorite_device.dart';
 import 'package:localsend_app/provider/receive_history_provider.dart';
 import 'package:localsend_app/provider/security_provider.dart';
 import 'package:localsend_app/provider/selection/selected_receiving_files_provider.dart';
 import 'package:localsend_app/provider/selection/selected_sending_files_provider.dart';
 import 'package:localsend_app/provider/settings_provider.dart';
+import 'package:localsend_app/provider/trust_provider.dart';
 import 'package:localsend_app/util/native/directories.dart';
 import 'package:localsend_app/util/native/platform_check.dart';
 import 'package:localsend_app/util/native/tray_helper.dart';
+import 'package:localsend_app/util/trust_evaluator.dart';
 import 'package:localsend_app/widget/dialogs/open_file_dialog.dart';
 import 'package:localsend_isolates/isolate.dart';
 import 'package:localsend_isolates/model/device.dart';
@@ -126,13 +129,38 @@ class ReceiveController {
           statuses: {for (final file in files.values) file.id: FileStatus.queue},
         );
 
+    // AnyShare modification (2026-10-12): trust decision chain
+    // (docs/扩展协议设计.md §3.2) — keyed by the unforgeable mTLS fingerprint.
+    final FavoriteDevice? trustEntry =
+        server.ref.read(favoritesProvider).firstWhereOrNull((e) => e.fingerprint == senderFingerprint);
+    final TrustDecision trustDecision = await decideTrust(
+      ref: server.ref,
+      entry: trustEntry,
+      fileSizes: files.values.map((f) => f.size),
+      destinationDir: destinationDir,
+    );
+    if (trustDecision is TrustReject) {
+      _logger.info('Rejected by trust policy: ${trustDecision.reason} (limit: ${trustDecision.limit}, used: ${trustDecision.used})');
+      declineFileRequest();
+      return;
+    }
+    final bool trustAutoAccept = trustDecision is TrustAutoAccept;
+
     bool quickSave = settings.quickSave && server.getState().session?.message == null;
     final quickSaveFromFavorites = settings.quickSaveFromFavorites && server.getState().session?.message == null;
     if (quickSaveFromFavorites) {
-      final bool isFavorite = server.ref.read(favoritesProvider).any((e) => e.fingerprint == senderFingerprint);
-      if (isFavorite) {
+      // AnyShare modification: only fully-trusted entries keep the upstream
+      // auto-accept behavior; limited entries pass the limit checks above,
+      // temp entries ask every time.
+      final bool isFullTrust = server.ref
+          .read(favoritesProvider)
+          .any((e) => e.fingerprint == senderFingerprint && e.trustLevel == TrustLevel.full);
+      if (isFullTrust) {
         quickSave = true;
       }
+    }
+    if (trustAutoAccept && !quickSave) {
+      quickSave = true;
     }
     if (server.getState().webUpload && settings.receiveViaLinkAutoAccept && server.getState().session?.message == null) {
       // The upload page (receive via link) is being served and requests should be accepted automatically.
@@ -177,6 +205,7 @@ class ReceiveController {
               fileSize: utf8.encode(message).length,
               senderAlias: server.getState().session!.senderAlias,
               timestamp: DateTime.now().toUtc(),
+              senderFingerprint: server.getState().session!.sender.fingerprint, // AnyShare modification
             ),
           );
     }
@@ -364,6 +393,7 @@ class ReceiveController {
               fileSize: receivingFile.file.size,
               senderAlias: receiveState.senderAlias,
               timestamp: DateTime.now().toUtc(),
+              senderFingerprint: receiveState.sender.fingerprint, // AnyShare modification
             ),
           );
     } else {
@@ -416,8 +446,11 @@ class ReceiveController {
       bool quickSave = settings.quickSave && !hasError && server.getState().session?.message == null;
       final quickSaveFromFavorites = settings.quickSaveFromFavorites && !hasError && server.getState().session?.message == null;
       if (quickSaveFromFavorites) {
-        final bool isFavorite = server.ref.read(favoritesProvider).any((e) => e.fingerprint == session.sender.fingerprint);
-        if (isFavorite) {
+        // AnyShare modification: only fully-trusted entries auto-close.
+        final bool isFullTrust = server.ref
+            .read(favoritesProvider)
+            .any((e) => e.fingerprint == session.sender.fingerprint && e.trustLevel == TrustLevel.full);
+        if (isFullTrust) {
           quickSave = true;
         }
       }

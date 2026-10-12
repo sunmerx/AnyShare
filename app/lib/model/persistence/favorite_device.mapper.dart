@@ -8,6 +8,106 @@
 
 part of 'favorite_device.dart';
 
+class TrustLevelMapper extends EnumMapper<TrustLevel> {
+  TrustLevelMapper._();
+
+  static TrustLevelMapper? _instance;
+  static TrustLevelMapper ensureInitialized() {
+    if (_instance == null) {
+      MapperContainer.globals.use(_instance = TrustLevelMapper._());
+    }
+    return _instance!;
+  }
+
+  static TrustLevel fromValue(dynamic value) {
+    ensureInitialized();
+    return MapperContainer.globals.fromValue(value);
+  }
+
+  @override
+  TrustLevel decode(dynamic value) {
+    switch (value) {
+      case r'temp':
+        return TrustLevel.temp;
+      case r'limited':
+        return TrustLevel.limited;
+      case r'full':
+        return TrustLevel.full;
+      default:
+        throw MapperException.unknownEnumValue(value);
+    }
+  }
+
+  @override
+  dynamic encode(TrustLevel self) {
+    switch (self) {
+      case TrustLevel.temp:
+        return r'temp';
+      case TrustLevel.limited:
+        return r'limited';
+      case TrustLevel.full:
+        return r'full';
+    }
+  }
+}
+
+extension TrustLevelMapperExtension on TrustLevel {
+  String toValue() {
+    TrustLevelMapper.ensureInitialized();
+    return MapperContainer.globals.toValue<TrustLevel>(this) as String;
+  }
+}
+
+class QuotaModeMapper extends EnumMapper<QuotaMode> {
+  QuotaModeMapper._();
+
+  static QuotaModeMapper? _instance;
+  static QuotaModeMapper ensureInitialized() {
+    if (_instance == null) {
+      MapperContainer.globals.use(_instance = QuotaModeMapper._());
+    }
+    return _instance!;
+  }
+
+  static QuotaMode fromValue(dynamic value) {
+    ensureInitialized();
+    return MapperContainer.globals.fromValue(value);
+  }
+
+  @override
+  QuotaMode decode(dynamic value) {
+    switch (value) {
+      case r'none':
+        return QuotaMode.none;
+      case r'absolute':
+        return QuotaMode.absolute;
+      case r'percent':
+        return QuotaMode.percent;
+      default:
+        throw MapperException.unknownEnumValue(value);
+    }
+  }
+
+  @override
+  dynamic encode(QuotaMode self) {
+    switch (self) {
+      case QuotaMode.none:
+        return r'none';
+      case QuotaMode.absolute:
+        return r'absolute';
+      case QuotaMode.percent:
+        return r'percent';
+    }
+  }
+}
+
+extension QuotaModeMapperExtension on QuotaMode {
+  String toValue() {
+    QuotaModeMapper.ensureInitialized();
+    return MapperContainer.globals.toValue<QuotaMode>(this) as String;
+  }
+}
+
 class FavoriteDeviceMapper extends ClassMapperBase<FavoriteDevice> {
   FavoriteDeviceMapper._();
 
@@ -15,6 +115,8 @@ class FavoriteDeviceMapper extends ClassMapperBase<FavoriteDevice> {
   static FavoriteDeviceMapper ensureInitialized() {
     if (_instance == null) {
       MapperContainer.globals.use(_instance = FavoriteDeviceMapper._());
+      TrustLevelMapper.ensureInitialized();
+      QuotaModeMapper.ensureInitialized();
     }
     return _instance!;
   }
@@ -42,6 +144,55 @@ class FavoriteDeviceMapper extends ClassMapperBase<FavoriteDevice> {
     opt: true,
     def: false,
   );
+  static String _$ownerId(FavoriteDevice v) => v.ownerId;
+  static const Field<FavoriteDevice, String> _f$ownerId = Field(
+    'ownerId',
+    _$ownerId,
+    opt: true,
+    def: '',
+  );
+  static String _$ownerName(FavoriteDevice v) => v.ownerName;
+  static const Field<FavoriteDevice, String> _f$ownerName = Field(
+    'ownerName',
+    _$ownerName,
+    opt: true,
+    def: '',
+  );
+  static TrustLevel _$trustLevel(FavoriteDevice v) => v.trustLevel;
+  static const Field<FavoriteDevice, TrustLevel> _f$trustLevel = Field(
+    'trustLevel',
+    _$trustLevel,
+    opt: true,
+    def: TrustLevel.full,
+  );
+  static bool _$blocked(FavoriteDevice v) => v.blocked;
+  static const Field<FavoriteDevice, bool> _f$blocked = Field(
+    'blocked',
+    _$blocked,
+    opt: true,
+    def: false,
+  );
+  static int _$maxFileSize(FavoriteDevice v) => v.maxFileSize;
+  static const Field<FavoriteDevice, int> _f$maxFileSize = Field(
+    'maxFileSize',
+    _$maxFileSize,
+    opt: true,
+    def: 0,
+  );
+  static QuotaMode _$quotaMode(FavoriteDevice v) => v.quotaMode;
+  static const Field<FavoriteDevice, QuotaMode> _f$quotaMode = Field(
+    'quotaMode',
+    _$quotaMode,
+    opt: true,
+    def: QuotaMode.none,
+  );
+  static int _$quotaValue(FavoriteDevice v) => v.quotaValue;
+  static const Field<FavoriteDevice, int> _f$quotaValue = Field(
+    'quotaValue',
+    _$quotaValue,
+    opt: true,
+    def: 0,
+  );
 
   @override
   final MappableFields<FavoriteDevice> fields = const {
@@ -51,6 +202,13 @@ class FavoriteDeviceMapper extends ClassMapperBase<FavoriteDevice> {
     #port: _f$port,
     #alias: _f$alias,
     #customAlias: _f$customAlias,
+    #ownerId: _f$ownerId,
+    #ownerName: _f$ownerName,
+    #trustLevel: _f$trustLevel,
+    #blocked: _f$blocked,
+    #maxFileSize: _f$maxFileSize,
+    #quotaMode: _f$quotaMode,
+    #quotaValue: _f$quotaValue,
   };
 
   static FavoriteDevice _instantiate(DecodingData data) {
@@ -61,6 +219,13 @@ class FavoriteDeviceMapper extends ClassMapperBase<FavoriteDevice> {
       port: data.dec(_f$port),
       alias: data.dec(_f$alias),
       customAlias: data.dec(_f$customAlias),
+      ownerId: data.dec(_f$ownerId),
+      ownerName: data.dec(_f$ownerName),
+      trustLevel: data.dec(_f$trustLevel),
+      blocked: data.dec(_f$blocked),
+      maxFileSize: data.dec(_f$maxFileSize),
+      quotaMode: data.dec(_f$quotaMode),
+      quotaValue: data.dec(_f$quotaValue),
     );
   }
 
@@ -133,6 +298,13 @@ abstract class FavoriteDeviceCopyWith<$R, $In extends FavoriteDevice, $Out>
     int? port,
     String? alias,
     bool? customAlias,
+    String? ownerId,
+    String? ownerName,
+    TrustLevel? trustLevel,
+    bool? blocked,
+    int? maxFileSize,
+    QuotaMode? quotaMode,
+    int? quotaValue,
   });
   FavoriteDeviceCopyWith<$R2, $In, $Out2> $chain<$R2, $Out2>(
     Then<$Out2, $R2> t,
@@ -155,6 +327,13 @@ class _FavoriteDeviceCopyWithImpl<$R, $Out>
     int? port,
     String? alias,
     bool? customAlias,
+    String? ownerId,
+    String? ownerName,
+    TrustLevel? trustLevel,
+    bool? blocked,
+    int? maxFileSize,
+    QuotaMode? quotaMode,
+    int? quotaValue,
   }) => $apply(
     FieldCopyWithData({
       if (id != null) #id: id,
@@ -163,6 +342,13 @@ class _FavoriteDeviceCopyWithImpl<$R, $Out>
       if (port != null) #port: port,
       if (alias != null) #alias: alias,
       if (customAlias != null) #customAlias: customAlias,
+      if (ownerId != null) #ownerId: ownerId,
+      if (ownerName != null) #ownerName: ownerName,
+      if (trustLevel != null) #trustLevel: trustLevel,
+      if (blocked != null) #blocked: blocked,
+      if (maxFileSize != null) #maxFileSize: maxFileSize,
+      if (quotaMode != null) #quotaMode: quotaMode,
+      if (quotaValue != null) #quotaValue: quotaValue,
     }),
   );
   @override
@@ -173,6 +359,13 @@ class _FavoriteDeviceCopyWithImpl<$R, $Out>
     port: data.get(#port, or: $value.port),
     alias: data.get(#alias, or: $value.alias),
     customAlias: data.get(#customAlias, or: $value.customAlias),
+    ownerId: data.get(#ownerId, or: $value.ownerId),
+    ownerName: data.get(#ownerName, or: $value.ownerName),
+    trustLevel: data.get(#trustLevel, or: $value.trustLevel),
+    blocked: data.get(#blocked, or: $value.blocked),
+    maxFileSize: data.get(#maxFileSize, or: $value.maxFileSize),
+    quotaMode: data.get(#quotaMode, or: $value.quotaMode),
+    quotaValue: data.get(#quotaValue, or: $value.quotaValue),
   );
 
   @override

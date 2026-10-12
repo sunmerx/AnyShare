@@ -32,6 +32,9 @@ class AddHistoryEntryAction extends AsyncReduxAction<ReceiveHistoryService, List
   final String senderAlias;
   final DateTime timestamp;
 
+  // AnyShare modification (2026-10-12): sender identity for quota accounting.
+  final String? senderFingerprint;
+
   AddHistoryEntryAction({
     required this.entryId,
     required this.fileName,
@@ -42,6 +45,7 @@ class AddHistoryEntryAction extends AsyncReduxAction<ReceiveHistoryService, List
     required this.fileSize,
     required this.senderAlias,
     required this.timestamp,
+    this.senderFingerprint,
   });
 
   @override
@@ -61,6 +65,7 @@ class AddHistoryEntryAction extends AsyncReduxAction<ReceiveHistoryService, List
         fileSize: fileSize,
         senderAlias: senderAlias,
         timestamp: timestamp,
+        senderFingerprint: senderFingerprint,
       ),
       ...state,
     ].take(_maxHistoryEntries).toList();
