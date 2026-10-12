@@ -53,6 +53,16 @@
 - `pubspec.lock`:8 个 build 工具链传递依赖小版本再解析(archive/build_config/build_daemon 等,仅 codegen 使用;官方源解析,运行时依赖零漂移)
 - `app/pubspec.yaml`:description 重写、homepage → github.com/sunmerx/AnyShare
 
+### 信任模型引擎批次(2026-10-12,Stage 2-A)
+
+- `app/lib/model/persistence/favorite_device.dart`:新增 `TrustLevel/QuotaMode` 枚举与 trustLevel/blocked/maxFileSize/quotaMode/quotaValue/ownerId/ownerName 字段(旧条目反序列化默认 full,保持上游 quickSaveFromFavorites 行为连续)
+- `app/lib/model/persistence/receive_history_entry.dart`:新增 `senderFingerprint`(配额统计键)
+- `app/lib/util/trust_evaluator.dart`(新增):纯函数信任判定链
+- `app/lib/provider/trust_provider.dart`(新增):按指纹聚合已用量 + 磁盘容量查询(占比模式)
+- `app/lib/provider/network/server/controller/receive_controller.dart`:prepare-upload 挂判定链(超限自动拒绝);两处 quickSaveFromFavorites 收紧为仅 full;历史写入携带指纹
+- `app/lib/provider/receive_history_provider.dart`:Action 增加可选 senderFingerprint
+- `app/test/unit/util/trust_evaluator_test.dart`(新增):10 个判定链单测
+
 **明确保留(不计入修改义务,均为内部标识或互操作所必需)**
 - Dart 包名 `localsend_app`(app/pubspec.yaml 的 `name`)及全部 `package:localsend_app/*` import:内部代码标识,非用户可见;保留以最小化 rebase 成本
 - 协议常量:端口 53317、`/api/localsend/v2/*` 路径、组播组 224.0.0.167 —— LocalSend protocol v2.2 互操作所必需
