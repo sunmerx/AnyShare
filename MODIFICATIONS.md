@@ -53,6 +53,15 @@
 - `pubspec.lock`:8 个 build 工具链传递依赖小版本再解析(archive/build_config/build_daemon 等,仅 codegen 使用;官方源解析,运行时依赖零漂移)
 - `app/pubspec.yaml`:description 重写、homepage → github.com/sunmerx/AnyShare
 
+### 信任 UI 与发送历史批次(2026-10-12,Stage 2-B)
+
+- `app/lib/widget/trust_settings_section.dart`(新增):设备详情页信任区块(等级切换/拉黑/单文件上限/容量限额/用量显示与显式重置)
+- `app/lib/pages/device_details_page.dart`:挂接信任区块(仅收藏设备显示)
+- `app/lib/model/persistence/send_history_entry.dart`(新增)、`app/lib/provider/send_history_provider.dart`(新增)、`app/lib/provider/persistence_provider.dart`(新增 `ls_send_history` 键,100 条窗口):发送记录模型/状态/持久化
+- `app/lib/provider/network/send_provider.dart`:会话收尾记录发送历史(成功逐文件一条、失败/拒绝/取消汇总一条)
+- `app/lib/pages/send_history_page.dart`(新增)、`app/lib/pages/tabs/send_tab.dart`:发送历史页与发送页入口按钮
+- `app/assets/i18n/en.json`、`app/assets/i18n/zh-CN.json`:信任设置与发送历史文案
+
 ### 信任模型引擎批次(2026-10-12,Stage 2-A)
 
 - `app/lib/model/persistence/favorite_device.dart`:新增 `TrustLevel/QuotaMode` 枚举与 trustLevel/blocked/maxFileSize/quotaMode/quotaValue/ownerId/ownerName 字段(旧条目反序列化默认 full,保持上游 quickSaveFromFavorites 行为连续)
