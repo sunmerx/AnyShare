@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:localsend_app/model/cross_file.dart';
+import 'package:localsend_app/model/persistence/send_history_entry.dart';
 import 'package:localsend_app/model/send_mode.dart';
 import 'package:localsend_app/model/state/send/send_session_state.dart';
 import 'package:localsend_app/model/state/send/sending_file.dart';
@@ -13,6 +14,7 @@ import 'package:localsend_app/provider/device_info_provider.dart';
 import 'package:localsend_app/provider/file_transfer_provider.dart';
 import 'package:localsend_app/provider/http_provider.dart';
 import 'package:localsend_app/provider/selection/selected_sending_files_provider.dart';
+import 'package:localsend_app/provider/send_history_provider.dart';
 import 'package:localsend_app/provider/settings_provider.dart';
 import 'package:localsend_app/widget/dialogs/pin_dialog.dart';
 import 'package:localsend_isolates/isolate.dart';
@@ -508,6 +510,12 @@ class SendNotifier extends Notifier<Map<String, SendSessionState>> {
       return;
     }
 
+    // AnyShare modification (2026-10-12): record outgoing transfers in the
+    // send history (PRD F-INT-R5). One entry per successful file; a failed,
+    // declined or canceled session is summarized as a single failed entry.
+    // ignore: discarded_futures
+    _recordSendHistory(sessionState);
+
     // The transfer is over, the process no longer needs to be kept alive for it.
     TransferNotification.stop(sessionId);
 
@@ -535,6 +543,79 @@ class SendNotifier extends Notifier<Map<String, SendSessionState>> {
           _logger.info('Transfer finished successfully.');
         }
       }
+    }
+  }
+
+  // AnyShare modification (2026-10-12): send history recording (see _finish).
+  void _recordSendHistory(SendSessionState sessionState) {
+    if (sessionState.status == SessionStatus.sending) {
+      // The transfer is still in progress (canceled handled by callers);
+      // actual outcomes are recorded below once final.
+    }
+    final bool success;
+    switch (sessionState.status) {
+      case SessionStatus.finished:
+        success = !ref.read(fileTransferProvider).getStatuses(sessionState.sessionId).any((status) => status == FileStatus.failed);
+        break;
+      case SessionStatus.finishedWithErrors:
+      case SessionStatus.declined:
+      case SessionStatus.canceledBySender:
+      case SessionStatus.recipientBusy:
+      case SessionStatus.tooManyAttempts:
+        success = false;
+        break;
+      default:
+        return; // waiting / sending: not final
+    }
+    final files = sessionState.files.values.toList();
+    if (files.isEmpty) {
+      return;
+    }
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    if (success) {
+      for (final file in files) {
+        final statuses = ref.read(fileTransferProvider).getStatuses(sessionState.sessionId);
+        if (statuses.contains(FileStatus.skipped) || statuses.contains(FileStatus.failed)) {
+          continue;
+        }
+        unawaited(
+          ref
+              .redux(sendHistoryProvider)
+              .dispatchAsync(
+                AddSendHistoryEntryAction(
+                  SendHistoryEntry(
+                    id: '${sessionState.sessionId}-${file.file.id}',
+                    fileName: file.file.fileName,
+                    fileType: file.file.fileType,
+                    fileSize: file.file.size,
+                    receiverAlias: sessionState.target.alias,
+                    receiverFingerprint: sessionState.target.fingerprint,
+                    success: true,
+                    timestamp: timestamp,
+                  ),
+                ),
+              ),
+        );
+      }
+    } else {
+      unawaited(
+        ref
+            .redux(sendHistoryProvider)
+            .dispatchAsync(
+              AddSendHistoryEntryAction(
+                SendHistoryEntry(
+                  id: '${sessionState.sessionId}-failure',
+                  fileName: files.first.file.fileName + (files.length > 1 ? ' (+${files.length - 1})' : ''),
+                  fileType: files.first.file.fileType,
+                  fileSize: files.fold(0, (sum, f) => sum + f.file.size),
+                  receiverAlias: sessionState.target.alias,
+                  receiverFingerprint: sessionState.target.fingerprint,
+                  success: false,
+                  timestamp: timestamp,
+                ),
+              ),
+            ),
+      );
     }
   }
 

@@ -9,6 +9,7 @@ import 'package:localsend_app/model/persistence/color_mode.dart';
 import 'package:localsend_app/model/persistence/favorite_device.dart';
 import 'package:localsend_app/model/persistence/quick_save_mode.dart';
 import 'package:localsend_app/model/persistence/receive_history_entry.dart';
+import 'package:localsend_app/model/persistence/send_history_entry.dart';
 import 'package:localsend_app/model/send_mode.dart';
 import 'package:localsend_app/provider/window_dimensions_provider.dart';
 import 'package:localsend_app/util/alias_generator.dart';
@@ -55,6 +56,7 @@ const _stunServers = 'ls_stun_servers';
 // Received file history
 const _receiveHistory = 'ls_receive_history';
 const _trustUsage = 'ls_trust_usage'; // AnyShare modification
+const _sendHistory = 'ls_send_history'; // AnyShare modification
 
 // Favorites
 const _favorites = 'ls_favorites';
@@ -279,6 +281,16 @@ class PersistenceService {
 
   Future<void> setTrustUsage(Map<String, int> usage) async {
     await _prefs.setString(_trustUsage, jsonEncode(usage));
+  }
+
+  List<SendHistoryEntry> getSendHistory() {
+    final raw = _prefs.getStringList(_sendHistory) ?? [];
+    return raw.map((entry) => SendHistoryEntry.fromJson(jsonDecode(entry))).toList();
+  }
+
+  Future<void> setSendHistory(List<SendHistoryEntry> entries) async {
+    final raw = entries.map((entry) => jsonEncode(entry.toJson())).toList();
+    await _prefs.setStringList(_sendHistory, raw);
   }
 
   List<FavoriteDevice> getFavorites() {

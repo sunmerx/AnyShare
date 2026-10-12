@@ -543,8 +543,7 @@ class _Translations$donationPage$eu extends Translations$donationPage$en {
   @override
   String get title => 'Egin dohaintza';
   @override
-  String get info =>
-      'AnyShare doakoa da, kode irekikoa eta iragarkirik gabea. Aplikazioa gustuko baduzu, garapena dohaintza batekin lagun dezakezu.';
+  String get info => 'AnyShare doakoa da, kode irekikoa eta iragarkirik gabea. Aplikazioa gustuko baduzu, garapena dohaintza batekin lagun dezakezu.';
   @override
   String donate({required Object amount}) => 'Eman ${amount}';
   @override

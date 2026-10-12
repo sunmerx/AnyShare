@@ -223,6 +223,27 @@
       "empty": "No logs available.",
       "discovered": "Discovered via {protocol} ({host})",
       "updated": "Updated via {protocol} ({host})"
+    },
+    "trust": {
+      "title": "Trust",
+      "level": "Trust level",
+      "levelTemp": "Temporary (ask every time)",
+      "levelLimited": "Trusted with limits",
+      "levelFull": "Fully trusted (no limits)",
+      "blocked": "Blocked",
+      "blockedHint": "Reject all transfers from this device without asking",
+      "maxFileSize": "Max file size",
+      "maxFileSizeUnlimited": "Unlimited",
+      "quota": "Receive quota",
+      "quotaNone": "Unlimited",
+      "quotaAbsolute": "Absolute size",
+      "quotaPercent": "Disk percentage",
+      "quotaUsed": "Used: {used}",
+      "quotaLimit": "Limit: {limit}",
+      "resetUsage": "Reset usage",
+      "resetUsageConfirm": "Reset the recorded receive usage for this device?",
+      "usage": "Usage",
+      "percentHint": "Percentage of the destination disk"
     }
   },
   "verifyPage": {
@@ -575,5 +596,9 @@
     "sActionUseCameraHint": "use camera",
     "sNameDurationLabel": "duration",
     "sUnitAssetCountLabel": "count"
+  },
+  "sendHistoryPage": {
+    "title": "Sent Files",
+    "empty": "No sent files yet."
   }
 }

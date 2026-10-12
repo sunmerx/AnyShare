@@ -543,8 +543,7 @@ class _Translations$donationPage$az extends Translations$donationPage$en {
   @override
   String get title => 'İanə et';
   @override
-  String get info =>
-      'AnyShare pulsuz, açıq mənbəlidir və heç bir reklam yoxdur. Proqramı bəyənirsinizsə, ianə ilə inkişafını dəstəkləyə bilərsiniz.';
+  String get info => 'AnyShare pulsuz, açıq mənbəlidir və heç bir reklam yoxdur. Proqramı bəyənirsinizsə, ianə ilə inkişafını dəstəkləyə bilərsiniz.';
   @override
   String donate({required Object amount}) => '${amount} ianə et';
   @override

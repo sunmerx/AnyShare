@@ -221,6 +221,27 @@
       "empty": "没有可用的日志。",
       "discovered": "通过 {protocol} 发现 ({host})",
       "updated": "通过 {protocol} 更新 ({host})"
+    },
+    "trust": {
+      "title": "信任设置",
+      "level": "信任等级",
+      "levelTemp": "临时传输(每次确认)",
+      "levelLimited": "一般信任(可设限额)",
+      "levelFull": "完全信任(无限制)",
+      "blocked": "拉黑",
+      "blockedHint": "不询问直接拒绝该设备的所有传输",
+      "maxFileSize": "单文件大小上限",
+      "maxFileSizeUnlimited": "不限制",
+      "quota": "接收容量限额",
+      "quotaNone": "不限制",
+      "quotaAbsolute": "绝对容量",
+      "quotaPercent": "磁盘占比",
+      "quotaUsed": "已用:{used}",
+      "quotaLimit": "上限:{limit}",
+      "resetUsage": "重置已用量",
+      "resetUsageConfirm": "确定重置该设备已记录的接收用量?",
+      "usage": "已用量",
+      "percentHint": "占接收盘总容量的百分比"
     }
   },
   "verifyPage": {
@@ -572,5 +593,9 @@
     "sActionUseCameraHint": "使用摄像头",
     "sNameDurationLabel": "时长",
     "sUnitAssetCountLabel": "计数"
+  },
+  "sendHistoryPage": {
+    "title": "发送记录",
+    "empty": "暂无发送记录"
   }
 }

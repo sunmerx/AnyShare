@@ -5,6 +5,7 @@ import 'package:localsend_app/gen/strings.g.dart';
 import 'package:localsend_app/model/send_mode.dart';
 import 'package:localsend_app/pages/device_details_page.dart';
 import 'package:localsend_app/pages/selected_files_page.dart';
+import 'package:localsend_app/pages/send_history_page.dart';
 import 'package:localsend_app/pages/tabs/send_tab_vm.dart';
 import 'package:localsend_app/pages/troubleshoot_page.dart';
 import 'package:localsend_app/provider/animation_provider.dart';
@@ -192,6 +193,14 @@ class SendTab extends StatelessWidget {
                   child: CustomIconButton(
                     onPressed: () async => await vm.onTapFavorite(context),
                     child: const Icon(Icons.favorite),
+                  ),
+                ),
+                // AnyShare modification (2026-10-12): outgoing transfer history.
+                Tooltip(
+                  message: t.sendHistoryPage.title,
+                  child: CustomIconButton(
+                    onPressed: () async => await context.push(() => const SendHistoryPage()),
+                    child: const Icon(Icons.outbound),
                   ),
                 ),
                 _SendModeButton(

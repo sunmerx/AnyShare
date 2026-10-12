@@ -521,8 +521,8 @@ class _Translations$aboutPage$fr extends Translations$aboutPage$en {
   String get title => 'À propos de AnyShare';
   @override
   List<String> get description => [
-    'Localsend est un logiciel gratuit et open-source qui vous permet de partager de manière sécurisée des fichiers et des messages avec d\'autres appareils connectés à votre réseau local. Une connexion à internet n\'est pas requise.',
-    'Localsend est disponible sur Android, iOS, macOS, Windows et Linux. Vous pouvez accéder à ces téléchargements depuis la page officielle.',
+    'AnyShare est un logiciel gratuit et open-source qui vous permet de partager de manière sécurisée des fichiers et des messages avec d\'autres appareils connectés à votre réseau local. Une connexion à internet n\'est pas requise.',
+    'AnyShare est disponible sur Android, iOS, macOS, Windows et Linux. Vous pouvez accéder à ces téléchargements depuis la page officielle.',
   ];
   @override
   String get author => 'Auteur';

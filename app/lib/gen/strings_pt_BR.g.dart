@@ -1556,8 +1556,7 @@ class Translations$dialogs$sendModeHelp$pt_BR extends Translations$dialogs$sendM
   @override
   String get multiple => 'Envia arquivos para vários destinatários. A seleção não será apagada.';
   @override
-  String get link =>
-      'Os destinatários que não têm o AnyShare instalado podem baixar os arquivos selecionados abrindo o link fornecido no navegador.';
+  String get link => 'Os destinatários que não têm o AnyShare instalado podem baixar os arquivos selecionados abrindo o link fornecido no navegador.';
 }
 
 // Path: dialogs.zoom

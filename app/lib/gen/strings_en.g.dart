@@ -73,6 +73,7 @@ class Translations with BaseTranslations<AppLocale, Translations> {
   late final Translations$tray$en tray = Translations$tray$en.internal(_root);
   late final Translations$web$en web = Translations$web$en.internal(_root);
   late final Translations$assetPicker$en assetPicker = Translations$assetPicker$en.internal(_root);
+  late final Translations$sendHistoryPage$en sendHistoryPage = Translations$sendHistoryPage$en.internal(_root);
 }
 
 // Path: general
@@ -406,6 +407,7 @@ class Translations$deviceDetailsPage$en {
 
   late final Translations$deviceDetailsPage$info$en info = Translations$deviceDetailsPage$info$en.internal(_root);
   late final Translations$deviceDetailsPage$logs$en logs = Translations$deviceDetailsPage$logs$en.internal(_root);
+  late final Translations$deviceDetailsPage$trust$en trust = Translations$deviceDetailsPage$trust$en.internal(_root);
 }
 
 // Path: verifyPage
@@ -947,6 +949,21 @@ class Translations$assetPicker$en {
   String get sUnitAssetCountLabel => 'count';
 }
 
+// Path: sendHistoryPage
+class Translations$sendHistoryPage$en {
+  Translations$sendHistoryPage$en.internal(this._root);
+
+  final Translations _root; // ignore: unused_field
+
+  // Translations
+
+  /// en: 'Sent Files'
+  String get title => 'Sent Files';
+
+  /// en: 'No sent files yet.'
+  String get empty => 'No sent files yet.';
+}
+
 // Path: receiveTab.infoBox
 class Translations$receiveTab$infoBox$en {
   Translations$receiveTab$infoBox$en.internal(this._root);
@@ -1355,6 +1372,72 @@ class Translations$deviceDetailsPage$logs$en {
 
   /// en: 'Updated via {protocol} ({host})'
   String updated({required Object protocol, required Object host}) => 'Updated via ${protocol} (${host})';
+}
+
+// Path: deviceDetailsPage.trust
+class Translations$deviceDetailsPage$trust$en {
+  Translations$deviceDetailsPage$trust$en.internal(this._root);
+
+  final Translations _root; // ignore: unused_field
+
+  // Translations
+
+  /// en: 'Trust'
+  String get title => 'Trust';
+
+  /// en: 'Trust level'
+  String get level => 'Trust level';
+
+  /// en: 'Temporary (ask every time)'
+  String get levelTemp => 'Temporary (ask every time)';
+
+  /// en: 'Trusted with limits'
+  String get levelLimited => 'Trusted with limits';
+
+  /// en: 'Fully trusted (no limits)'
+  String get levelFull => 'Fully trusted (no limits)';
+
+  /// en: 'Blocked'
+  String get blocked => 'Blocked';
+
+  /// en: 'Reject all transfers from this device without asking'
+  String get blockedHint => 'Reject all transfers from this device without asking';
+
+  /// en: 'Max file size'
+  String get maxFileSize => 'Max file size';
+
+  /// en: 'Unlimited'
+  String get maxFileSizeUnlimited => 'Unlimited';
+
+  /// en: 'Receive quota'
+  String get quota => 'Receive quota';
+
+  /// en: 'Unlimited'
+  String get quotaNone => 'Unlimited';
+
+  /// en: 'Absolute size'
+  String get quotaAbsolute => 'Absolute size';
+
+  /// en: 'Disk percentage'
+  String get quotaPercent => 'Disk percentage';
+
+  /// en: 'Used: {used}'
+  String quotaUsed({required Object used}) => 'Used: ${used}';
+
+  /// en: 'Limit: {limit}'
+  String quotaLimit({required Object limit}) => 'Limit: ${limit}';
+
+  /// en: 'Reset usage'
+  String get resetUsage => 'Reset usage';
+
+  /// en: 'Reset the recorded receive usage for this device?'
+  String get resetUsageConfirm => 'Reset the recorded receive usage for this device?';
+
+  /// en: 'Usage'
+  String get usage => 'Usage';
+
+  /// en: 'Percentage of the destination disk'
+  String get percentHint => 'Percentage of the destination disk';
 }
 
 // Path: progressPage.total

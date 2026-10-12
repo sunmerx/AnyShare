@@ -543,8 +543,7 @@ class _Translations$donationPage$es_ES extends Translations$donationPage$en {
   @override
   String get title => 'Donar';
   @override
-  String get info =>
-      'AnyShare es libre, open source y no contiene anuncios. Si te gusta la aplicación puedes ayudar al desarrollo con una donación.';
+  String get info => 'AnyShare es libre, open source y no contiene anuncios. Si te gusta la aplicación puedes ayudar al desarrollo con una donación.';
   @override
   String donate({required Object amount}) => 'Donar ${amount}';
   @override

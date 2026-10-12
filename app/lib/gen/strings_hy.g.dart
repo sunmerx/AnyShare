@@ -545,8 +545,7 @@ class _Translations$donationPage$hy extends Translations$donationPage$en {
   @override
   String get title => 'Նվիրաբերել';
   @override
-  String get info =>
-      'AnyShare-ը անվճար է, բաց կոդով և առանց որևէ գովազդի: Եթե ​​ձեզ դուր է գալիս ծրագիրը, կարող եք աջակցել զարգացմանը նվիրաբերելով:';
+  String get info => 'AnyShare-ը անվճար է, բաց կոդով և առանց որևէ գովազդի: Եթե ​​ձեզ դուր է գալիս ծրագիրը, կարող եք աջակցել զարգացմանը նվիրաբերելով:';
   @override
   String donate({required Object amount}) => 'Նվիրաբերել ${amount}';
   @override

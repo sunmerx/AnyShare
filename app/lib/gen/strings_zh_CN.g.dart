@@ -95,6 +95,8 @@ class TranslationsZhCn extends Translations with BaseTranslations<AppLocale, Tra
   late final Translations$web$zh_CN web = Translations$web$zh_CN.internal(_root);
   @override
   late final Translations$assetPicker$zh_CN assetPicker = Translations$assetPicker$zh_CN.internal(_root);
+  @override
+  late final Translations$sendHistoryPage$zh_CN sendHistoryPage = Translations$sendHistoryPage$zh_CN.internal(_root);
 }
 
 // Path: general
@@ -363,6 +365,8 @@ class Translations$deviceDetailsPage$zh_CN extends Translations$deviceDetailsPag
   late final Translations$deviceDetailsPage$info$zh_CN info = Translations$deviceDetailsPage$info$zh_CN.internal(_root);
   @override
   late final Translations$deviceDetailsPage$logs$zh_CN logs = Translations$deviceDetailsPage$logs$zh_CN.internal(_root);
+  @override
+  late final Translations$deviceDetailsPage$trust$zh_CN trust = Translations$deviceDetailsPage$trust$zh_CN.internal(_root);
 }
 
 // Path: verifyPage
@@ -840,6 +844,19 @@ class Translations$assetPicker$zh_CN extends Translations$assetPicker$en {
   String get sUnitAssetCountLabel => '计数';
 }
 
+// Path: sendHistoryPage
+class Translations$sendHistoryPage$zh_CN extends Translations$sendHistoryPage$en {
+  Translations$sendHistoryPage$zh_CN.internal(TranslationsZhCn root) : this._root = root, super.internal(root);
+
+  final TranslationsZhCn _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get title => '发送记录';
+  @override
+  String get empty => '暂无发送记录';
+}
+
 // Path: receiveTab.infoBox
 class Translations$receiveTab$infoBox$zh_CN extends Translations$receiveTab$infoBox$en {
   Translations$receiveTab$infoBox$zh_CN.internal(TranslationsZhCn root) : this._root = root, super.internal(root);
@@ -1157,6 +1174,53 @@ class Translations$deviceDetailsPage$logs$zh_CN extends Translations$deviceDetai
   String discovered({required Object protocol, required Object host}) => '通过 ${protocol} 发现 (${host})';
   @override
   String updated({required Object protocol, required Object host}) => '通过 ${protocol} 更新 (${host})';
+}
+
+// Path: deviceDetailsPage.trust
+class Translations$deviceDetailsPage$trust$zh_CN extends Translations$deviceDetailsPage$trust$en {
+  Translations$deviceDetailsPage$trust$zh_CN.internal(TranslationsZhCn root) : this._root = root, super.internal(root);
+
+  final TranslationsZhCn _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get title => '信任设置';
+  @override
+  String get level => '信任等级';
+  @override
+  String get levelTemp => '临时传输(每次确认)';
+  @override
+  String get levelLimited => '一般信任(可设限额)';
+  @override
+  String get levelFull => '完全信任(无限制)';
+  @override
+  String get blocked => '拉黑';
+  @override
+  String get blockedHint => '不询问直接拒绝该设备的所有传输';
+  @override
+  String get maxFileSize => '单文件大小上限';
+  @override
+  String get maxFileSizeUnlimited => '不限制';
+  @override
+  String get quota => '接收容量限额';
+  @override
+  String get quotaNone => '不限制';
+  @override
+  String get quotaAbsolute => '绝对容量';
+  @override
+  String get quotaPercent => '磁盘占比';
+  @override
+  String quotaUsed({required Object used}) => '已用:${used}';
+  @override
+  String quotaLimit({required Object limit}) => '上限:${limit}';
+  @override
+  String get resetUsage => '重置已用量';
+  @override
+  String get resetUsageConfirm => '确定重置该设备已记录的接收用量?';
+  @override
+  String get usage => '已用量';
+  @override
+  String get percentHint => '占接收盘总容量的百分比';
 }
 
 // Path: progressPage.total

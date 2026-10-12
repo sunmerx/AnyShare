@@ -9,6 +9,7 @@ import 'package:localsend_app/widget/big_button.dart';
 import 'package:localsend_app/widget/dialogs/favorite_delete_dialog.dart';
 import 'package:localsend_app/widget/dialogs/favorite_edit_dialog.dart';
 import 'package:localsend_app/widget/responsive_list_view.dart';
+import 'package:localsend_app/widget/trust_settings_section.dart';
 import 'package:localsend_isolates/isolate.dart';
 import 'package:localsend_isolates/model/device.dart';
 import 'package:refena_flutter/refena_flutter.dart';
@@ -121,6 +122,11 @@ class _DeviceDetailsPageState extends State<DeviceDetailsPage> with Refena {
             ],
           ),
           const SizedBox(height: 20),
+          // AnyShare modification (2026-10-12): trust level & limits editor.
+          if (favoriteEntry != null) ...[
+            TrustSettingsSection(entry: favoriteEntry),
+            const SizedBox(height: 20),
+          ],
           Text(t.deviceDetailsPage.logs.title, style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 10),
           if (_logs.isEmpty)

@@ -1409,8 +1409,7 @@ class _Translations$dialogs$localNetworkUnauthorized$ky extends Translations$dia
   @override
   String get title => _root.dialogs.noPermission.title;
   @override
-  String get description =>
-      'AnyShare жергиликтүү тармакты сканерлөөгө уруксатсыз башка түзмөктөрдү таба албайт. Жөндөөлөрдөн бул уруксатты бериңиз.';
+  String get description => 'AnyShare жергиликтүү тармакты сканерлөөгө уруксатсыз башка түзмөктөрдү таба албайт. Жөндөөлөрдөн бул уруксатты бериңиз.';
   @override
   String get gotoSettings => 'Жөндөөлөр';
 }
