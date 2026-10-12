@@ -15,7 +15,7 @@ dependencies:
   flutter:
     sdk: flutter
   flutter_foreground_task: ^9.2.2
-  flutter_rust_bridge: ^2.12.0
+  flutter_rust_bridge: 2.12.0 # AnyShare modification: pin to match rust crate (=2.12.0) and committed codegen; upstream lock resolves 2.13.0 which fails FRB sanity check at runtime
   freezed_annotation: ^3.1.0
   gal: ^2.3.3
   logging: ^1.3.0
