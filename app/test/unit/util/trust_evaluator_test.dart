@@ -88,12 +88,14 @@ void main() {
     });
 
     test('limited: exceeding absolute quota → reject', () {
-      final decision = TrustEvaluator.evaluate(
-        entry: device(trustLevel: TrustLevel.limited, quotaMode: QuotaMode.absolute, quotaValue: 1000),
-        sessionTotalBytes: 300,
-        fileSizes: [100, 200],
-        receivedBytesFromSender: 800,
-      ) as TrustReject;
+      final decision =
+          TrustEvaluator.evaluate(
+                entry: device(trustLevel: TrustLevel.limited, quotaMode: QuotaMode.absolute, quotaValue: 1000),
+                sessionTotalBytes: 300,
+                fileSizes: [100, 200],
+                receivedBytesFromSender: 800,
+              )
+              as TrustReject;
       expect(decision.reason, TrustRejectReason.quotaExceeded);
       expect(decision.limit, 1000);
       expect(decision.used, 800);
@@ -111,13 +113,15 @@ void main() {
     });
 
     test('limited: percent quota exceeded', () {
-      final decision = TrustEvaluator.evaluate(
-        entry: device(trustLevel: TrustLevel.limited, quotaMode: QuotaMode.percent, quotaValue: 2000),
-        sessionTotalBytes: (200 << 20) * 2, // 400 MiB > 20% of 1 GiB (≈204.8 MiB)
-        fileSizes: [(200 << 20) * 2],
-        receivedBytesFromSender: 0,
-        destinationVolumeTotalBytes: 1 << 30,
-      ) as TrustReject;
+      final decision =
+          TrustEvaluator.evaluate(
+                entry: device(trustLevel: TrustLevel.limited, quotaMode: QuotaMode.percent, quotaValue: 2000),
+                sessionTotalBytes: (200 << 20) * 2, // 400 MiB > 20% of 1 GiB (≈204.8 MiB)
+                fileSizes: [(200 << 20) * 2],
+                receivedBytesFromSender: 0,
+                destinationVolumeTotalBytes: 1 << 30,
+              )
+              as TrustReject;
       expect(decision.reason, TrustRejectReason.quotaExceeded);
       expect(decision.limit, (1 << 30) * 2000 ~/ 10000);
     });

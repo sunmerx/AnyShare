@@ -54,6 +54,7 @@ const _stunServers = 'ls_stun_servers';
 
 // Received file history
 const _receiveHistory = 'ls_receive_history';
+const _trustUsage = 'ls_trust_usage'; // AnyShare modification
 
 // Favorites
 const _favorites = 'ls_favorites';
@@ -263,6 +264,21 @@ class PersistenceService {
   Future<void> setReceiveHistory(List<ReceiveHistoryEntry> entries) async {
     final historyRaw = entries.map((entry) => jsonEncode(entry.toJson())).toList();
     await _prefs.setStringList(_receiveHistory, historyRaw);
+  }
+
+  // AnyShare modification (2026-10-12): per-sender receive usage ledger,
+  // independent of the rotating 30-entry history window (PRD F-PAIR-12).
+  Map<String, int> getTrustUsage() {
+    final raw = _prefs.getString(_trustUsage);
+    if (raw == null || raw.isEmpty) {
+      return {};
+    }
+    final decoded = (jsonDecode(raw) as Map).cast<String, dynamic>();
+    return decoded.map((k, v) => MapEntry(k, (v as num).toInt()));
+  }
+
+  Future<void> setTrustUsage(Map<String, int> usage) async {
+    await _prefs.setString(_trustUsage, jsonEncode(usage));
   }
 
   List<FavoriteDevice> getFavorites() {

@@ -61,8 +61,7 @@ class TrustEvaluator {
         final int? quotaLimit = switch (device.quotaMode) {
           QuotaMode.none => null,
           QuotaMode.absolute => device.quotaValue,
-          QuotaMode.percent =>
-            destinationVolumeTotalBytes == null ? null : (destinationVolumeTotalBytes * device.quotaValue) ~/ 10000,
+          QuotaMode.percent => destinationVolumeTotalBytes == null ? null : (destinationVolumeTotalBytes * device.quotaValue) ~/ 10000,
         };
         if (quotaLimit != null && quotaLimit > 0 && receivedBytesFromSender + sessionTotalBytes > quotaLimit) {
           return TrustReject(TrustRejectReason.quotaExceeded, limit: quotaLimit, used: receivedBytesFromSender);

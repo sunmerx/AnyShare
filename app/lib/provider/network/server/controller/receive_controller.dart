@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:localsend_app/model/state/server/receive_session_state.dart';
 import 'package:localsend_app/model/state/server/receiving_file.dart';
+import 'package:localsend_app/model/persistence/favorite_device.dart';
 import 'package:localsend_app/pages/home_page.dart';
 import 'package:localsend_app/pages/home_page_controller.dart';
 import 'package:localsend_app/pages/progress_page.dart';
@@ -17,7 +18,6 @@ import 'package:localsend_app/provider/logging/discovery_logs_provider.dart';
 import 'package:localsend_app/provider/network/send_provider.dart';
 import 'package:localsend_app/provider/network/server/server_provider.dart';
 import 'package:localsend_app/provider/network/server/server_utils.dart';
-import 'package:localsend_app/model/persistence/favorite_device.dart';
 import 'package:localsend_app/provider/receive_history_provider.dart';
 import 'package:localsend_app/provider/security_provider.dart';
 import 'package:localsend_app/provider/selection/selected_receiving_files_provider.dart';
@@ -131,10 +131,9 @@ class ReceiveController {
 
     // AnyShare modification (2026-10-12): trust decision chain
     // (docs/扩展协议设计.md §3.2) — keyed by the unforgeable mTLS fingerprint.
-    final FavoriteDevice? trustEntry =
-        server.ref.read(favoritesProvider).firstWhereOrNull((e) => e.fingerprint == senderFingerprint);
+    final FavoriteDevice? trustEntry = server.ref.read(favoritesProvider).firstWhereOrNull((e) => e.fingerprint == senderFingerprint);
     final TrustDecision trustDecision = await decideTrust(
-      ref: server.ref,
+      usage: server.ref.read(trustUsageProvider),
       entry: trustEntry,
       fileSizes: files.values.map((f) => f.size),
       destinationDir: destinationDir,
@@ -152,14 +151,15 @@ class ReceiveController {
       // AnyShare modification: only fully-trusted entries keep the upstream
       // auto-accept behavior; limited entries pass the limit checks above,
       // temp entries ask every time.
-      final bool isFullTrust = server.ref
-          .read(favoritesProvider)
-          .any((e) => e.fingerprint == senderFingerprint && e.trustLevel == TrustLevel.full);
+      final bool isFullTrust = server.ref.read(favoritesProvider).any((e) => e.fingerprint == senderFingerprint && e.trustLevel == TrustLevel.full);
       if (isFullTrust) {
         quickSave = true;
       }
     }
-    if (trustAutoAccept && !quickSave) {
+    if (trustAutoAccept && !quickSave && server.getState().session?.message == null) {
+      // AnyShare modification: auto-accept for trusted devices, but never
+      // silently for sessions carrying a message (upstream intent: messages
+      // must be seen).
       quickSave = true;
     }
     if (server.getState().webUpload && settings.receiveViaLinkAutoAccept && server.getState().session?.message == null) {
@@ -394,6 +394,16 @@ class ReceiveController {
               senderAlias: receiveState.senderAlias,
               timestamp: DateTime.now().toUtc(),
               senderFingerprint: receiveState.sender.fingerprint, // AnyShare modification
+            ),
+          );
+
+      // AnyShare modification: count towards the sender's receive quota.
+      server.ref
+          .redux(trustUsageProvider)
+          .dispatch(
+            IncrementTrustUsageAction(
+              fingerprint: receiveState.sender.fingerprint,
+              bytes: receivingFile.file.size,
             ),
           );
     } else {
