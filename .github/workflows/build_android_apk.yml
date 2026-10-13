@@ -13,6 +13,11 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.get_version.outputs.version }}
+    env:
+      # AnyShare modification: job-level relay so step `if`s can test
+      # presence without touching `secrets` in conditions (unsupported).
+      ANDROID_KEY_PROPERTIES: ${{ secrets.ANDROID_KEY_PROPERTIES }}
+      ANDROID_KEY_STORE: ${{ secrets.ANDROID_KEY_STORE }}
 
     steps:
       - uses: actions/checkout@v6
@@ -43,14 +48,14 @@ jobs:
       # CI builds a debug-signed APK for verification, releases use the
       # locally-signed artifact.
       - name: Decode key.properties file
-        if: ${{ secrets.ANDROID_KEY_PROPERTIES != '' }}
+        if: ${{ env.ANDROID_KEY_PROPERTIES != '' }}
         working-directory: ${{ env.APK_BUILD_DIR }}
         env:
           ENCODED_STRING: ${{ secrets.ANDROID_KEY_PROPERTIES }}
         run: echo $ENCODED_STRING | base64 -di > app/android/key.properties
 
       - name: Decode android-keystore.jks file
-        if: ${{ secrets.ANDROID_KEY_STORE != '' }}
+        if: ${{ env.ANDROID_KEY_STORE != '' }}
         working-directory: ${{ env.APK_BUILD_DIR }}
         env:
           ENCODED_STRING: ${{ secrets.ANDROID_KEY_STORE }}
