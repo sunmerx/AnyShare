@@ -260,8 +260,26 @@ class PersistenceService {
     await _prefs.setString(_stunServers, jsonEncode(servers));
   }
 
+  /// AnyShare modification: tolerates a wrongly-typed stored value (e.g. an
+  /// external tool writing a JSON string where a List is expected) instead of
+  /// crashing the notifier init.
+  List<String> _getStringListSafe(String key) {
+    try {
+      return _prefs.getStringList(key) ?? [];
+    } on TypeError {
+      final raw = _prefs.get(key);
+      if (raw is String) {
+        final decoded = jsonDecode(raw);
+        if (decoded is List) {
+          return decoded.map((e) => e is String ? e : jsonEncode(e)).toList();
+        }
+      }
+      return [];
+    }
+  }
+
   List<ReceiveHistoryEntry> getReceiveHistory() {
-    final historyRaw = _prefs.getStringList(_receiveHistory) ?? [];
+    final historyRaw = _getStringListSafe(_receiveHistory);
     return historyRaw.map((entry) => ReceiveHistoryEntry.fromJson(jsonDecode(entry))).toList();
   }
 
@@ -286,7 +304,7 @@ class PersistenceService {
   }
 
   List<SendHistoryEntry> getSendHistory() {
-    final raw = _prefs.getStringList(_sendHistory) ?? [];
+    final raw = _getStringListSafe(_sendHistory);
     return raw.map((entry) => SendHistoryEntry.fromJson(jsonDecode(entry))).toList();
   }
 
@@ -304,7 +322,7 @@ class PersistenceService {
   Future<void> setOwnerName(String name) => _prefs.setString(_ownerName, name);
 
   List<FavoriteDevice> getFavorites() {
-    final favoritesRaw = _prefs.getStringList(_favorites) ?? [];
+    final favoritesRaw = _getStringListSafe(_favorites);
     return favoritesRaw.map((entry) => FavoriteDevice.fromJson(jsonDecode(entry))).toList();
   }
 

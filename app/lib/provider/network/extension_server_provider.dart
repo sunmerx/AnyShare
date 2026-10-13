@@ -161,18 +161,10 @@ class AcceptPendingPairingAction extends AsyncReduxAction<ExtensionServerService
     if (!pending.userGate.isCompleted) {
       pending.userGate.complete(true);
     }
-    await notifier.ref.redux(favoritesProvider).dispatchAsync(
-          AddFavoriteAction(
-            // Pairing must NOT default to full trust: temp asks the user on
-            // every transfer until they raise the level deliberately.
-            FavoriteDevice.fromValues(
-              fingerprint: pending.peerFingerprint,
-              ip: pending.ip,
-              port: pending.peerPort,
-              alias: pending.peerAlias,
-            ).copyWith(trustLevel: TrustLevel.temp),
-          ),
-        );
+    // Persistence happens ONLY in the confirm handler: it is the single
+    // place that also knows the initiator's ownerId/ownerName (required by
+    // the same-owner rule) — accepting here as well would create a
+    // duplicate favorite without the owner link.
     return ExtensionServerState(server: state.server, port: state.port);
   }
 }
