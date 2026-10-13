@@ -53,6 +53,14 @@
 - `pubspec.lock`:8 个 build 工具链传递依赖小版本再解析(archive/build_config/build_daemon 等,仅 codegen 使用;官方源解析,运行时依赖零漂移)
 - `app/pubspec.yaml`:description 重写、homepage → github.com/sunmerx/AnyShare
 
+### 品牌图标全量替换批次(2026-10-13,Stage 3)
+
+- 新商标:双向交换弧(两段同圆弧带、末端斜切成尖,180° 旋转对称),彻底替换 LocalSend 形状的换色版(商标合规)
+- `tools/gen_icons.py`(新增):PIL 生成器(4x 超采样;<=64px 自动加粗变体),一键重生成全部资产
+- 再生成资产:`app/assets/img/*`(logo-512/256/128/32、白色/黑色变体、logo.ico)、`app/web/icons/*`(Icon-192/512、maskable)、`app/android/.../mipmap-*`(launcher/round/adaptive foreground/monochrome/quicktile 全密度)、`drawable/banner.png`(TV)、`app/windows/runner/resources/app_icon.ico`
+- `app/android/.../drawable/ic_launcher_foreground.xml`:遗留 LocalSend 矢量替换为 layer-list(指向新 mipmap)
+- `support/scripts/compile_windows_exe-inno.iss`:AppId 更换为新 GUID(EC7921F5-…,与 LocalSend 安装器隔离)
+
 ### 配对真机回归修复批次(2026-10-13,Stage 2 回归)
 
 - `app/lib/config/init.dart`:preInit 主动启动扩展服务器(Provider 懒初始化无人触发;init() 内嵌套 dispatch 会无限递归)
