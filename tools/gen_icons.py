@@ -15,21 +15,29 @@ BLACK = (0, 0, 0, 255)
 S = 4  # supersample factor
 
 
-def _arc_arrow(draw, cx, cy, r_in, r_out, a1, a2, color, tip_deg=20):
-    """One arc band drawn as a sampled polygon. The end is cut diagonally:
-    the outer edge runs `tip_deg` ahead of the inner edge, so the arrow tip
-    lies ON the outer arc itself — band and tip share one circle."""
-    steps = 48
-    pts = []
-    for i in range(steps + 1):  # outer edge, a1 -> a2
-        ang = a1 + (a2 - a1) * i / steps
-        rad = math.radians(ang)
-        pts.append((cx + r_out * math.cos(rad), cy + r_out * math.sin(rad)))
-    for i in range(steps + 1):  # inner edge, (a2 - tip_deg) -> a1
-        ang = (a2 - tip_deg) - ((a2 - tip_deg) - a1) * i / steps
-        rad = math.radians(ang)
-        pts.append((cx + r_in * math.cos(rad), cy + r_in * math.sin(rad)))
-    draw.polygon(pts, fill=color)
+def _arc_arrow(draw, cx, cy, r_in, r_out, a1, a2, color, head_deg=26, pad_frac=0.35):
+    """Arc band + straight-edged arrowhead. The head's TIP lies ON the
+    band's centerline circle (at angle a2 + head_deg) — tip and band share
+    one arc — while the base sits perpendicular to the flow, slightly wider
+    than the band so the arrow reads clearly."""
+    draw.arc(
+        [cx - r_out, cy - r_out, cx + r_out, cy + r_out],
+        start=a1, end=a2, fill=color, width=int(round(r_out - r_in)),
+    )
+    mid = (r_in + r_out) / 2
+    rad = math.radians(a2)
+    tx, ty = -math.sin(rad), math.cos(rad)  # flow direction (clockwise)
+    px, py = math.cos(rad), math.sin(rad)   # radial
+    bx = cx + mid * math.cos(rad)
+    by = cy + mid * math.sin(rad)
+    hw = (r_out - r_in) / 2 * (1 + pad_frac)
+    tip = pt(cx, cy, mid, a2 + head_deg)
+    draw.polygon([(bx + px * hw, by + py * hw), (bx - px * hw, by - py * hw), tip], fill=color)
+
+
+def pt(cx, cy, radius, ang):
+    rad = math.radians(ang)
+    return (cx + radius * math.cos(rad), cy + radius * math.sin(rad))
 
 
 def draw_glyph(draw, color, size, thick=False):
@@ -38,10 +46,10 @@ def draw_glyph(draw, color, size, thick=False):
     c = size / 2
     r_out = size * (0.44 if thick else 0.39)
     band = size * (0.21 if thick else 0.155)
-    tip = 26 if thick else 20
+    head = 30 if thick else 26
     r_in = r_out - band
-    _arc_arrow(draw, c, c, r_in, r_out, 100, 192, color, tip_deg=tip)
-    _arc_arrow(draw, c, c, r_in, r_out, 280, 372, color, tip_deg=tip)
+    _arc_arrow(draw, c, c, r_in, r_out, 100, 168, color, head_deg=head)
+    _arc_arrow(draw, c, c, r_in, r_out, 280, 348, color, head_deg=head)
 
 
 def glyph(color, size_px):
