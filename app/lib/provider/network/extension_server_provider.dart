@@ -297,7 +297,9 @@ extension ExtensionServerHandler on ExtensionServerService {
       });
       // Persist the peer with temp trust and the initiator's owner identity
       // (required by the same-owner rule, PRD F-PAIR-09).
-      await ref.redux(favoritesProvider).dispatchAsync(
+      await ref
+          .redux(favoritesProvider)
+          .dispatchAsync(
             AddFavoriteAction(
               FavoriteDevice.fromValues(
                 fingerprint: pending.peerFingerprint,

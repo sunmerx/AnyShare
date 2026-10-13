@@ -10,7 +10,12 @@ import 'package:refena_flutter/refena_flutter.dart';
 ///
 /// [onPaired] is called with the finished favorite entry so the details page
 /// can refresh.
-Future<void> showInitiatorPairingDialog(BuildContext context, {required String host, required int extPort, required void Function(FavoriteDevice) onPaired}) async {
+Future<void> showInitiatorPairingDialog(
+  BuildContext context, {
+  required String host,
+  required int extPort,
+  required void Function(FavoriteDevice) onPaired,
+}) async {
   await showDialog(
     context: context,
     builder: (_) => _InitiatorPairingDialog(host: host, extPort: extPort, onPaired: onPaired),
@@ -99,23 +104,28 @@ class _InitiatorPairingDialogState extends State<_InitiatorPairingDialog> with R
     return AlertDialog(
       title: Text(tp.start),
       content: switch (_phase) {
-        _Phase.probing => Row(mainAxisSize: MainAxisSize.min, children: [const CircularProgressIndicator(), const SizedBox(width: 15), Text(tp.probing)]),
+        _Phase.probing => Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [const CircularProgressIndicator(), const SizedBox(width: 15), Text(tp.probing)],
+        ),
         _Phase.code => Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(tp.codeTitle),
-              const SizedBox(height: 12),
-              Center(
-                child: Text(
-                  _code ?? '',
-                  style: Theme.of(context).textTheme.displayMedium?.copyWith(fontFamily: 'monospace', letterSpacing: 8),
-                ),
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(tp.codeTitle),
+            const SizedBox(height: 12),
+            Center(
+              child: Text(
+                _code ?? '',
+                style: Theme.of(context).textTheme.displayMedium?.copyWith(fontFamily: 'monospace', letterSpacing: 8),
               ),
-              const SizedBox(height: 12),
-              Center(child: Text(tp.waitingPeer, style: const TextStyle(color: Colors.grey, fontSize: 12))),
-            ],
-          ),
+            ),
+            const SizedBox(height: 12),
+            Center(
+              child: Text(tp.waitingPeer, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+            ),
+          ],
+        ),
         _Phase.done => Text(tp.done(name: _session?.peerAlias ?? '')),
         _Phase.failed => Text(_error ?? '', style: TextStyle(color: Theme.of(context).colorScheme.error)),
       },

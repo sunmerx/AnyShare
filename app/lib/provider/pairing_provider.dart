@@ -66,10 +66,10 @@ class PairingResult {
 /// the key exchange; see sas.dart docs).
 extension PairingClient on Ref {
   Uri _extUri(String host, int port, String path) {
-  // IPv6 (incl. link-local with %scope) must be bracketed; '%' escapes to %25.
-  final String hostPart = host.contains(':') ? '[${host.replaceAll('%', '%25')}]' : host;
-  return Uri.parse('http://$hostPart:$port/api/anyshare/v1/$path');
-}
+    // IPv6 (incl. link-local with %scope) must be bracketed; '%' escapes to %25.
+    final String hostPart = host.contains(':') ? '[${host.replaceAll('%', '%25')}]' : host;
+    return Uri.parse('http://$hostPart:$port/api/anyshare/v1/$path');
+  }
 
   Future<dynamic> _post(String host, int port, String path, Map<String, dynamic> body, {Duration? timeout}) async {
     final Duration wait = timeout ?? _timeout;
@@ -121,13 +121,15 @@ extension PairingClient on Ref {
     final keyPair = await SasCrypto.generateKeyPair();
     final localPub = await keyPair.extractPublicKey();
     final server = read(serverProvider);
-    final response = await _post(host, extPort, 'pair/register', {
-      'alias': server?.alias ?? '',
-      'fingerprint': read(securityProvider).certificateHash,
-      'eph': base64Encode(localPub.bytes),
-      'port': server?.port ?? 53317,
-      'https': server?.https ?? true,
-    }) as Map;
+    final response =
+        await _post(host, extPort, 'pair/register', {
+              'alias': server?.alias ?? '',
+              'fingerprint': read(securityProvider).certificateHash,
+              'eph': base64Encode(localPub.bytes),
+              'port': server?.port ?? 53317,
+              'https': server?.https ?? true,
+            })
+            as Map;
     if (response['session'] is! String || response['eph'] is! String || response['code'] is! String) {
       throw const PairingException(PairingError.protocol);
     }
@@ -150,12 +152,14 @@ extension PairingClient on Ref {
     final server = read(serverProvider);
     // The server long-polls until the responder accepts the SAS comparison
     // (60s) — allow for it.
-    final response = await _post(host, extPort, 'pair/confirm', {
-      'session': session.sessionId,
-      'ownerId': owner.id,
-      'ownerName': owner.name,
-      'alias': server?.alias ?? '',
-    }, timeout: const Duration(seconds: 75)) as Map;
+    final response =
+        await _post(host, extPort, 'pair/confirm', {
+              'session': session.sessionId,
+              'ownerId': owner.id,
+              'ownerName': owner.name,
+              'alias': server?.alias ?? '',
+            }, timeout: const Duration(seconds: 75))
+            as Map;
     if (response['ok'] != true || response['ownerId'] is! String) {
       throw const PairingException(PairingError.rejected);
     }
