@@ -53,6 +53,15 @@
 - `pubspec.lock`:8 个 build 工具链传递依赖小版本再解析(archive/build_config/build_daemon 等,仅 codegen 使用;官方源解析,运行时依赖零漂移)
 - `app/pubspec.yaml`:description 重写、homepage → github.com/sunmerx/AnyShare
 
+### 配对真机回归修复批次(2026-10-13,Stage 2 回归)
+
+- `app/lib/config/init.dart`:preInit 主动启动扩展服务器(Provider 懒初始化无人触发;init() 内嵌套 dispatch 会无限递归)
+- `app/lib/provider/network/extension_server_provider.dart`:响应方默认信任 full→temp;发起方 transcript 指纹改用 register 响应值;服务器 dual-stack(anyIPv6, v6Only off);confirm 需本地用户开门(60s),单边接受不完成配对;响应方落库收敛到 confirm 单点(含发起方 ownerId);IPv4-mapped 地址清洗
+- `app/lib/provider/pairing_provider.dart`:IPv6 host 加方括号+%25 转义;confirm 长轮询 75s
+- `app/lib/widget/dialogs/pairing_dialog.dart`:发起方自动等待(仅响应方确认,产品裁决 2026-10-12)
+- `app/lib/provider/persistence_provider.dart`:getStringList 容错(外部工具写坏类型不再崩)
+- `app/lib/pages/device_details_page.dart`:配对入口 IPv4 通道优先
+
 ### SAS 配对与扩展服务器批次(2026-10-12,Stage 2-C)
 
 - `app/pubspec.yaml`:新增依赖 `cryptography 2.7.0`(X25519+HKDF,纯 Dart)与 dev `convert`(测试 hex 解码)
