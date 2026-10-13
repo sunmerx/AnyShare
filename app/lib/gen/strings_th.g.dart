@@ -95,6 +95,10 @@ class TranslationsTh extends Translations with BaseTranslations<AppLocale, Trans
   late final _Translations$web$th web = _Translations$web$th._(_root);
   @override
   late final _Translations$assetPicker$th assetPicker = _Translations$assetPicker$th._(_root);
+  @override
+  late final _Translations$pairingIncoming$th pairingIncoming = _Translations$pairingIncoming$th._(_root);
+  @override
+  late final _Translations$sendHistoryPage$th sendHistoryPage = _Translations$sendHistoryPage$th._(_root);
 }
 
 // Path: general
@@ -364,6 +368,10 @@ class _Translations$deviceDetailsPage$th extends Translations$deviceDetailsPage$
   late final _Translations$deviceDetailsPage$info$th info = _Translations$deviceDetailsPage$info$th._(_root);
   @override
   late final _Translations$deviceDetailsPage$logs$th logs = _Translations$deviceDetailsPage$logs$th._(_root);
+  @override
+  late final _Translations$deviceDetailsPage$trust$th trust = _Translations$deviceDetailsPage$trust$th._(_root);
+  @override
+  late final _Translations$deviceDetailsPage$pairing$th pairing = _Translations$deviceDetailsPage$pairing$th._(_root);
 }
 
 // Path: verifyPage
@@ -842,6 +850,36 @@ class _Translations$assetPicker$th extends Translations$assetPicker$en {
   String get sUnitAssetCountLabel => 'จำนวน';
 }
 
+// Path: pairingIncoming
+class _Translations$pairingIncoming$th extends Translations$pairingIncoming$en {
+  _Translations$pairingIncoming$th._(TranslationsTh root) : this._root = root, super.internal(root);
+
+  final TranslationsTh _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get title => 'คำขอจับคู่';
+  @override
+  String body({required Object name}) => '${name} ต้องการจับคู่ ตรวจสอบว่าทั้งสองหน้าจอแสดงรหัสเดียวกัน:';
+  @override
+  String get match => 'รหัสตรงกัน';
+  @override
+  String get mismatch => 'รหัสไม่ตรงกัน';
+}
+
+// Path: sendHistoryPage
+class _Translations$sendHistoryPage$th extends Translations$sendHistoryPage$en {
+  _Translations$sendHistoryPage$th._(TranslationsTh root) : this._root = root, super.internal(root);
+
+  final TranslationsTh _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get title => 'ไฟล์ที่ส่ง';
+  @override
+  String get empty => 'ยังไม่มีไฟล์ที่ส่ง';
+}
+
 // Path: receiveTab.infoBox
 class _Translations$receiveTab$infoBox$th extends Translations$receiveTab$infoBox$en {
   _Translations$receiveTab$infoBox$th._(TranslationsTh root) : this._root = root, super.internal(root);
@@ -1161,6 +1199,88 @@ class _Translations$deviceDetailsPage$logs$th extends Translations$deviceDetails
   String discovered({required Object protocol, required Object host}) => 'ค้นพบผ่าน ${protocol} (${host})';
   @override
   String updated({required Object protocol, required Object host}) => 'อัปเดตผ่าน ${protocol} (${host})';
+}
+
+// Path: deviceDetailsPage.trust
+class _Translations$deviceDetailsPage$trust$th extends Translations$deviceDetailsPage$trust$en {
+  _Translations$deviceDetailsPage$trust$th._(TranslationsTh root) : this._root = root, super.internal(root);
+
+  final TranslationsTh _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get title => 'ความน่าเชื่อถือ';
+  @override
+  String get level => 'ระดับความน่าเชื่อถือ';
+  @override
+  String get levelTemp => 'ชั่วคราว (ถามทุกครั้ง)';
+  @override
+  String get levelLimited => 'เชื่อถือแบบจำกัด';
+  @override
+  String get levelFull => 'เชื่อถือเต็มที่ (ไม่จำกัด)';
+  @override
+  String get blocked => 'บล็อก';
+  @override
+  String get blockedHint => 'ปฏิเสธการส่งทั้งหมดจากอุปกรณ์นี้โดยไม่ถาม';
+  @override
+  String get maxFileSize => 'ขนาดไฟล์สูงสุด';
+  @override
+  String get maxFileSizeUnlimited => 'ไม่จำกัด';
+  @override
+  String get quota => 'โควตารับ';
+  @override
+  String get quotaNone => 'ไม่จำกัด';
+  @override
+  String get quotaAbsolute => 'ขนาดแบบสัมบูรณ์';
+  @override
+  String get quotaPercent => 'เปอร์เซ็นต์ดิสก์';
+  @override
+  String quotaUsed({required Object used}) => 'ใช้แล้ว: ${used}';
+  @override
+  String quotaLimit({required Object limit}) => 'ขีดจำกัด: ${limit}';
+  @override
+  String get resetUsage => 'รีเซ็ตการใช้งาน';
+  @override
+  String get resetUsageConfirm => 'รีเซ็ตปริมาณรับที่บันทึกไว้ของอุปกรณ์นี้?';
+  @override
+  String get usage => 'ปริมาณใช้งาน';
+  @override
+  String get percentHint => 'เปอร์เซ็นต์ของดิสก์ปลายทาง';
+}
+
+// Path: deviceDetailsPage.pairing
+class _Translations$deviceDetailsPage$pairing$th extends Translations$deviceDetailsPage$pairing$en {
+  _Translations$deviceDetailsPage$pairing$th._(TranslationsTh root) : this._root = root, super.internal(root);
+
+  final TranslationsTh _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get start => 'จับคู่ (AnyShare)';
+  @override
+  String get notSupported => 'อุปกรณ์ตอบสนองแบบ AnyShare ไม่ได้ คุณยังเพิ่มเป็นรายการโปรดเพื่อรับอัตโนมัติได้';
+  @override
+  String get probing => 'กำลังติดต่ออุปกรณ์…';
+  @override
+  String get codeTitle => 'ตรวจสอบว่าทั้งสองหน้าจอแสดงรหัสเดียวกัน';
+  @override
+  String get waitingPeer => 'กำลังรออุปกรณ์อีกฝั่ง…';
+  @override
+  String get match => 'รหัสตรงกัน';
+  @override
+  String get mismatch => 'รหัสไม่ตรงกัน';
+  @override
+  String done({required Object name}) => 'จับคู่กับ ${name} แล้ว ระดับความน่าเชื่อถือ: ชั่วคราว (เปลี่ยนได้ด้านล่าง)';
+  @override
+  String get errorNotAnyShare => 'อุปกรณ์ปลายทางไม่ใช่แอป AnyShare';
+  @override
+  String get errorUnreachable => 'ติดต่ออุปกรณ์ไม่ได้';
+  @override
+  String get errorBusy => 'อุปกรณ์กำลังจับคู่รายการอื่น';
+  @override
+  String get errorRejected => 'คำขอจับคู่ถูกปฏิเสธ';
+  @override
+  String get errorProtocol => 'การตอบสนองการจับคู่ผิดปกติ';
 }
 
 // Path: progressPage.total

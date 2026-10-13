@@ -93,6 +93,10 @@ class TranslationsId extends Translations with BaseTranslations<AppLocale, Trans
   late final _Translations$web$id web = _Translations$web$id._(_root);
   @override
   late final _Translations$assetPicker$id assetPicker = _Translations$assetPicker$id._(_root);
+  @override
+  late final _Translations$pairingIncoming$id pairingIncoming = _Translations$pairingIncoming$id._(_root);
+  @override
+  late final _Translations$sendHistoryPage$id sendHistoryPage = _Translations$sendHistoryPage$id._(_root);
 }
 
 // Path: general
@@ -362,6 +366,10 @@ class _Translations$deviceDetailsPage$id extends Translations$deviceDetailsPage$
   late final _Translations$deviceDetailsPage$info$id info = _Translations$deviceDetailsPage$info$id._(_root);
   @override
   late final _Translations$deviceDetailsPage$logs$id logs = _Translations$deviceDetailsPage$logs$id._(_root);
+  @override
+  late final _Translations$deviceDetailsPage$trust$id trust = _Translations$deviceDetailsPage$trust$id._(_root);
+  @override
+  late final _Translations$deviceDetailsPage$pairing$id pairing = _Translations$deviceDetailsPage$pairing$id._(_root);
 }
 
 // Path: verifyPage
@@ -756,6 +764,36 @@ class _Translations$assetPicker$id extends Translations$assetPicker$en {
   String get sUnitAssetCountLabel => 'Jumlah';
 }
 
+// Path: pairingIncoming
+class _Translations$pairingIncoming$id extends Translations$pairingIncoming$en {
+  _Translations$pairingIncoming$id._(TranslationsId root) : this._root = root, super.internal(root);
+
+  final TranslationsId _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get title => 'Permintaan pemasangan';
+  @override
+  String body({required Object name}) => '${name} ingin dipasangkan. Pastikan kedua layar menampilkan kode yang sama:';
+  @override
+  String get match => 'Kode cocok';
+  @override
+  String get mismatch => 'Kode tidak cocok';
+}
+
+// Path: sendHistoryPage
+class _Translations$sendHistoryPage$id extends Translations$sendHistoryPage$en {
+  _Translations$sendHistoryPage$id._(TranslationsId root) : this._root = root, super.internal(root);
+
+  final TranslationsId _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get title => 'File terkirim';
+  @override
+  String get empty => 'Belum ada file terkirim';
+}
+
 // Path: receiveTab.infoBox
 class _Translations$receiveTab$infoBox$id extends Translations$receiveTab$infoBox$en {
   _Translations$receiveTab$infoBox$id._(TranslationsId root) : this._root = root, super.internal(root);
@@ -1075,6 +1113,88 @@ class _Translations$deviceDetailsPage$logs$id extends Translations$deviceDetails
   String discovered({required Object protocol, required Object host}) => 'Ditemukan melalui ${protocol} (${host})';
   @override
   String updated({required Object protocol, required Object host}) => 'Diperbarui melalui ${protocol} (${host})';
+}
+
+// Path: deviceDetailsPage.trust
+class _Translations$deviceDetailsPage$trust$id extends Translations$deviceDetailsPage$trust$en {
+  _Translations$deviceDetailsPage$trust$id._(TranslationsId root) : this._root = root, super.internal(root);
+
+  final TranslationsId _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get title => 'Kepercayaan';
+  @override
+  String get level => 'Tingkat kepercayaan';
+  @override
+  String get levelTemp => 'Sementara (tanya setiap kali)';
+  @override
+  String get levelLimited => 'Dipercaya dengan batas';
+  @override
+  String get levelFull => 'Sepenuhnya dipercaya (tanpa batas)';
+  @override
+  String get blocked => 'Diblokir';
+  @override
+  String get blockedHint => 'Tolak semua transfer dari perangkat ini tanpa bertanya';
+  @override
+  String get maxFileSize => 'Ukuran file maks.';
+  @override
+  String get maxFileSizeUnlimited => 'Tanpa batas';
+  @override
+  String get quota => 'Kuota penerimaan';
+  @override
+  String get quotaNone => 'Tanpa batas';
+  @override
+  String get quotaAbsolute => 'Ukuran absolut';
+  @override
+  String get quotaPercent => 'Persentase disk';
+  @override
+  String quotaUsed({required Object used}) => 'Terpakai: ${used}';
+  @override
+  String quotaLimit({required Object limit}) => 'Batas: ${limit}';
+  @override
+  String get resetUsage => 'Reset pemakaian';
+  @override
+  String get resetUsageConfirm => 'Reset catatan penerimaan untuk perangkat ini?';
+  @override
+  String get usage => 'Pemakaian';
+  @override
+  String get percentHint => 'Persentase disk tujuan';
+}
+
+// Path: deviceDetailsPage.pairing
+class _Translations$deviceDetailsPage$pairing$id extends Translations$deviceDetailsPage$pairing$en {
+  _Translations$deviceDetailsPage$pairing$id._(TranslationsId root) : this._root = root, super.internal(root);
+
+  final TranslationsId _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get start => 'Pasangkan (AnyShare)';
+  @override
+  String get notSupported => 'Perangkat tidak merespons sebagai AnyShare. Anda tetap dapat memfavoritkannya untuk penerimaan otomatis.';
+  @override
+  String get probing => 'Menghubungi perangkat…';
+  @override
+  String get codeTitle => 'Pastikan kedua layar menampilkan kode yang sama';
+  @override
+  String get waitingPeer => 'Menunggu perangkat lain…';
+  @override
+  String get match => 'Kode cocok';
+  @override
+  String get mismatch => 'Kode tidak cocok';
+  @override
+  String done({required Object name}) => 'Terpasang dengan ${name}. Tingkat kepercayaan: sementara (ubah di bawah).';
+  @override
+  String get errorNotAnyShare => 'Perangkat bukan aplikasi AnyShare.';
+  @override
+  String get errorUnreachable => 'Tidak dapat menghubungi perangkat.';
+  @override
+  String get errorBusy => 'Perangkat sedang sibuk dengan pemasangan lain.';
+  @override
+  String get errorRejected => 'Pemasangan ditolak.';
+  @override
+  String get errorProtocol => 'Respons pemasangan tak terduga.';
 }
 
 // Path: progressPage.total

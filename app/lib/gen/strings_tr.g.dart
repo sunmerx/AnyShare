@@ -93,6 +93,10 @@ class TranslationsTr extends Translations with BaseTranslations<AppLocale, Trans
   late final _Translations$web$tr web = _Translations$web$tr._(_root);
   @override
   late final _Translations$assetPicker$tr assetPicker = _Translations$assetPicker$tr._(_root);
+  @override
+  late final _Translations$pairingIncoming$tr pairingIncoming = _Translations$pairingIncoming$tr._(_root);
+  @override
+  late final _Translations$sendHistoryPage$tr sendHistoryPage = _Translations$sendHistoryPage$tr._(_root);
 }
 
 // Path: general
@@ -362,6 +366,10 @@ class _Translations$deviceDetailsPage$tr extends Translations$deviceDetailsPage$
   late final _Translations$deviceDetailsPage$info$tr info = _Translations$deviceDetailsPage$info$tr._(_root);
   @override
   late final _Translations$deviceDetailsPage$logs$tr logs = _Translations$deviceDetailsPage$logs$tr._(_root);
+  @override
+  late final _Translations$deviceDetailsPage$trust$tr trust = _Translations$deviceDetailsPage$trust$tr._(_root);
+  @override
+  late final _Translations$deviceDetailsPage$pairing$tr pairing = _Translations$deviceDetailsPage$pairing$tr._(_root);
 }
 
 // Path: verifyPage
@@ -756,6 +764,36 @@ class _Translations$assetPicker$tr extends Translations$assetPicker$en {
   String get sUnitAssetCountLabel => 'sayım';
 }
 
+// Path: pairingIncoming
+class _Translations$pairingIncoming$tr extends Translations$pairingIncoming$en {
+  _Translations$pairingIncoming$tr._(TranslationsTr root) : this._root = root, super.internal(root);
+
+  final TranslationsTr _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get title => 'Eşleştirme isteği';
+  @override
+  String body({required Object name}) => '${name} eşleştirme istiyor. Her iki ekranda da aynı kodun göründüğünü doğrulayın:';
+  @override
+  String get match => 'Kodlar eşleşiyor';
+  @override
+  String get mismatch => 'Kodlar farklı';
+}
+
+// Path: sendHistoryPage
+class _Translations$sendHistoryPage$tr extends Translations$sendHistoryPage$en {
+  _Translations$sendHistoryPage$tr._(TranslationsTr root) : this._root = root, super.internal(root);
+
+  final TranslationsTr _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get title => 'Gönderilen dosyalar';
+  @override
+  String get empty => 'Henüz gönderilen dosya yok';
+}
+
 // Path: receiveTab.infoBox
 class _Translations$receiveTab$infoBox$tr extends Translations$receiveTab$infoBox$en {
   _Translations$receiveTab$infoBox$tr._(TranslationsTr root) : this._root = root, super.internal(root);
@@ -1075,6 +1113,88 @@ class _Translations$deviceDetailsPage$logs$tr extends Translations$deviceDetails
   String discovered({required Object protocol, required Object host}) => '${protocol} üzerinden keşfedildi (${host})';
   @override
   String updated({required Object protocol, required Object host}) => '${protocol} üzerinden güncellendi (${host})';
+}
+
+// Path: deviceDetailsPage.trust
+class _Translations$deviceDetailsPage$trust$tr extends Translations$deviceDetailsPage$trust$en {
+  _Translations$deviceDetailsPage$trust$tr._(TranslationsTr root) : this._root = root, super.internal(root);
+
+  final TranslationsTr _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get title => 'Güven';
+  @override
+  String get level => 'Güven düzeyi';
+  @override
+  String get levelTemp => 'Geçici (her seferinde sor)';
+  @override
+  String get levelLimited => 'Sınırlı güven';
+  @override
+  String get levelFull => 'Tam güven (sınırsız)';
+  @override
+  String get blocked => 'Engellenmiş';
+  @override
+  String get blockedHint => 'Bu cihazdan gelen tüm aktarımları sormadan reddet';
+  @override
+  String get maxFileSize => 'En büyük dosya boyutu';
+  @override
+  String get maxFileSizeUnlimited => 'Sınırsız';
+  @override
+  String get quota => 'Alma kotası';
+  @override
+  String get quotaNone => 'Sınırsız';
+  @override
+  String get quotaAbsolute => 'Mutlak boyut';
+  @override
+  String get quotaPercent => 'Disk yüzdesi';
+  @override
+  String quotaUsed({required Object used}) => 'Kullanılan: ${used}';
+  @override
+  String quotaLimit({required Object limit}) => 'Sınır: ${limit}';
+  @override
+  String get resetUsage => 'Kullanımı sıfırla';
+  @override
+  String get resetUsageConfirm => 'Bu cihaz için kayıtlı alma kullanımı sıfırlansın mı?';
+  @override
+  String get usage => 'Kullanım';
+  @override
+  String get percentHint => 'Hedef diskin yüzdesi';
+}
+
+// Path: deviceDetailsPage.pairing
+class _Translations$deviceDetailsPage$pairing$tr extends Translations$deviceDetailsPage$pairing$en {
+  _Translations$deviceDetailsPage$pairing$tr._(TranslationsTr root) : this._root = root, super.internal(root);
+
+  final TranslationsTr _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get start => 'Eşleştir (AnyShare)';
+  @override
+  String get notSupported => 'Bu cihaz AnyShare olarak yanıt vermiyor. Yine de otomatik kabul için favorilere ekleyebilirsiniz.';
+  @override
+  String get probing => 'Cihaza bağlanılıyor…';
+  @override
+  String get codeTitle => 'Her iki ekranda da aynı kodun göründüğünü doğrulayın';
+  @override
+  String get waitingPeer => 'Diğer cihaz bekleniyor…';
+  @override
+  String get match => 'Kodlar eşleşiyor';
+  @override
+  String get mismatch => 'Kodlar farklı';
+  @override
+  String done({required Object name}) => '${name} ile eşleştirildi. Güven düzeyi: geçici (aşağıdan değiştirin).';
+  @override
+  String get errorNotAnyShare => 'Karşı cihaz bir AnyShare uygulaması değil.';
+  @override
+  String get errorUnreachable => 'Cihaza ulaşılamadı.';
+  @override
+  String get errorBusy => 'Cihaz başka bir eşleştirmeyle meşgul.';
+  @override
+  String get errorRejected => 'Eşleştirme reddedildi.';
+  @override
+  String get errorProtocol => 'Beklenmeyen eşleştirme yanıtı.';
 }
 
 // Path: progressPage.total

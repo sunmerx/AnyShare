@@ -221,6 +221,42 @@
       "empty": "Geen logboeken beschikbaar.",
       "discovered": "Ontdekt via {protocol} ({host})",
       "updated": "Bijgewerkt via {protocol} ({host})"
+    },
+    "trust": {
+      "title": "Vertrouwen",
+      "level": "Vertrouwensniveau",
+      "levelTemp": "Tijdelijk (elke keer vragen)",
+      "levelLimited": "Beperkt vertrouwen",
+      "levelFull": "Volledig vertrouwen (zonder limiet)",
+      "blocked": "Geblokkeerd",
+      "blockedHint": "Alle overdrachten van dit apparaat weigeren zonder te vragen",
+      "maxFileSize": "Max. bestandsgrootte",
+      "maxFileSizeUnlimited": "Onbeperkt",
+      "quota": "Ontvangquotum",
+      "quotaNone": "Onbeperkt",
+      "quotaAbsolute": "Absolute grootte",
+      "quotaPercent": "Schijfpercentage",
+      "quotaUsed": "Gebruikt: {used}",
+      "quotaLimit": "Limiet: {limit}",
+      "resetUsage": "Gebruik resetten",
+      "resetUsageConfirm": "De geregistreerde ontvangst van dit apparaat resetten?",
+      "usage": "Gebruik",
+      "percentHint": "Percentage van de doelschijf"
+    },
+    "pairing": {
+      "start": "Koppelen (AnyShare)",
+      "notSupported": "Dit apparaat reageert niet als AnyShare. Je kunt het alsnog als favoriet toevoegen voor automatische acceptatie.",
+      "probing": "Apparaat wordt gecontacteerd…",
+      "codeTitle": "Controleer dat beide schermen dezelfde code tonen",
+      "waitingPeer": "Wachten op het andere apparaat…",
+      "match": "Codes komen overeen",
+      "mismatch": "Codes verschillen",
+      "done": "Gekoppeld met {name}. Vertrouwensniveau: tijdelijk (onderaan te wijzigen).",
+      "errorNotAnyShare": "Het apparaat is geen AnyShare-app.",
+      "errorUnreachable": "Apparaat niet bereikbaar.",
+      "errorBusy": "Het apparaat is bezig met een andere koppeling.",
+      "errorRejected": "Koppeling geweigerd.",
+      "errorProtocol": "Onverwacht koppelingsantwoord."
     }
   },
   "verifyPage": {
@@ -503,5 +539,15 @@
     "sActionUseCameraHint": "camera gebruiken",
     "sNameDurationLabel": "duur",
     "sUnitAssetCountLabel": "aantal"
+  },
+  "pairingIncoming": {
+    "title": "Koppelingsverzoek",
+    "body": "{name} wil koppelen. Controleer dat beide schermen dezelfde code tonen:",
+    "match": "Codes komen overeen",
+    "mismatch": "Codes verschillen"
+  },
+  "sendHistoryPage": {
+    "title": "Verzonden bestanden",
+    "empty": "Nog geen verzonden bestanden"
   }
 }

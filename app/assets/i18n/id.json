@@ -221,6 +221,42 @@
       "empty": "Tidak ada log yang tersedia.",
       "discovered": "Ditemukan melalui {protocol} ({host})",
       "updated": "Diperbarui melalui {protocol} ({host})"
+    },
+    "trust": {
+      "title": "Kepercayaan",
+      "level": "Tingkat kepercayaan",
+      "levelTemp": "Sementara (tanya setiap kali)",
+      "levelLimited": "Dipercaya dengan batas",
+      "levelFull": "Sepenuhnya dipercaya (tanpa batas)",
+      "blocked": "Diblokir",
+      "blockedHint": "Tolak semua transfer dari perangkat ini tanpa bertanya",
+      "maxFileSize": "Ukuran file maks.",
+      "maxFileSizeUnlimited": "Tanpa batas",
+      "quota": "Kuota penerimaan",
+      "quotaNone": "Tanpa batas",
+      "quotaAbsolute": "Ukuran absolut",
+      "quotaPercent": "Persentase disk",
+      "quotaUsed": "Terpakai: {used}",
+      "quotaLimit": "Batas: {limit}",
+      "resetUsage": "Reset pemakaian",
+      "resetUsageConfirm": "Reset catatan penerimaan untuk perangkat ini?",
+      "usage": "Pemakaian",
+      "percentHint": "Persentase disk tujuan"
+    },
+    "pairing": {
+      "start": "Pasangkan (AnyShare)",
+      "notSupported": "Perangkat tidak merespons sebagai AnyShare. Anda tetap dapat memfavoritkannya untuk penerimaan otomatis.",
+      "probing": "Menghubungi perangkat…",
+      "codeTitle": "Pastikan kedua layar menampilkan kode yang sama",
+      "waitingPeer": "Menunggu perangkat lain…",
+      "match": "Kode cocok",
+      "mismatch": "Kode tidak cocok",
+      "done": "Terpasang dengan {name}. Tingkat kepercayaan: sementara (ubah di bawah).",
+      "errorNotAnyShare": "Perangkat bukan aplikasi AnyShare.",
+      "errorUnreachable": "Tidak dapat menghubungi perangkat.",
+      "errorBusy": "Perangkat sedang sibuk dengan pemasangan lain.",
+      "errorRejected": "Pemasangan ditolak.",
+      "errorProtocol": "Respons pemasangan tak terduga."
     }
   },
   "verifyPage": {
@@ -503,5 +539,15 @@
     "sActionUseCameraHint": "Gunakan kamera",
     "sNameDurationLabel": "Durasi",
     "sUnitAssetCountLabel": "Jumlah"
+  },
+  "pairingIncoming": {
+    "title": "Permintaan pemasangan",
+    "body": "{name} ingin dipasangkan. Pastikan kedua layar menampilkan kode yang sama:",
+    "match": "Kode cocok",
+    "mismatch": "Kode tidak cocok"
+  },
+  "sendHistoryPage": {
+    "title": "File terkirim",
+    "empty": "Belum ada file terkirim"
   }
 }

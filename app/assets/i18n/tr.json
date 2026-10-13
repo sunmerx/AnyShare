@@ -221,6 +221,42 @@
       "empty": "Kullanılabilir günlük yok.",
       "discovered": "{protocol} üzerinden keşfedildi ({host})",
       "updated": "{protocol} üzerinden güncellendi ({host})"
+    },
+    "trust": {
+      "title": "Güven",
+      "level": "Güven düzeyi",
+      "levelTemp": "Geçici (her seferinde sor)",
+      "levelLimited": "Sınırlı güven",
+      "levelFull": "Tam güven (sınırsız)",
+      "blocked": "Engellenmiş",
+      "blockedHint": "Bu cihazdan gelen tüm aktarımları sormadan reddet",
+      "maxFileSize": "En büyük dosya boyutu",
+      "maxFileSizeUnlimited": "Sınırsız",
+      "quota": "Alma kotası",
+      "quotaNone": "Sınırsız",
+      "quotaAbsolute": "Mutlak boyut",
+      "quotaPercent": "Disk yüzdesi",
+      "quotaUsed": "Kullanılan: {used}",
+      "quotaLimit": "Sınır: {limit}",
+      "resetUsage": "Kullanımı sıfırla",
+      "resetUsageConfirm": "Bu cihaz için kayıtlı alma kullanımı sıfırlansın mı?",
+      "usage": "Kullanım",
+      "percentHint": "Hedef diskin yüzdesi"
+    },
+    "pairing": {
+      "start": "Eşleştir (AnyShare)",
+      "notSupported": "Bu cihaz AnyShare olarak yanıt vermiyor. Yine de otomatik kabul için favorilere ekleyebilirsiniz.",
+      "probing": "Cihaza bağlanılıyor…",
+      "codeTitle": "Her iki ekranda da aynı kodun göründüğünü doğrulayın",
+      "waitingPeer": "Diğer cihaz bekleniyor…",
+      "match": "Kodlar eşleşiyor",
+      "mismatch": "Kodlar farklı",
+      "done": "{name} ile eşleştirildi. Güven düzeyi: geçici (aşağıdan değiştirin).",
+      "errorNotAnyShare": "Karşı cihaz bir AnyShare uygulaması değil.",
+      "errorUnreachable": "Cihaza ulaşılamadı.",
+      "errorBusy": "Cihaz başka bir eşleştirmeyle meşgul.",
+      "errorRejected": "Eşleştirme reddedildi.",
+      "errorProtocol": "Beklenmeyen eşleştirme yanıtı."
     }
   },
   "verifyPage": {
@@ -503,5 +539,15 @@
     "sActionUseCameraHint": "Kamera kullan",
     "sNameDurationLabel": "süre",
     "sUnitAssetCountLabel": "sayım"
+  },
+  "pairingIncoming": {
+    "title": "Eşleştirme isteği",
+    "body": "{name} eşleştirme istiyor. Her iki ekranda da aynı kodun göründüğünü doğrulayın:",
+    "match": "Kodlar eşleşiyor",
+    "mismatch": "Kodlar farklı"
+  },
+  "sendHistoryPage": {
+    "title": "Gönderilen dosyalar",
+    "empty": "Henüz gönderilen dosya yok"
   }
 }

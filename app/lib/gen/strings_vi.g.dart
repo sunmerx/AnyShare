@@ -93,6 +93,10 @@ class TranslationsVi extends Translations with BaseTranslations<AppLocale, Trans
   late final _Translations$web$vi web = _Translations$web$vi._(_root);
   @override
   late final _Translations$assetPicker$vi assetPicker = _Translations$assetPicker$vi._(_root);
+  @override
+  late final _Translations$pairingIncoming$vi pairingIncoming = _Translations$pairingIncoming$vi._(_root);
+  @override
+  late final _Translations$sendHistoryPage$vi sendHistoryPage = _Translations$sendHistoryPage$vi._(_root);
 }
 
 // Path: general
@@ -362,6 +366,10 @@ class _Translations$deviceDetailsPage$vi extends Translations$deviceDetailsPage$
   late final _Translations$deviceDetailsPage$info$vi info = _Translations$deviceDetailsPage$info$vi._(_root);
   @override
   late final _Translations$deviceDetailsPage$logs$vi logs = _Translations$deviceDetailsPage$logs$vi._(_root);
+  @override
+  late final _Translations$deviceDetailsPage$trust$vi trust = _Translations$deviceDetailsPage$trust$vi._(_root);
+  @override
+  late final _Translations$deviceDetailsPage$pairing$vi pairing = _Translations$deviceDetailsPage$pairing$vi._(_root);
 }
 
 // Path: verifyPage
@@ -756,6 +764,36 @@ class _Translations$assetPicker$vi extends Translations$assetPicker$en {
   String get sUnitAssetCountLabel => 'đếm';
 }
 
+// Path: pairingIncoming
+class _Translations$pairingIncoming$vi extends Translations$pairingIncoming$en {
+  _Translations$pairingIncoming$vi._(TranslationsVi root) : this._root = root, super.internal(root);
+
+  final TranslationsVi _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get title => 'Yêu cầu ghép cặp';
+  @override
+  String body({required Object name}) => '${name} muốn ghép cặp. Kiểm tra cả hai màn hình hiển thị cùng một mã:';
+  @override
+  String get match => 'Mã khớp';
+  @override
+  String get mismatch => 'Mã không khớp';
+}
+
+// Path: sendHistoryPage
+class _Translations$sendHistoryPage$vi extends Translations$sendHistoryPage$en {
+  _Translations$sendHistoryPage$vi._(TranslationsVi root) : this._root = root, super.internal(root);
+
+  final TranslationsVi _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get title => 'Tệp đã gửi';
+  @override
+  String get empty => 'Chưa có tệp nào được gửi';
+}
+
 // Path: receiveTab.infoBox
 class _Translations$receiveTab$infoBox$vi extends Translations$receiveTab$infoBox$en {
   _Translations$receiveTab$infoBox$vi._(TranslationsVi root) : this._root = root, super.internal(root);
@@ -1075,6 +1113,88 @@ class _Translations$deviceDetailsPage$logs$vi extends Translations$deviceDetails
   String discovered({required Object protocol, required Object host}) => 'Được phát hiện qua ${protocol} (${host})';
   @override
   String updated({required Object protocol, required Object host}) => 'Được cập nhật qua ${protocol} (${host})';
+}
+
+// Path: deviceDetailsPage.trust
+class _Translations$deviceDetailsPage$trust$vi extends Translations$deviceDetailsPage$trust$en {
+  _Translations$deviceDetailsPage$trust$vi._(TranslationsVi root) : this._root = root, super.internal(root);
+
+  final TranslationsVi _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get title => 'Tin cậy';
+  @override
+  String get level => 'Mức tin cậy';
+  @override
+  String get levelTemp => 'Tạm thời (hỏi mỗi lần)';
+  @override
+  String get levelLimited => 'Tin cậy có giới hạn';
+  @override
+  String get levelFull => 'Tin cậy hoàn toàn (không giới hạn)';
+  @override
+  String get blocked => 'Chặn';
+  @override
+  String get blockedHint => 'Từ chối mọi tệp từ thiết bị này mà không hỏi';
+  @override
+  String get maxFileSize => 'Kích thước tệp tối đa';
+  @override
+  String get maxFileSizeUnlimited => 'Không giới hạn';
+  @override
+  String get quota => 'Hạn mức nhận';
+  @override
+  String get quotaNone => 'Không giới hạn';
+  @override
+  String get quotaAbsolute => 'Dung lượng tuyệt đối';
+  @override
+  String get quotaPercent => 'Phần trăm ổ đĩa';
+  @override
+  String quotaUsed({required Object used}) => 'Đã dùng: ${used}';
+  @override
+  String quotaLimit({required Object limit}) => 'Giới hạn: ${limit}';
+  @override
+  String get resetUsage => 'Đặt lại mức dùng';
+  @override
+  String get resetUsageConfirm => 'Đặt lại mức nhận đã ghi cho thiết bị này?';
+  @override
+  String get usage => 'Mức dùng';
+  @override
+  String get percentHint => 'Phần trăm ổ đích';
+}
+
+// Path: deviceDetailsPage.pairing
+class _Translations$deviceDetailsPage$pairing$vi extends Translations$deviceDetailsPage$pairing$en {
+  _Translations$deviceDetailsPage$pairing$vi._(TranslationsVi root) : this._root = root, super.internal(root);
+
+  final TranslationsVi _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get start => 'Ghép cặp (AnyShare)';
+  @override
+  String get notSupported => 'Thiết bị không phản hồi như AnyShare. Bạn vẫn có thể thêm vào yêu thích để tự động nhận.';
+  @override
+  String get probing => 'Đang kết nối thiết bị…';
+  @override
+  String get codeTitle => 'Kiểm tra cả hai màn hình hiển thị cùng một mã';
+  @override
+  String get waitingPeer => 'Đang chờ thiết bị kia…';
+  @override
+  String get match => 'Mã khớp';
+  @override
+  String get mismatch => 'Mã không khớp';
+  @override
+  String done({required Object name}) => 'Đã ghép cặp với ${name}. Mức tin cậy: tạm thời (thay đổi bên dưới).';
+  @override
+  String get errorNotAnyShare => 'Thiết bị đối diện không phải ứng dụng AnyShare.';
+  @override
+  String get errorUnreachable => 'Không thể kết nối tới thiết bị.';
+  @override
+  String get errorBusy => 'Thiết bị đang bận ghép cặp khác.';
+  @override
+  String get errorRejected => 'Yêu cầu ghép cặp bị từ chối.';
+  @override
+  String get errorProtocol => 'Phản hồi ghép cặp bất thường.';
 }
 
 // Path: progressPage.total

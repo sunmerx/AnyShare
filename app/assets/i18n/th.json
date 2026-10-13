@@ -221,6 +221,42 @@
       "empty": "ไม่มีบันทึก",
       "discovered": "ค้นพบผ่าน {protocol} ({host})",
       "updated": "อัปเดตผ่าน {protocol} ({host})"
+    },
+    "trust": {
+      "title": "ความน่าเชื่อถือ",
+      "level": "ระดับความน่าเชื่อถือ",
+      "levelTemp": "ชั่วคราว (ถามทุกครั้ง)",
+      "levelLimited": "เชื่อถือแบบจำกัด",
+      "levelFull": "เชื่อถือเต็มที่ (ไม่จำกัด)",
+      "blocked": "บล็อก",
+      "blockedHint": "ปฏิเสธการส่งทั้งหมดจากอุปกรณ์นี้โดยไม่ถาม",
+      "maxFileSize": "ขนาดไฟล์สูงสุด",
+      "maxFileSizeUnlimited": "ไม่จำกัด",
+      "quota": "โควตารับ",
+      "quotaNone": "ไม่จำกัด",
+      "quotaAbsolute": "ขนาดแบบสัมบูรณ์",
+      "quotaPercent": "เปอร์เซ็นต์ดิสก์",
+      "quotaUsed": "ใช้แล้ว: {used}",
+      "quotaLimit": "ขีดจำกัด: {limit}",
+      "resetUsage": "รีเซ็ตการใช้งาน",
+      "resetUsageConfirm": "รีเซ็ตปริมาณรับที่บันทึกไว้ของอุปกรณ์นี้?",
+      "usage": "ปริมาณใช้งาน",
+      "percentHint": "เปอร์เซ็นต์ของดิสก์ปลายทาง"
+    },
+    "pairing": {
+      "start": "จับคู่ (AnyShare)",
+      "notSupported": "อุปกรณ์ตอบสนองแบบ AnyShare ไม่ได้ คุณยังเพิ่มเป็นรายการโปรดเพื่อรับอัตโนมัติได้",
+      "probing": "กำลังติดต่ออุปกรณ์…",
+      "codeTitle": "ตรวจสอบว่าทั้งสองหน้าจอแสดงรหัสเดียวกัน",
+      "waitingPeer": "กำลังรออุปกรณ์อีกฝั่ง…",
+      "match": "รหัสตรงกัน",
+      "mismatch": "รหัสไม่ตรงกัน",
+      "done": "จับคู่กับ {name} แล้ว ระดับความน่าเชื่อถือ: ชั่วคราว (เปลี่ยนได้ด้านล่าง)",
+      "errorNotAnyShare": "อุปกรณ์ปลายทางไม่ใช่แอป AnyShare",
+      "errorUnreachable": "ติดต่ออุปกรณ์ไม่ได้",
+      "errorBusy": "อุปกรณ์กำลังจับคู่รายการอื่น",
+      "errorRejected": "คำขอจับคู่ถูกปฏิเสธ",
+      "errorProtocol": "การตอบสนองการจับคู่ผิดปกติ"
     }
   },
   "verifyPage": {
@@ -573,5 +609,15 @@
     "sActionUseCameraHint": "ใช้กล้อง",
     "sNameDurationLabel": "ความยาว",
     "sUnitAssetCountLabel": "จำนวน"
+  },
+  "pairingIncoming": {
+    "title": "คำขอจับคู่",
+    "body": "{name} ต้องการจับคู่ ตรวจสอบว่าทั้งสองหน้าจอแสดงรหัสเดียวกัน:",
+    "match": "รหัสตรงกัน",
+    "mismatch": "รหัสไม่ตรงกัน"
+  },
+  "sendHistoryPage": {
+    "title": "ไฟล์ที่ส่ง",
+    "empty": "ยังไม่มีไฟล์ที่ส่ง"
   }
 }

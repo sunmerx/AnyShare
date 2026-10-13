@@ -50,10 +50,10 @@ android {
         versionName flutterVersionName
     }
 
+    def keystoreProperties = new Properties()
+    def keystorePropertiesFile = rootProject.file('key.properties')
     signingConfigs {
         release {
-            def keystoreProperties = new Properties()
-            def keystorePropertiesFile = rootProject.file('key.properties')
             if (keystorePropertiesFile.exists()) {
                 keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
             }
@@ -67,7 +67,12 @@ android {
 
     buildTypes {
         release {
-            signingConfig signingConfigs.release
+            // AnyShare modification: fall back to the debug signature when no
+            // key.properties exists (CI verification builds; release
+            // artifacts are signed locally).
+            signingConfig keystorePropertiesFile?.exists()
+                ? signingConfigs.release
+                : signingConfigs.debug
         }
         debug {
             applicationIdSuffix ".debug"

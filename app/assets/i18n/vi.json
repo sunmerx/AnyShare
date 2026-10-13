@@ -221,6 +221,42 @@
       "empty": "Không có nhật ký nào.",
       "discovered": "Được phát hiện qua {protocol} ({host})",
       "updated": "Được cập nhật qua {protocol} ({host})"
+    },
+    "trust": {
+      "title": "Tin cậy",
+      "level": "Mức tin cậy",
+      "levelTemp": "Tạm thời (hỏi mỗi lần)",
+      "levelLimited": "Tin cậy có giới hạn",
+      "levelFull": "Tin cậy hoàn toàn (không giới hạn)",
+      "blocked": "Chặn",
+      "blockedHint": "Từ chối mọi tệp từ thiết bị này mà không hỏi",
+      "maxFileSize": "Kích thước tệp tối đa",
+      "maxFileSizeUnlimited": "Không giới hạn",
+      "quota": "Hạn mức nhận",
+      "quotaNone": "Không giới hạn",
+      "quotaAbsolute": "Dung lượng tuyệt đối",
+      "quotaPercent": "Phần trăm ổ đĩa",
+      "quotaUsed": "Đã dùng: {used}",
+      "quotaLimit": "Giới hạn: {limit}",
+      "resetUsage": "Đặt lại mức dùng",
+      "resetUsageConfirm": "Đặt lại mức nhận đã ghi cho thiết bị này?",
+      "usage": "Mức dùng",
+      "percentHint": "Phần trăm ổ đích"
+    },
+    "pairing": {
+      "start": "Ghép cặp (AnyShare)",
+      "notSupported": "Thiết bị không phản hồi như AnyShare. Bạn vẫn có thể thêm vào yêu thích để tự động nhận.",
+      "probing": "Đang kết nối thiết bị…",
+      "codeTitle": "Kiểm tra cả hai màn hình hiển thị cùng một mã",
+      "waitingPeer": "Đang chờ thiết bị kia…",
+      "match": "Mã khớp",
+      "mismatch": "Mã không khớp",
+      "done": "Đã ghép cặp với {name}. Mức tin cậy: tạm thời (thay đổi bên dưới).",
+      "errorNotAnyShare": "Thiết bị đối diện không phải ứng dụng AnyShare.",
+      "errorUnreachable": "Không thể kết nối tới thiết bị.",
+      "errorBusy": "Thiết bị đang bận ghép cặp khác.",
+      "errorRejected": "Yêu cầu ghép cặp bị từ chối.",
+      "errorProtocol": "Phản hồi ghép cặp bất thường."
     }
   },
   "verifyPage": {
@@ -503,5 +539,15 @@
     "sActionUseCameraHint": "dùng camera",
     "sNameDurationLabel": "thời lượng",
     "sUnitAssetCountLabel": "đếm"
+  },
+  "pairingIncoming": {
+    "title": "Yêu cầu ghép cặp",
+    "body": "{name} muốn ghép cặp. Kiểm tra cả hai màn hình hiển thị cùng một mã:",
+    "match": "Mã khớp",
+    "mismatch": "Mã không khớp"
+  },
+  "sendHistoryPage": {
+    "title": "Tệp đã gửi",
+    "empty": "Chưa có tệp nào được gửi"
   }
 }

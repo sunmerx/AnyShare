@@ -221,6 +221,42 @@
       "empty": "Brak dostępnych dzienników.",
       "discovered": "Wykryto przez {protocol} ({host})",
       "updated": "Zaktualizowano przez {protocol} ({host})"
+    },
+    "trust": {
+      "title": "Zaufanie",
+      "level": "Poziom zaufania",
+      "levelTemp": "Tymczasowe (pytaj za każdym razem)",
+      "levelLimited": "Zaufanie z limitami",
+      "levelFull": "Pełne zaufanie (bez limitów)",
+      "blocked": "Zablokowany",
+      "blockedHint": "Odrzucaj wszystkie transfery z tego urządzenia bez pytania",
+      "maxFileSize": "Maks. rozmiar pliku",
+      "maxFileSizeUnlimited": "Bez limitu",
+      "quota": "Limit odbioru",
+      "quotaNone": "Bez limitu",
+      "quotaAbsolute": "Rozmiar bezwzględny",
+      "quotaPercent": "Procent dysku",
+      "quotaUsed": "Wykorzystano: {used}",
+      "quotaLimit": "Limit: {limit}",
+      "resetUsage": "Zeruj licznik",
+      "resetUsageConfirm": "Zerować zapisany licznik odbioru dla tego urządzenia?",
+      "usage": "Wykorzystanie",
+      "percentHint": "Procent dysku docelowego"
+    },
+    "pairing": {
+      "start": "Paruj (AnyShare)",
+      "notSupported": "Urządzenie nie odpowiada jako AnyShare. Nadal możesz dodać je do ulubionych dla automatycznego przyjmowania.",
+      "probing": "Łączenie z urządzeniem…",
+      "codeTitle": "Sprawdź, czy oba ekrany pokazują ten sam kod",
+      "waitingPeer": "Oczekiwanie na drugie urządzenie…",
+      "match": "Kody są zgodne",
+      "mismatch": "Kody różnią się",
+      "done": "Sparowano z {name}. Poziom zaufania: tymczasowy (zmień poniżej).",
+      "errorNotAnyShare": "To urządzenie nie jest aplikacją AnyShare.",
+      "errorUnreachable": "Nie można połączyć się z urządzeniem.",
+      "errorBusy": "Urządzenie jest zajęte innym parowaniem.",
+      "errorRejected": "Parowanie odrzucone.",
+      "errorProtocol": "Nieoczekiwana odpowiedź parowania."
     }
   },
   "verifyPage": {
@@ -503,5 +539,15 @@
     "sActionUseCameraHint": "użyj kamery",
     "sNameDurationLabel": "czas trwania",
     "sUnitAssetCountLabel": "liczba"
+  },
+  "pairingIncoming": {
+    "title": "Prośba o parowanie",
+    "body": "{name} prosi o parowanie. Sprawdź, czy oba ekrany pokazują ten sam kod:",
+    "match": "Kody są zgodne",
+    "mismatch": "Kody różnią się"
+  },
+  "sendHistoryPage": {
+    "title": "Wysłane pliki",
+    "empty": "Brak wysłanych plików"
   }
 }

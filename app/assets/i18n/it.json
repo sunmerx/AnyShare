@@ -221,6 +221,42 @@
       "empty": "Nessun log disponibile.",
       "discovered": "Rilevato tramite {protocol} ({host})",
       "updated": "Aggiornato tramite {protocol} ({host})"
+    },
+    "trust": {
+      "title": "Fiducia",
+      "level": "Livello di fiducia",
+      "levelTemp": "Temporaneo (chiedi sempre)",
+      "levelLimited": "Fiducia con limiti",
+      "levelFull": "Piena fiducia (senza limiti)",
+      "blocked": "Bloccato",
+      "blockedHint": "Rifiuta tutti i trasferimenti da questo dispositivo senza chiedere",
+      "maxFileSize": "Dimensione max. file",
+      "maxFileSizeUnlimited": "Illimitata",
+      "quota": "Quota di ricezione",
+      "quotaNone": "Illimitata",
+      "quotaAbsolute": "Dimensione assoluta",
+      "quotaPercent": "Percentuale del disco",
+      "quotaUsed": "Usato: {used}",
+      "quotaLimit": "Limite: {limit}",
+      "resetUsage": "Azzera utilizzo",
+      "resetUsageConfirm": "Azzerare l'utilizzo di ricezione registrato per questo dispositivo?",
+      "usage": "Utilizzo",
+      "percentHint": "Percentuale del disco di destinazione"
+    },
+    "pairing": {
+      "start": "Associa (AnyShare)",
+      "notSupported": "Il dispositivo non risponde come AnyShare. Puoi comunque aggiungerlo ai preferiti per l'accettazione automatica.",
+      "probing": "Contatto del dispositivo…",
+      "codeTitle": "Verifica che entrambi gli schermi mostrino lo stesso codice",
+      "waitingPeer": "In attesa dell'altro dispositivo…",
+      "match": "I codici coincidono",
+      "mismatch": "I codici differiscono",
+      "done": "Associato a {name}. Livello di fiducia: temporaneo (modificabile sotto).",
+      "errorNotAnyShare": "Il dispositivo non è un'app AnyShare.",
+      "errorUnreachable": "Impossibile raggiungere il dispositivo.",
+      "errorBusy": "Il dispositivo è occupato con un'altra associazione.",
+      "errorRejected": "Associazione rifiutata.",
+      "errorProtocol": "Risposta di associazione inattesa."
     }
   },
   "verifyPage": {
@@ -503,5 +539,15 @@
     "sActionUseCameraHint": "usa fotocamera",
     "sNameDurationLabel": "durata",
     "sUnitAssetCountLabel": "conteggio"
+  },
+  "pairingIncoming": {
+    "title": "Richiesta di associazione",
+    "body": "{name} chiede di associarsi. Verifica che entrambi gli schermi mostrino lo stesso codice:",
+    "match": "I codici coincidono",
+    "mismatch": "I codici differiscono"
+  },
+  "sendHistoryPage": {
+    "title": "File inviati",
+    "empty": "Nessun file inviato"
   }
 }

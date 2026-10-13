@@ -93,6 +93,10 @@ class TranslationsIt extends Translations with BaseTranslations<AppLocale, Trans
   late final _Translations$web$it web = _Translations$web$it._(_root);
   @override
   late final _Translations$assetPicker$it assetPicker = _Translations$assetPicker$it._(_root);
+  @override
+  late final _Translations$pairingIncoming$it pairingIncoming = _Translations$pairingIncoming$it._(_root);
+  @override
+  late final _Translations$sendHistoryPage$it sendHistoryPage = _Translations$sendHistoryPage$it._(_root);
 }
 
 // Path: general
@@ -362,6 +366,10 @@ class _Translations$deviceDetailsPage$it extends Translations$deviceDetailsPage$
   late final _Translations$deviceDetailsPage$info$it info = _Translations$deviceDetailsPage$info$it._(_root);
   @override
   late final _Translations$deviceDetailsPage$logs$it logs = _Translations$deviceDetailsPage$logs$it._(_root);
+  @override
+  late final _Translations$deviceDetailsPage$trust$it trust = _Translations$deviceDetailsPage$trust$it._(_root);
+  @override
+  late final _Translations$deviceDetailsPage$pairing$it pairing = _Translations$deviceDetailsPage$pairing$it._(_root);
 }
 
 // Path: verifyPage
@@ -756,6 +764,36 @@ class _Translations$assetPicker$it extends Translations$assetPicker$en {
   String get sUnitAssetCountLabel => 'conteggio';
 }
 
+// Path: pairingIncoming
+class _Translations$pairingIncoming$it extends Translations$pairingIncoming$en {
+  _Translations$pairingIncoming$it._(TranslationsIt root) : this._root = root, super.internal(root);
+
+  final TranslationsIt _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get title => 'Richiesta di associazione';
+  @override
+  String body({required Object name}) => '${name} chiede di associarsi. Verifica che entrambi gli schermi mostrino lo stesso codice:';
+  @override
+  String get match => 'I codici coincidono';
+  @override
+  String get mismatch => 'I codici differiscono';
+}
+
+// Path: sendHistoryPage
+class _Translations$sendHistoryPage$it extends Translations$sendHistoryPage$en {
+  _Translations$sendHistoryPage$it._(TranslationsIt root) : this._root = root, super.internal(root);
+
+  final TranslationsIt _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get title => 'File inviati';
+  @override
+  String get empty => 'Nessun file inviato';
+}
+
 // Path: receiveTab.infoBox
 class _Translations$receiveTab$infoBox$it extends Translations$receiveTab$infoBox$en {
   _Translations$receiveTab$infoBox$it._(TranslationsIt root) : this._root = root, super.internal(root);
@@ -1075,6 +1113,88 @@ class _Translations$deviceDetailsPage$logs$it extends Translations$deviceDetails
   String discovered({required Object protocol, required Object host}) => 'Rilevato tramite ${protocol} (${host})';
   @override
   String updated({required Object protocol, required Object host}) => 'Aggiornato tramite ${protocol} (${host})';
+}
+
+// Path: deviceDetailsPage.trust
+class _Translations$deviceDetailsPage$trust$it extends Translations$deviceDetailsPage$trust$en {
+  _Translations$deviceDetailsPage$trust$it._(TranslationsIt root) : this._root = root, super.internal(root);
+
+  final TranslationsIt _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get title => 'Fiducia';
+  @override
+  String get level => 'Livello di fiducia';
+  @override
+  String get levelTemp => 'Temporaneo (chiedi sempre)';
+  @override
+  String get levelLimited => 'Fiducia con limiti';
+  @override
+  String get levelFull => 'Piena fiducia (senza limiti)';
+  @override
+  String get blocked => 'Bloccato';
+  @override
+  String get blockedHint => 'Rifiuta tutti i trasferimenti da questo dispositivo senza chiedere';
+  @override
+  String get maxFileSize => 'Dimensione max. file';
+  @override
+  String get maxFileSizeUnlimited => 'Illimitata';
+  @override
+  String get quota => 'Quota di ricezione';
+  @override
+  String get quotaNone => 'Illimitata';
+  @override
+  String get quotaAbsolute => 'Dimensione assoluta';
+  @override
+  String get quotaPercent => 'Percentuale del disco';
+  @override
+  String quotaUsed({required Object used}) => 'Usato: ${used}';
+  @override
+  String quotaLimit({required Object limit}) => 'Limite: ${limit}';
+  @override
+  String get resetUsage => 'Azzera utilizzo';
+  @override
+  String get resetUsageConfirm => 'Azzerare l\'utilizzo di ricezione registrato per questo dispositivo?';
+  @override
+  String get usage => 'Utilizzo';
+  @override
+  String get percentHint => 'Percentuale del disco di destinazione';
+}
+
+// Path: deviceDetailsPage.pairing
+class _Translations$deviceDetailsPage$pairing$it extends Translations$deviceDetailsPage$pairing$en {
+  _Translations$deviceDetailsPage$pairing$it._(TranslationsIt root) : this._root = root, super.internal(root);
+
+  final TranslationsIt _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get start => 'Associa (AnyShare)';
+  @override
+  String get notSupported => 'Il dispositivo non risponde come AnyShare. Puoi comunque aggiungerlo ai preferiti per l\'accettazione automatica.';
+  @override
+  String get probing => 'Contatto del dispositivo…';
+  @override
+  String get codeTitle => 'Verifica che entrambi gli schermi mostrino lo stesso codice';
+  @override
+  String get waitingPeer => 'In attesa dell\'altro dispositivo…';
+  @override
+  String get match => 'I codici coincidono';
+  @override
+  String get mismatch => 'I codici differiscono';
+  @override
+  String done({required Object name}) => 'Associato a ${name}. Livello di fiducia: temporaneo (modificabile sotto).';
+  @override
+  String get errorNotAnyShare => 'Il dispositivo non è un\'app AnyShare.';
+  @override
+  String get errorUnreachable => 'Impossibile raggiungere il dispositivo.';
+  @override
+  String get errorBusy => 'Il dispositivo è occupato con un\'altra associazione.';
+  @override
+  String get errorRejected => 'Associazione rifiutata.';
+  @override
+  String get errorProtocol => 'Risposta di associazione inattesa.';
 }
 
 // Path: progressPage.total

@@ -93,6 +93,10 @@ class TranslationsUk extends Translations with BaseTranslations<AppLocale, Trans
   late final _Translations$web$uk web = _Translations$web$uk._(_root);
   @override
   late final _Translations$assetPicker$uk assetPicker = _Translations$assetPicker$uk._(_root);
+  @override
+  late final _Translations$pairingIncoming$uk pairingIncoming = _Translations$pairingIncoming$uk._(_root);
+  @override
+  late final _Translations$sendHistoryPage$uk sendHistoryPage = _Translations$sendHistoryPage$uk._(_root);
 }
 
 // Path: general
@@ -362,6 +366,10 @@ class _Translations$deviceDetailsPage$uk extends Translations$deviceDetailsPage$
   late final _Translations$deviceDetailsPage$info$uk info = _Translations$deviceDetailsPage$info$uk._(_root);
   @override
   late final _Translations$deviceDetailsPage$logs$uk logs = _Translations$deviceDetailsPage$logs$uk._(_root);
+  @override
+  late final _Translations$deviceDetailsPage$trust$uk trust = _Translations$deviceDetailsPage$trust$uk._(_root);
+  @override
+  late final _Translations$deviceDetailsPage$pairing$uk pairing = _Translations$deviceDetailsPage$pairing$uk._(_root);
 }
 
 // Path: verifyPage
@@ -756,6 +764,36 @@ class _Translations$assetPicker$uk extends Translations$assetPicker$en {
   String get sUnitAssetCountLabel => 'кількість';
 }
 
+// Path: pairingIncoming
+class _Translations$pairingIncoming$uk extends Translations$pairingIncoming$en {
+  _Translations$pairingIncoming$uk._(TranslationsUk root) : this._root = root, super.internal(root);
+
+  final TranslationsUk _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get title => 'Запит на з\'єднання';
+  @override
+  String body({required Object name}) => '${name} запитує з\'єднання. Переконайтеся, що на обох екранах однаковий код:';
+  @override
+  String get match => 'Коди збігаються';
+  @override
+  String get mismatch => 'Коди відрізняються';
+}
+
+// Path: sendHistoryPage
+class _Translations$sendHistoryPage$uk extends Translations$sendHistoryPage$en {
+  _Translations$sendHistoryPage$uk._(TranslationsUk root) : this._root = root, super.internal(root);
+
+  final TranslationsUk _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get title => 'Надіслані файли';
+  @override
+  String get empty => 'Надісланих файлів ще немає';
+}
+
 // Path: receiveTab.infoBox
 class _Translations$receiveTab$infoBox$uk extends Translations$receiveTab$infoBox$en {
   _Translations$receiveTab$infoBox$uk._(TranslationsUk root) : this._root = root, super.internal(root);
@@ -1075,6 +1113,88 @@ class _Translations$deviceDetailsPage$logs$uk extends Translations$deviceDetails
   String discovered({required Object protocol, required Object host}) => 'Виявлено через ${protocol} (${host})';
   @override
   String updated({required Object protocol, required Object host}) => 'Оновлено через ${protocol} (${host})';
+}
+
+// Path: deviceDetailsPage.trust
+class _Translations$deviceDetailsPage$trust$uk extends Translations$deviceDetailsPage$trust$en {
+  _Translations$deviceDetailsPage$trust$uk._(TranslationsUk root) : this._root = root, super.internal(root);
+
+  final TranslationsUk _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get title => 'Довіра';
+  @override
+  String get level => 'Рівень довіри';
+  @override
+  String get levelTemp => 'Тимчасовий (запитувати щоразу)';
+  @override
+  String get levelLimited => 'Довіра з обмеженнями';
+  @override
+  String get levelFull => 'Повна довіра (без обмежень)';
+  @override
+  String get blocked => 'Заблоковано';
+  @override
+  String get blockedHint => 'Відхиляти всі передачі з цього пристрою без запиту';
+  @override
+  String get maxFileSize => 'Макс. розмір файлу';
+  @override
+  String get maxFileSizeUnlimited => 'Без обмежень';
+  @override
+  String get quota => 'Квота приймання';
+  @override
+  String get quotaNone => 'Без обмежень';
+  @override
+  String get quotaAbsolute => 'Абсолютний розмір';
+  @override
+  String get quotaPercent => 'Відсоток диска';
+  @override
+  String quotaUsed({required Object used}) => 'Використано: ${used}';
+  @override
+  String quotaLimit({required Object limit}) => 'Ліміт: ${limit}';
+  @override
+  String get resetUsage => 'Скинути облік';
+  @override
+  String get resetUsageConfirm => 'Скинути облік обсягу приймання для цього пристрою?';
+  @override
+  String get usage => 'Облік';
+  @override
+  String get percentHint => 'Відсоток цільового диска';
+}
+
+// Path: deviceDetailsPage.pairing
+class _Translations$deviceDetailsPage$pairing$uk extends Translations$deviceDetailsPage$pairing$en {
+  _Translations$deviceDetailsPage$pairing$uk._(TranslationsUk root) : this._root = root, super.internal(root);
+
+  final TranslationsUk _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get start => 'З\'єднання (AnyShare)';
+  @override
+  String get notSupported => 'Пристрій не відповідає як AnyShare. Його все одно можна додати до улюблених для автоприймання.';
+  @override
+  String get probing => 'З\'єднання з пристроєм…';
+  @override
+  String get codeTitle => 'Переконайтеся, що на обох екранах однаковий код';
+  @override
+  String get waitingPeer => 'Очікування другого пристрою…';
+  @override
+  String get match => 'Коди збігаються';
+  @override
+  String get mismatch => 'Коди відрізняються';
+  @override
+  String done({required Object name}) => 'З\'єднано з ${name}. Рівень довіри: тимчасовий (змініть нижче).';
+  @override
+  String get errorNotAnyShare => 'Пристрій не є застосунком AnyShare.';
+  @override
+  String get errorUnreachable => 'Не вдалося з\'єднатися з пристроєм.';
+  @override
+  String get errorBusy => 'Пристрій зайнятий іншим з\'єднанням.';
+  @override
+  String get errorRejected => 'У з\'єднанні відмовлено.';
+  @override
+  String get errorProtocol => 'Неочікувана відповідь з\'єднання.';
 }
 
 // Path: progressPage.total
