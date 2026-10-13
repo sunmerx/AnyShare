@@ -12,7 +12,7 @@
 #endif
 
 #define MyAppName "AnyShare"
-#define MyAppVersion "1.18.2"
+#define MyAppVersion "0.1.0"
 #define MyAppPublisher "AnyShare Dev"
 #define MyAppURL "https://localsend.org"
 #define MyAppExeName "anyshare_app.exe"
