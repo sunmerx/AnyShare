@@ -216,6 +216,13 @@ class Translations$receiveTab$en {
 
   /// en: 'Receive via link'
   String get link => 'Receive via link';
+
+  /// en: 'Transfer from {alias} declined automatically (device is blocked)'
+  String trustDeclinedBlocked({required Object alias}) => 'Transfer from ${alias} declined automatically (device is blocked)';
+
+  /// en: 'Transfer from {alias} declined automatically (limit: {limit}, used: {used})'
+  String trustDeclinedLimited({required Object alias, required Object limit, required Object used}) =>
+      'Transfer from ${alias} declined automatically (limit: ${limit}, used: ${used})';
 }
 
 // Path: sendTab

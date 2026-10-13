@@ -52,7 +52,9 @@
       "favorites": "Favorites",
       "on": "@:general.on"
     },
-    "link": "Receive via link"
+    "link": "Receive via link",
+    "trustDeclinedBlocked": "Transfer from {alias} declined automatically (device is blocked)",
+    "trustDeclinedLimited": "Transfer from {alias} declined automatically (limit: {limit}, used: {used})"
   },
   "sendTab": {
     "title": "Send",

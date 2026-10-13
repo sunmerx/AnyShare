@@ -137,21 +137,27 @@ class AboutPage extends StatelessWidget {
             children: [
               TextButton(
                 onPressed: () async {
-                  await launchUrl(Uri.parse('https://localsend.org'));
+                  await launchUrl(Uri.parse('https://github.com/sunmerx/AnyShare'), mode: LaunchMode.externalApplication);
                 },
-                child: const Text('Homepage'),
+                child: const Text('AnyShare Homepage'),
+              ),
+              TextButton(
+                onPressed: () async {
+                  await launchUrl(Uri.parse('https://github.com/sunmerx/AnyShare/releases'), mode: LaunchMode.externalApplication);
+                },
+                child: const Text('AnyShare Releases'),
               ),
               TextButton(
                 onPressed: () async {
                   await launchUrl(Uri.parse('https://github.com/localsend/localsend'), mode: LaunchMode.externalApplication);
                 },
-                child: const Text('Source Code (Github)'),
+                child: const Text('LocalSend Source (Github)'),
               ),
               TextButton(
                 onPressed: () async {
                   await launchUrl(Uri.parse('https://codeberg.org/localsend/localsend'), mode: LaunchMode.externalApplication);
                 },
-                child: const Text('Source Code (Codeberg)'),
+                child: const Text('LocalSend Source (Codeberg)'),
               ),
               TextButton(
                 onPressed: () async {

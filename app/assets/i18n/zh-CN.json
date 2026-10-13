@@ -52,7 +52,9 @@
       "favorites": "收藏夹",
       "on": "@:general.on"
     },
-    "link": "通过链接接收"
+    "link": "通过链接接收",
+    "trustDeclinedBlocked": "已自动拒绝来自 {alias} 的传输(设备已被拉黑)",
+    "trustDeclinedLimited": "已自动拒绝来自 {alias} 的传输(上限 {limit},已用 {used})"
   },
   "sendTab": {
     "title": "发送",

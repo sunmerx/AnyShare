@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:collection/collection.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:localsend_app/gen/strings.g.dart';
 import 'package:localsend_app/model/persistence/favorite_device.dart';
 import 'package:localsend_app/model/state/server/receive_session_state.dart';
 import 'package:localsend_app/model/state/server/receiving_file.dart';
@@ -28,6 +29,7 @@ import 'package:localsend_app/util/native/directories.dart';
 import 'package:localsend_app/util/native/platform_check.dart';
 import 'package:localsend_app/util/native/tray_helper.dart';
 import 'package:localsend_app/util/trust_evaluator.dart';
+import 'package:localsend_app/util/ui/snackbar.dart';
 import 'package:localsend_app/widget/dialogs/open_file_dialog.dart';
 import 'package:localsend_isolates/isolate.dart';
 import 'package:localsend_isolates/model/device.dart';
@@ -35,6 +37,7 @@ import 'package:localsend_isolates/model/file_status.dart';
 import 'package:localsend_isolates/model/file_type.dart';
 import 'package:localsend_isolates/model/session_status.dart';
 import 'package:localsend_isolates/rust/api/server.dart' show SessionEndReasonV2;
+import 'package:localsend_isolates/util/file_size_helper.dart';
 import 'package:localsend_isolates/util/rust.dart';
 import 'package:localsend_isolates/util/transfer_notification.dart';
 import 'package:logging/logging.dart';
@@ -141,6 +144,22 @@ class ReceiveController {
     if (trustDecision is TrustReject) {
       _logger.info('Rejected by trust policy: ${trustDecision.reason} (limit: ${trustDecision.limit}, used: ${trustDecision.used})');
       declineFileRequest();
+
+      // AnyShare modification: surface the auto-decline to the local user
+      // (design: 超限自动拒绝 + 本地提示; the sender sees "rejected" on their side).
+      final String alias = server.getState().session?.sender.alias ?? '';
+      final String message;
+      if (trustDecision.reason == TrustRejectReason.blocked) {
+        message = t.receiveTab.trustDeclinedBlocked(alias: alias);
+      } else {
+        message = t.receiveTab.trustDeclinedLimited(
+          alias: alias,
+          limit: (trustDecision.limit ?? 0).asReadableFileSize,
+          used: (trustDecision.used ?? 0).asReadableFileSize,
+        );
+      }
+      // ignore: use_build_context_synchronously, unawaited_futures
+      Routerino.context.showSnackBar(message);
       return;
     }
     final bool trustAutoAccept = trustDecision is TrustAutoAccept;

@@ -201,6 +201,10 @@ class Translations$receiveTab$zh_CN extends Translations$receiveTab$en {
   late final Translations$receiveTab$quickSave$zh_CN quickSave = Translations$receiveTab$quickSave$zh_CN.internal(_root);
   @override
   String get link => '通过链接接收';
+  @override
+  String trustDeclinedBlocked({required Object alias}) => '已自动拒绝来自 ${alias} 的传输(设备已被拉黑)';
+  @override
+  String trustDeclinedLimited({required Object alias, required Object limit, required Object used}) => '已自动拒绝来自 ${alias} 的传输(上限 ${limit},已用 ${used})';
 }
 
 // Path: sendTab
