@@ -93,6 +93,10 @@ class TranslationsKo extends Translations with BaseTranslations<AppLocale, Trans
   late final _Translations$web$ko web = _Translations$web$ko._(_root);
   @override
   late final _Translations$assetPicker$ko assetPicker = _Translations$assetPicker$ko._(_root);
+  @override
+  late final _Translations$pairingIncoming$ko pairingIncoming = _Translations$pairingIncoming$ko._(_root);
+  @override
+  late final _Translations$sendHistoryPage$ko sendHistoryPage = _Translations$sendHistoryPage$ko._(_root);
 }
 
 // Path: general
@@ -361,6 +365,10 @@ class _Translations$deviceDetailsPage$ko extends Translations$deviceDetailsPage$
   late final _Translations$deviceDetailsPage$info$ko info = _Translations$deviceDetailsPage$info$ko._(_root);
   @override
   late final _Translations$deviceDetailsPage$logs$ko logs = _Translations$deviceDetailsPage$logs$ko._(_root);
+  @override
+  late final _Translations$deviceDetailsPage$trust$ko trust = _Translations$deviceDetailsPage$trust$ko._(_root);
+  @override
+  late final _Translations$deviceDetailsPage$pairing$ko pairing = _Translations$deviceDetailsPage$pairing$ko._(_root);
 }
 
 // Path: verifyPage
@@ -753,6 +761,36 @@ class _Translations$assetPicker$ko extends Translations$assetPicker$en {
   String get sUnitAssetCountLabel => '개수';
 }
 
+// Path: pairingIncoming
+class _Translations$pairingIncoming$ko extends Translations$pairingIncoming$en {
+  _Translations$pairingIncoming$ko._(TranslationsKo root) : this._root = root, super.internal(root);
+
+  final TranslationsKo _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get title => '페어링 요청';
+  @override
+  String body({required Object name}) => '${name}이(가) 페어링을 요청합니다. 두 화면에 같은 코드가 표시되는지 확인하세요:';
+  @override
+  String get match => '코드 일치';
+  @override
+  String get mismatch => '코드 불일치';
+}
+
+// Path: sendHistoryPage
+class _Translations$sendHistoryPage$ko extends Translations$sendHistoryPage$en {
+  _Translations$sendHistoryPage$ko._(TranslationsKo root) : this._root = root, super.internal(root);
+
+  final TranslationsKo _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get title => '보낸 파일';
+  @override
+  String get empty => '보낸 파일이 없습니다';
+}
+
 // Path: receiveTab.infoBox
 class _Translations$receiveTab$infoBox$ko extends Translations$receiveTab$infoBox$en {
   _Translations$receiveTab$infoBox$ko._(TranslationsKo root) : this._root = root, super.internal(root);
@@ -1069,6 +1107,88 @@ class _Translations$deviceDetailsPage$logs$ko extends Translations$deviceDetails
   String discovered({required Object protocol, required Object host}) => '${protocol}을(를) 통해 발견됨 (${host})';
   @override
   String updated({required Object protocol, required Object host}) => '${protocol}을(를) 통해 업데이트됨 (${host})';
+}
+
+// Path: deviceDetailsPage.trust
+class _Translations$deviceDetailsPage$trust$ko extends Translations$deviceDetailsPage$trust$en {
+  _Translations$deviceDetailsPage$trust$ko._(TranslationsKo root) : this._root = root, super.internal(root);
+
+  final TranslationsKo _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get title => '신뢰';
+  @override
+  String get level => '신뢰 수준';
+  @override
+  String get levelTemp => '임시(매번 확인)';
+  @override
+  String get levelLimited => '제한적 신뢰';
+  @override
+  String get levelFull => '완전 신뢰(제한 없음)';
+  @override
+  String get blocked => '차단';
+  @override
+  String get blockedHint => '이 기기의 모든 전송을 묻지 않고 거부';
+  @override
+  String get maxFileSize => '최대 파일 크기';
+  @override
+  String get maxFileSizeUnlimited => '제한 없음';
+  @override
+  String get quota => '수신 할당량';
+  @override
+  String get quotaNone => '제한 없음';
+  @override
+  String get quotaAbsolute => '절대 용량';
+  @override
+  String get quotaPercent => '디스크 비율';
+  @override
+  String quotaUsed({required Object used}) => '사용량: ${used}';
+  @override
+  String quotaLimit({required Object limit}) => '한도: ${limit}';
+  @override
+  String get resetUsage => '사용량 초기화';
+  @override
+  String get resetUsageConfirm => '이 기기의 기록된 수신 사용량을 초기화할까요?';
+  @override
+  String get usage => '사용량';
+  @override
+  String get percentHint => '대상 디스크의 비율';
+}
+
+// Path: deviceDetailsPage.pairing
+class _Translations$deviceDetailsPage$pairing$ko extends Translations$deviceDetailsPage$pairing$en {
+  _Translations$deviceDetailsPage$pairing$ko._(TranslationsKo root) : this._root = root, super.internal(root);
+
+  final TranslationsKo _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get start => '페어링(AnyShare)';
+  @override
+  String get notSupported => '이 기기는 AnyShare로 응답하지 않습니다. 자동 수신용으로 즐겨찾기에 추가할 수는 있습니다.';
+  @override
+  String get probing => '기기에 연결 중…';
+  @override
+  String get codeTitle => '두 화면에 같은 코드가 표시되는지 확인하세요';
+  @override
+  String get waitingPeer => '상대 기기를 기다리는 중…';
+  @override
+  String get match => '코드 일치';
+  @override
+  String get mismatch => '코드 불일치';
+  @override
+  String done({required Object name}) => '${name}와(과) 페어링되었습니다. 신뢰 수준: 임시(아래에서 변경 가능).';
+  @override
+  String get errorNotAnyShare => '상대 기기는 AnyShare 앱이 아닙니다.';
+  @override
+  String get errorUnreachable => '기기에 연결할 수 없습니다.';
+  @override
+  String get errorBusy => '상대 기기가 다른 페어링 중입니다.';
+  @override
+  String get errorRejected => '페어링이 거부되었습니다.';
+  @override
+  String get errorProtocol => '예상치 못한 페어링 응답.';
 }
 
 // Path: progressPage.total

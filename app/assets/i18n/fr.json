@@ -221,6 +221,42 @@
       "empty": "Aucun journal disponible.",
       "discovered": "Découvert via {protocol} ({host})",
       "updated": "Mis à jour via {protocol} ({host})"
+    },
+    "trust": {
+      "title": "Confiance",
+      "level": "Niveau de confiance",
+      "levelTemp": "Temporaire (demander à chaque fois)",
+      "levelLimited": "Confiance limitée",
+      "levelFull": "Confiance totale (sans limite)",
+      "blocked": "Bloqué",
+      "blockedHint": "Rejeter tous les transferts de cet appareil sans demander",
+      "maxFileSize": "Taille max. du fichier",
+      "maxFileSizeUnlimited": "Illimité",
+      "quota": "Quota de réception",
+      "quotaNone": "Illimité",
+      "quotaAbsolute": "Taille absolue",
+      "quotaPercent": "Pourcentage du disque",
+      "quotaUsed": "Utilisé : {used}",
+      "quotaLimit": "Limite : {limit}",
+      "resetUsage": "Réinitialiser l'utilisation",
+      "resetUsageConfirm": "Réinitialiser l'utilisation enregistrée pour cet appareil ?",
+      "usage": "Utilisation",
+      "percentHint": "Pourcentage du disque de destination"
+    },
+    "pairing": {
+      "start": "Associer (AnyShare)",
+      "notSupported": "Cet appareil ne répond pas comme AnyShare. Vous pouvez toujours le mettre en favori pour l'acceptation automatique.",
+      "probing": "Contact de l'appareil…",
+      "codeTitle": "Vérifiez que les deux écrans affichent le même code",
+      "waitingPeer": "En attente de l'autre appareil…",
+      "match": "Les codes correspondent",
+      "mismatch": "Les codes diffèrent",
+      "done": "Associé à {name}. Niveau de confiance : temporaire (modifiable ci-dessous).",
+      "errorNotAnyShare": "L'appareil n'est pas une application AnyShare.",
+      "errorUnreachable": "Impossible de joindre l'appareil.",
+      "errorBusy": "L'appareil est occupé avec une autre association.",
+      "errorRejected": "L'association a été refusée.",
+      "errorProtocol": "Réponse d'association inattendue."
     }
   },
   "verifyPage": {
@@ -503,5 +539,15 @@
     "sActionUseCameraHint": "Utiliser la Caméra",
     "sNameDurationLabel": "durée",
     "sUnitAssetCountLabel": "quantité"
+  },
+  "pairingIncoming": {
+    "title": "Demande d'association",
+    "body": "{name} souhaite s'associer. Vérifiez que les deux écrans affichent le même code :",
+    "match": "Les codes correspondent",
+    "mismatch": "Les codes diffèrent"
+  },
+  "sendHistoryPage": {
+    "title": "Fichiers envoyés",
+    "empty": "Aucun fichier envoyé"
   }
 }

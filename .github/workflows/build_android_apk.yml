@@ -39,13 +39,18 @@ jobs:
           mkdir -p $APK_BUILD_DIR
           cp -r . $APK_BUILD_DIR
 
+      # AnyShare modification: signing material stays local (product decision);
+      # CI builds a debug-signed APK for verification, releases use the
+      # locally-signed artifact.
       - name: Decode key.properties file
+        if: ${{ secrets.ANDROID_KEY_PROPERTIES != '' }}
         working-directory: ${{ env.APK_BUILD_DIR }}
         env:
           ENCODED_STRING: ${{ secrets.ANDROID_KEY_PROPERTIES }}
         run: echo $ENCODED_STRING | base64 -di > app/android/key.properties
 
       - name: Decode android-keystore.jks file
+        if: ${{ secrets.ANDROID_KEY_STORE != '' }}
         working-directory: ${{ env.APK_BUILD_DIR }}
         env:
           ENCODED_STRING: ${{ secrets.ANDROID_KEY_STORE }}

@@ -221,6 +221,42 @@
       "empty": "Keine Logs vorhanden.",
       "discovered": "Entdeckt über {protocol} ({host})",
       "updated": "Aktualisiert über {protocol} ({host})"
+    },
+    "trust": {
+      "title": "Vertrauen",
+      "level": "Vertrauensstufe",
+      "levelTemp": "Temporär (jedes Mal fragen)",
+      "levelLimited": "Begrenzt vertraut",
+      "levelFull": "Voll vertraut (ohne Grenzen)",
+      "blocked": "Blockiert",
+      "blockedHint": "Alle Übertragungen dieses Geräts ohne Nachfrage ablehnen",
+      "maxFileSize": "Max. Dateigröße",
+      "maxFileSizeUnlimited": "Unbegrenzt",
+      "quota": "Empfangskontingent",
+      "quotaNone": "Unbegrenzt",
+      "quotaAbsolute": "Absolute Größe",
+      "quotaPercent": "Prozent der Festplatte",
+      "quotaUsed": "Benutzt: {used}",
+      "quotaLimit": "Grenze: {limit}",
+      "resetUsage": "Nutzung zurücksetzen",
+      "resetUsageConfirm": "Die aufgezeichnete Empfangsnutzung dieses Geräts zurücksetzen?",
+      "usage": "Nutzung",
+      "percentHint": "Prozent des Ziellaufwerks"
+    },
+    "pairing": {
+      "start": "Koppeln (AnyShare)",
+      "notSupported": "Dieses Gerät antwortet nicht als AnyShare. Du kannst es trotzdem als Favorit für Auto-Annahme hinzufügen.",
+      "probing": "Gerät wird kontaktiert…",
+      "codeTitle": "Prüfe, dass beide Bildschirme denselben Code zeigen",
+      "waitingPeer": "Warte auf das andere Gerät…",
+      "match": "Codes stimmen überein",
+      "mismatch": "Codes weichen ab",
+      "done": "Mit {name} gekoppelt. Vertrauensstufe: temporär (unten änderbar).",
+      "errorNotAnyShare": "Das Gerät ist keine AnyShare-App.",
+      "errorUnreachable": "Gerät nicht erreichbar.",
+      "errorBusy": "Das Gerät ist mit einer anderen Kopplung beschäftigt.",
+      "errorRejected": "Kopplung wurde abgelehnt.",
+      "errorProtocol": "Unerwartete Kopplungsantwort."
     }
   },
   "verifyPage": {
@@ -503,5 +539,15 @@
     "sActionUseCameraHint": "Kamera benutzen",
     "sNameDurationLabel": "Dauer",
     "sUnitAssetCountLabel": "Anzahl"
+  },
+  "pairingIncoming": {
+    "title": "Kopplungsanfrage",
+    "body": "{name} möchte sich koppeln. Prüfe, dass beide Bildschirme denselben Code zeigen:",
+    "match": "Codes stimmen überein",
+    "mismatch": "Codes weichen ab"
+  },
+  "sendHistoryPage": {
+    "title": "Gesendete Dateien",
+    "empty": "Noch keine gesendeten Dateien"
   }
 }

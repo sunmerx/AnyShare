@@ -221,6 +221,42 @@
       "empty": "사용 가능한 로그가 없습니다.",
       "discovered": "{protocol}을(를) 통해 발견됨 ({host})",
       "updated": "{protocol}을(를) 통해 업데이트됨 ({host})"
+    },
+    "trust": {
+      "title": "신뢰",
+      "level": "신뢰 수준",
+      "levelTemp": "임시(매번 확인)",
+      "levelLimited": "제한적 신뢰",
+      "levelFull": "완전 신뢰(제한 없음)",
+      "blocked": "차단",
+      "blockedHint": "이 기기의 모든 전송을 묻지 않고 거부",
+      "maxFileSize": "최대 파일 크기",
+      "maxFileSizeUnlimited": "제한 없음",
+      "quota": "수신 할당량",
+      "quotaNone": "제한 없음",
+      "quotaAbsolute": "절대 용량",
+      "quotaPercent": "디스크 비율",
+      "quotaUsed": "사용량: {used}",
+      "quotaLimit": "한도: {limit}",
+      "resetUsage": "사용량 초기화",
+      "resetUsageConfirm": "이 기기의 기록된 수신 사용량을 초기화할까요?",
+      "usage": "사용량",
+      "percentHint": "대상 디스크의 비율"
+    },
+    "pairing": {
+      "start": "페어링(AnyShare)",
+      "notSupported": "이 기기는 AnyShare로 응답하지 않습니다. 자동 수신용으로 즐겨찾기에 추가할 수는 있습니다.",
+      "probing": "기기에 연결 중…",
+      "codeTitle": "두 화면에 같은 코드가 표시되는지 확인하세요",
+      "waitingPeer": "상대 기기를 기다리는 중…",
+      "match": "코드 일치",
+      "mismatch": "코드 불일치",
+      "done": "{name}와(과) 페어링되었습니다. 신뢰 수준: 임시(아래에서 변경 가능).",
+      "errorNotAnyShare": "상대 기기는 AnyShare 앱이 아닙니다.",
+      "errorUnreachable": "기기에 연결할 수 없습니다.",
+      "errorBusy": "상대 기기가 다른 페어링 중입니다.",
+      "errorRejected": "페어링이 거부되었습니다.",
+      "errorProtocol": "예상치 못한 페어링 응답."
     }
   },
   "verifyPage": {
@@ -503,5 +539,15 @@
     "sActionUseCameraHint": "카메라 사용",
     "sNameDurationLabel": "길이",
     "sUnitAssetCountLabel": "개수"
+  },
+  "pairingIncoming": {
+    "title": "페어링 요청",
+    "body": "{name}이(가) 페어링을 요청합니다. 두 화면에 같은 코드가 표시되는지 확인하세요:",
+    "match": "코드 일치",
+    "mismatch": "코드 불일치"
+  },
+  "sendHistoryPage": {
+    "title": "보낸 파일",
+    "empty": "보낸 파일이 없습니다"
   }
 }

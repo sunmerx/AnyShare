@@ -93,6 +93,10 @@ class TranslationsJa extends Translations with BaseTranslations<AppLocale, Trans
   late final _Translations$web$ja web = _Translations$web$ja._(_root);
   @override
   late final _Translations$assetPicker$ja assetPicker = _Translations$assetPicker$ja._(_root);
+  @override
+  late final _Translations$pairingIncoming$ja pairingIncoming = _Translations$pairingIncoming$ja._(_root);
+  @override
+  late final _Translations$sendHistoryPage$ja sendHistoryPage = _Translations$sendHistoryPage$ja._(_root);
 }
 
 // Path: general
@@ -361,6 +365,10 @@ class _Translations$deviceDetailsPage$ja extends Translations$deviceDetailsPage$
   late final _Translations$deviceDetailsPage$info$ja info = _Translations$deviceDetailsPage$info$ja._(_root);
   @override
   late final _Translations$deviceDetailsPage$logs$ja logs = _Translations$deviceDetailsPage$logs$ja._(_root);
+  @override
+  late final _Translations$deviceDetailsPage$trust$ja trust = _Translations$deviceDetailsPage$trust$ja._(_root);
+  @override
+  late final _Translations$deviceDetailsPage$pairing$ja pairing = _Translations$deviceDetailsPage$pairing$ja._(_root);
 }
 
 // Path: verifyPage
@@ -753,6 +761,36 @@ class _Translations$assetPicker$ja extends Translations$assetPicker$en {
   String get sUnitAssetCountLabel => '個数';
 }
 
+// Path: pairingIncoming
+class _Translations$pairingIncoming$ja extends Translations$pairingIncoming$en {
+  _Translations$pairingIncoming$ja._(TranslationsJa root) : this._root = root, super.internal(root);
+
+  final TranslationsJa _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get title => 'ペアリング要求';
+  @override
+  String body({required Object name}) => '${name} がペアリングを要求しています。両方の画面に同じコードが表示されているか確認してください:';
+  @override
+  String get match => 'コードが一致';
+  @override
+  String get mismatch => 'コードが一致しません';
+}
+
+// Path: sendHistoryPage
+class _Translations$sendHistoryPage$ja extends Translations$sendHistoryPage$en {
+  _Translations$sendHistoryPage$ja._(TranslationsJa root) : this._root = root, super.internal(root);
+
+  final TranslationsJa _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get title => '送信済みファイル';
+  @override
+  String get empty => '送信済みファイルはありません';
+}
+
 // Path: receiveTab.infoBox
 class _Translations$receiveTab$infoBox$ja extends Translations$receiveTab$infoBox$en {
   _Translations$receiveTab$infoBox$ja._(TranslationsJa root) : this._root = root, super.internal(root);
@@ -1069,6 +1107,88 @@ class _Translations$deviceDetailsPage$logs$ja extends Translations$deviceDetails
   String discovered({required Object protocol, required Object host}) => '${protocol} 経由で発見 (${host})';
   @override
   String updated({required Object protocol, required Object host}) => '${protocol} 経由で更新 (${host})';
+}
+
+// Path: deviceDetailsPage.trust
+class _Translations$deviceDetailsPage$trust$ja extends Translations$deviceDetailsPage$trust$en {
+  _Translations$deviceDetailsPage$trust$ja._(TranslationsJa root) : this._root = root, super.internal(root);
+
+  final TranslationsJa _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get title => '信頼';
+  @override
+  String get level => '信頼レベル';
+  @override
+  String get levelTemp => '一時的(毎回確認)';
+  @override
+  String get levelLimited => '制限付き信頼';
+  @override
+  String get levelFull => '完全信頼(無制限)';
+  @override
+  String get blocked => 'ブロック';
+  @override
+  String get blockedHint => 'このデバイスからの転送を確認なしで拒否';
+  @override
+  String get maxFileSize => '最大ファイルサイズ';
+  @override
+  String get maxFileSizeUnlimited => '無制限';
+  @override
+  String get quota => '受信クォータ';
+  @override
+  String get quotaNone => '無制限';
+  @override
+  String get quotaAbsolute => '絶対容量';
+  @override
+  String get quotaPercent => 'ディスク割合';
+  @override
+  String quotaUsed({required Object used}) => '使用済み: ${used}';
+  @override
+  String quotaLimit({required Object limit}) => '上限: ${limit}';
+  @override
+  String get resetUsage => '使用量をリセット';
+  @override
+  String get resetUsageConfirm => 'このデバイスの記録された受信使用量をリセットしますか?';
+  @override
+  String get usage => '使用量';
+  @override
+  String get percentHint => '保存先ディスクの割合';
+}
+
+// Path: deviceDetailsPage.pairing
+class _Translations$deviceDetailsPage$pairing$ja extends Translations$deviceDetailsPage$pairing$en {
+  _Translations$deviceDetailsPage$pairing$ja._(TranslationsJa root) : this._root = root, super.internal(root);
+
+  final TranslationsJa _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get start => 'ペアリング(AnyShare)';
+  @override
+  String get notSupported => '相手は AnyShare として応答しません。自動受信用にお気に入りへ追加できます。';
+  @override
+  String get probing => 'デバイスに接続中…';
+  @override
+  String get codeTitle => '両方の画面に同じコードが表示されているか確認してください';
+  @override
+  String get waitingPeer => '相手の操作を待っています…';
+  @override
+  String get match => 'コードが一致';
+  @override
+  String get mismatch => 'コードが一致しません';
+  @override
+  String done({required Object name}) => '${name} とペアリングしました。信頼レベル:一時的(下で変更できます)。';
+  @override
+  String get errorNotAnyShare => '相手は AnyShare アプリではありません。';
+  @override
+  String get errorUnreachable => 'デバイスに接続できません。';
+  @override
+  String get errorBusy => '相手は別のペアリング処理中です。';
+  @override
+  String get errorRejected => 'ペアリングが拒否されました。';
+  @override
+  String get errorProtocol => '予期しないペアリング応答。';
 }
 
 // Path: progressPage.total

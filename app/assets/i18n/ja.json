@@ -221,6 +221,42 @@
       "empty": "ログはありません。",
       "discovered": "{protocol} 経由で発見 ({host})",
       "updated": "{protocol} 経由で更新 ({host})"
+    },
+    "trust": {
+      "title": "信頼",
+      "level": "信頼レベル",
+      "levelTemp": "一時的(毎回確認)",
+      "levelLimited": "制限付き信頼",
+      "levelFull": "完全信頼(無制限)",
+      "blocked": "ブロック",
+      "blockedHint": "このデバイスからの転送を確認なしで拒否",
+      "maxFileSize": "最大ファイルサイズ",
+      "maxFileSizeUnlimited": "無制限",
+      "quota": "受信クォータ",
+      "quotaNone": "無制限",
+      "quotaAbsolute": "絶対容量",
+      "quotaPercent": "ディスク割合",
+      "quotaUsed": "使用済み: {used}",
+      "quotaLimit": "上限: {limit}",
+      "resetUsage": "使用量をリセット",
+      "resetUsageConfirm": "このデバイスの記録された受信使用量をリセットしますか?",
+      "usage": "使用量",
+      "percentHint": "保存先ディスクの割合"
+    },
+    "pairing": {
+      "start": "ペアリング(AnyShare)",
+      "notSupported": "相手は AnyShare として応答しません。自動受信用にお気に入りへ追加できます。",
+      "probing": "デバイスに接続中…",
+      "codeTitle": "両方の画面に同じコードが表示されているか確認してください",
+      "waitingPeer": "相手の操作を待っています…",
+      "match": "コードが一致",
+      "mismatch": "コードが一致しません",
+      "done": "{name} とペアリングしました。信頼レベル:一時的(下で変更できます)。",
+      "errorNotAnyShare": "相手は AnyShare アプリではありません。",
+      "errorUnreachable": "デバイスに接続できません。",
+      "errorBusy": "相手は別のペアリング処理中です。",
+      "errorRejected": "ペアリングが拒否されました。",
+      "errorProtocol": "予期しないペアリング応答。"
     }
   },
   "verifyPage": {
@@ -503,5 +539,15 @@
     "sActionUseCameraHint": "カメラを使う",
     "sNameDurationLabel": "長さ",
     "sUnitAssetCountLabel": "個数"
+  },
+  "pairingIncoming": {
+    "title": "ペアリング要求",
+    "body": "{name} がペアリングを要求しています。両方の画面に同じコードが表示されているか確認してください:",
+    "match": "コードが一致",
+    "mismatch": "コードが一致しません"
+  },
+  "sendHistoryPage": {
+    "title": "送信済みファイル",
+    "empty": "送信済みファイルはありません"
   }
 }
