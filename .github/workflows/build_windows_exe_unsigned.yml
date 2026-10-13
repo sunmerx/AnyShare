@@ -37,7 +37,9 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: "stable"
 
-      # Required by the CMake install step (app/windows/CMakeLists.txt installs localsend_msix_helper.msix)
+      # AnyShare modification: the MSIX helper is a LocalSend-only sparse
+      # package feature; CMake installs it only when present, so we skip
+      # building it entirely (kept for reference):
       - name: Build MSIX helper
         run: |
           $makepri = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin\10.*\x64\makepri.exe' | Select-Object -Last 1
@@ -65,11 +67,11 @@ jobs:
         run: iscc /DSkipSignTool /DSkipMsixHelper "/DPayloadDir=${{ runner.temp }}\inno" "/DResultDir=${{ runner.temp }}\inno-result" support\scripts\compile_windows_exe-inno.iss
 
       - name: Rename installer
-        run: Rename-Item -Path "${{ runner.temp }}\inno-result\localsend.exe" -NewName "LocalSend-${{ needs.build.outputs.version }}-windows-x86-64.exe"
+        run: Rename-Item -Path "${{ runner.temp }}\inno-result\AnyShare.exe" -NewName "AnyShare-${{ needs.build.outputs.version }}-windows-x86-64-installer.exe"
 
       - name: Upload installer
         uses: actions/upload-artifact@v6
         with:
           name: windows-exe-x86-64-unsigned
-          path: ${{ runner.temp }}\inno-result\LocalSend-${{ needs.build.outputs.version }}-windows-x86-64.exe
+          path: ${{ runner.temp }}\inno-result\AnyShare-${{ needs.build.outputs.version }}-windows-x86-64-installer.exe
           if-no-files-found: error
