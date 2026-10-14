@@ -103,7 +103,10 @@ class ExtensionServerService extends ReduxNotifier<ExtensionServerState> {
 }
 
 class StartExtensionServerAction extends AsyncReduxAction<ExtensionServerService, ExtensionServerState> {
-  StartExtensionServerAction();
+  StartExtensionServerAction({this.port = kExtensionPort});
+
+  /// Ephemeral port (0) for tests.
+  final int port;
 
   @override
   Future<ExtensionServerState> reduce() async {
@@ -113,7 +116,7 @@ class StartExtensionServerAction extends AsyncReduxAction<ExtensionServerService
     try {
       // Dual-stack: anyIPv6 with v6Only=false (default) also accepts IPv4,
       // so peers that discovered us via link-local IPv6 can still pair.
-      final server = await HttpServer.bind(InternetAddress.anyIPv6, kExtensionPort, shared: true);
+      final server = await HttpServer.bind(InternetAddress.anyIPv6, port, shared: true);
       _logger.info('Extension server listening on $kExtensionPort');
       // ignore: discarded_futures
       server.listen((request) async {
@@ -123,7 +126,7 @@ class StartExtensionServerAction extends AsyncReduxAction<ExtensionServerService
           _logger.fine('Extension request error: $e\n$st');
         }
       });
-      return ExtensionServerState(server: server, port: kExtensionPort, pending: state.pending);
+      return ExtensionServerState(server: server, port: server.port, pending: state.pending);
     } catch (e) {
       _logger.warning('Extension server could not bind port $kExtensionPort: $e');
       return state;
@@ -144,7 +147,9 @@ class AbortPendingPairingAction extends ReduxAction<ExtensionServerService, Exte
         pending.userGate.complete(false);
       }
     }
-    return ExtensionServerState(server: state.server, port: state.port);
+    // pending is PRESERVED (aborted): the in-flight confirm long-poll reads
+    // it to resolve with `not_confirmed` instead of `no_pending`.
+    return ExtensionServerState(server: state.server, port: state.port, pending: pending);
   }
 }
 
@@ -165,7 +170,8 @@ class AcceptPendingPairingAction extends AsyncReduxAction<ExtensionServerService
     // place that also knows the initiator's ownerId/ownerName (required by
     // the same-owner rule) — accepting here as well would create a
     // duplicate favorite without the owner link.
-    return ExtensionServerState(server: state.server, port: state.port);
+    // pending is PRESERVED: the in-flight confirm long-poll still needs it.
+    return ExtensionServerState(server: state.server, port: state.port, pending: pending);
   }
 }
 
@@ -262,7 +268,9 @@ extension ExtensionServerHandler on ExtensionServerService {
     if (request.method == 'POST' && path == '/api/anyshare/v1/pair/confirm') {
       final body = await _readJson(request);
       final pending = ref.read(extensionServerProvider).pending;
-      if (body == null || pending == null || pending.aborted || body['session'] != pending.sessionId) {
+      // Note: pending.aborted is NOT rejected here — the gate below resolves
+      // to false in that case, yielding a distinct `not_confirmed` error.
+      if (body == null || pending == null || body['session'] != pending.sessionId) {
         await _json(request, {'error': 'no_pending'}, status: 409);
         return;
       }

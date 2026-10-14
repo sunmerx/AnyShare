@@ -113,6 +113,10 @@ class PersistenceService {
 
   PersistenceService._(this._prefs, this.isFirstAppStart);
 
+  /// AnyShare modification: deterministic instance for tests.
+  @visibleForTesting
+  factory PersistenceService.test(SharedPreferences prefs) => PersistenceService._(prefs, false);
+
   static Future<PersistenceService> initialize({
     required bool supportsDynamicColors,
   }) async {
