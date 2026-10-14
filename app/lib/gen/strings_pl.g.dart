@@ -234,6 +234,13 @@ class _Translations$sendTab$pl extends Translations$sendTab$en {
   String get help => 'Upewnij się, że żądany cel również znajduje się w tej samej sieci Wi-Fi.';
   @override
   String get placeItems => 'Umieść elementy do udostępnienia.';
+  @override
+  String trustHintAutoAccept({required Object alias}) => '${alias} przyjmie twój transfer automatycznie';
+  @override
+  String trustHintLimited({required Object alias, required Object max, required Object quota}) =>
+      '${alias} ustawił limity (maks. plik: ${max}, limit: ${quota}) — przekroczenia zostaną odrzucone';
+  @override
+  String trustHintBlocked({required Object alias}) => '${alias} zablokował cię — transfer zostanie odrzucony';
 }
 
 // Path: settingsTab

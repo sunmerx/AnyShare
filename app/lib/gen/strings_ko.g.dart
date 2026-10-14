@@ -234,6 +234,13 @@ class _Translations$sendTab$ko extends Translations$sendTab$en {
   String get help => '파일을 전송받을 기기도 동일한 Wi-Fi 네트워크에 연결되어 있어야 합니다.';
   @override
   String get placeItems => '드롭하여 공유하기';
+  @override
+  String trustHintAutoAccept({required Object alias}) => '${alias}이(가) 전송을 자동으로 수락합니다';
+  @override
+  String trustHintLimited({required Object alias, required Object max, required Object quota}) =>
+      '${alias}이(가) 한도를 설정했습니다(최대 파일 ${max}, 용량 ${quota}). 초과 시 거부됩니다';
+  @override
+  String trustHintBlocked({required Object alias}) => '${alias}이(가) 당신을 차단했습니다. 전송이 거부됩니다';
 }
 
 // Path: settingsTab

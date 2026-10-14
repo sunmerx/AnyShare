@@ -84,7 +84,10 @@
     },
     "sendModeHelp": "提示",
     "help": "请确保目标连接到同一个 Wi‑Fi 网络。",
-    "placeItems": "列出要分享的项目。"
+    "placeItems": "列出要分享的项目。",
+    "trustHintAutoAccept": "{alias} 将自动接收你的传输",
+    "trustHintLimited": "{alias} 设置了限额(单文件 {max},容量 {quota}),超出将被自动拒绝",
+    "trustHintBlocked": "{alias} 已拉黑你,发送将被拒绝"
   },
   "settingsTab": {
     "title": "设置",

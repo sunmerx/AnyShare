@@ -24,6 +24,39 @@ class PeerCapabilities {
   const PeerCapabilities({required this.fingerprint, required this.alias, required this.ownerName});
 }
 
+class PeerTrustPolicy {
+  final bool known;
+  final bool blocked;
+  final String trustLevel; // temp | limited | full
+  final int maxFileSize; // 0 = unlimited
+  final String quotaMode; // none | absolute | percent
+  final int quotaValue;
+
+  const PeerTrustPolicy({
+    required this.known,
+    required this.blocked,
+    required this.trustLevel,
+    required this.maxFileSize,
+    required this.quotaMode,
+    required this.quotaValue,
+  });
+
+  bool get hasLimits => trustLevel == 'limited' || maxFileSize > 0 || quotaMode != 'none';
+}
+
+extension PeerTrustPolicyParsing on PeerTrustPolicy {
+  static PeerTrustPolicy fromMap(Map data) {
+    return PeerTrustPolicy(
+      known: data['known'] == true,
+      blocked: data['blocked'] == true,
+      trustLevel: data['trustLevel'] as String? ?? 'temp',
+      maxFileSize: (data['maxFileSize'] as num?)?.toInt() ?? 0,
+      quotaMode: data['quotaMode'] as String? ?? 'none',
+      quotaValue: (data['quotaValue'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
 class PairingException implements Exception {
   final PairingError error;
   final String? detail;
@@ -90,6 +123,33 @@ extension PairingClient on Ref {
       throw const PairingException(PairingError.unreachable);
     } on FormatException catch (e) {
       throw PairingException(PairingError.protocol, e.message);
+    }
+  }
+
+  /// Asks the receiver how it would treat a transfer from us
+  /// (auto-accept / limited / blocked). Returns null when the peer is not
+  /// an AnyShare app or is unreachable — senders stay silent then.
+  Future<PeerTrustPolicy?> queryTrustPolicy({
+    required String host,
+    required int extPort,
+    required String myFingerprint,
+  }) async {
+    try {
+      final client = HttpClient()..connectionTimeout = _timeout;
+      final request = await client.postUrl(_extUri(host, extPort, 'trust/query'));
+      request.headers.contentType = ContentType.json;
+      request.write(jsonEncode({'fingerprint': myFingerprint}));
+      final response = await request.close().timeout(const Duration(seconds: 3));
+      if (response.statusCode != 200) {
+        return null;
+      }
+      final data = jsonDecode(await response.transform(utf8.decoder).join().timeout(const Duration(seconds: 3))) as Map;
+      if (data['known'] != true) {
+        return null;
+      }
+      return PeerTrustPolicyParsing.fromMap(data);
+    } on Exception {
+      return null;
     }
   }
 

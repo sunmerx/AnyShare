@@ -82,7 +82,10 @@
     },
     "sendModeHelp": "Explication",
     "help": "Veuillez vous assurer que l'appareil cible se trouve sur le même réseau Wi-Fi.",
-    "placeItems": "Placez des éléments à partager."
+    "placeItems": "Placez des éléments à partager.",
+    "trustHintAutoAccept": "{alias} acceptera automatiquement votre transfert",
+    "trustHintLimited": "{alias} a des limites (fichier max : {max}, quota : {quota}) — les dépassements seront refusés",
+    "trustHintBlocked": "{alias} vous a bloqué — le transfert sera refusé"
   },
   "settingsTab": {
     "title": "Paramètres",

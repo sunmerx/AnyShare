@@ -82,7 +82,10 @@
     },
     "sendModeHelp": "説明",
     "help": "目標のデバイスが同じWi-Fiネットワーク内にあることを確認してください。",
-    "placeItems": "共有するアイテムを配置してください。"
+    "placeItems": "共有するアイテムを配置してください。",
+    "trustHintAutoAccept": "{alias} は転送を自動的に受け入れます",
+    "trustHintLimited": "{alias} は制限を設定しています(最大ファイル {max}、容量 {quota})。超過すると拒否されます",
+    "trustHintBlocked": "{alias} はあなたをブロックしています。転送は拒否されます"
   },
   "settingsTab": {
     "title": "設定",

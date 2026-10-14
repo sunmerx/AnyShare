@@ -265,6 +265,37 @@ extension ExtensionServerHandler on ExtensionServerService {
       return;
     }
 
+    if (request.method == 'POST' && path == '/api/anyshare/v1/trust/query') {
+      // Lets the SENDER check how the receiver would treat them before a
+      // transfer (auto-accept / limited / blocked). Reveals only the policy
+      // toward the queried fingerprint — never ownerId/ownerName.
+      final body = await _readJson(request);
+      if (body == null || body['fingerprint'] is! String) {
+        await _json(request, {'error': 'bad_request'}, status: 400);
+        return;
+      }
+      FavoriteDevice? entry;
+      for (final e in ref.read(favoritesProvider)) {
+        if (e.fingerprint == body['fingerprint']) {
+          entry = e;
+          break;
+        }
+      }
+      if (entry == null) {
+        await _json(request, {'known': false});
+        return;
+      }
+      await _json(request, {
+        'known': true,
+        'trustLevel': entry.trustLevel.name,
+        'blocked': entry.blocked,
+        'maxFileSize': entry.maxFileSize,
+        'quotaMode': entry.quotaMode.name,
+        'quotaValue': entry.quotaValue,
+      });
+      return;
+    }
+
     if (request.method == 'POST' && path == '/api/anyshare/v1/pair/confirm') {
       final body = await _readJson(request);
       final pending = ref.read(extensionServerProvider).pending;

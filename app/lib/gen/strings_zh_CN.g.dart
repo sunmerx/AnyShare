@@ -240,6 +240,12 @@ class Translations$sendTab$zh_CN extends Translations$sendTab$en {
   String get help => '请确保目标连接到同一个 Wi‑Fi 网络。';
   @override
   String get placeItems => '列出要分享的项目。';
+  @override
+  String trustHintAutoAccept({required Object alias}) => '${alias} 将自动接收你的传输';
+  @override
+  String trustHintLimited({required Object alias, required Object max, required Object quota}) => '${alias} 设置了限额(单文件 ${max},容量 ${quota}),超出将被自动拒绝';
+  @override
+  String trustHintBlocked({required Object alias}) => '${alias} 已拉黑你,发送将被拒绝';
 }
 
 // Path: settingsTab

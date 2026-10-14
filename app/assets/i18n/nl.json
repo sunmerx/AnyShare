@@ -82,7 +82,10 @@
     },
     "sendModeHelp": "Informatie",
     "help": "Zorg ervoor dat de ontvanger is verbonden met hetzelfde wifi-netwerk.",
-    "placeItems": "Zet items neer om te delen."
+    "placeItems": "Zet items neer om te delen.",
+    "trustHintAutoAccept": "{alias} accepteert je overdracht automatisch",
+    "trustHintLimited": "{alias} heeft limieten ingesteld (max. bestand: {max}, quotum: {quota}) — overschrijding wordt geweigerd",
+    "trustHintBlocked": "{alias} heeft je geblokkeerd — de overdracht wordt geweigerd"
   },
   "settingsTab": {
     "title": "Instellingen",

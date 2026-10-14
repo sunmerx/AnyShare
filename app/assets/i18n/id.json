@@ -82,7 +82,10 @@
     },
     "sendModeHelp": "Penjelasan",
     "help": "Pastikan perangkat tujuan juga terkoneksi pada jaringan Wi-Fi yang sama.",
-    "placeItems": "Letakkan item untuk dibagikan."
+    "placeItems": "Letakkan item untuk dibagikan.",
+    "trustHintAutoAccept": "{alias} akan menerima transfer Anda secara otomatis",
+    "trustHintLimited": "{alias} menetapkan batas (file maks.: {max}, kuota: {quota}) — kelebihan akan ditolak",
+    "trustHintBlocked": "{alias} memblokir Anda — transfer akan ditolak"
   },
   "settingsTab": {
     "title": "Pengaturan",

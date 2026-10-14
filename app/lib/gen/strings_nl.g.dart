@@ -234,6 +234,13 @@ class _Translations$sendTab$nl extends Translations$sendTab$en {
   String get help => 'Zorg ervoor dat de ontvanger is verbonden met hetzelfde wifi-netwerk.';
   @override
   String get placeItems => 'Zet items neer om te delen.';
+  @override
+  String trustHintAutoAccept({required Object alias}) => '${alias} accepteert je overdracht automatisch';
+  @override
+  String trustHintLimited({required Object alias, required Object max, required Object quota}) =>
+      '${alias} heeft limieten ingesteld (max. bestand: ${max}, quotum: ${quota}) — overschrijding wordt geweigerd';
+  @override
+  String trustHintBlocked({required Object alias}) => '${alias} heeft je geblokkeerd — de overdracht wordt geweigerd';
 }
 
 // Path: settingsTab

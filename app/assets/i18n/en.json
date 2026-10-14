@@ -84,7 +84,10 @@
     },
     "sendModeHelp": "Explanation",
     "help": "Please ensure that the desired target is also on the same Wi-Fi network.",
-    "placeItems": "Place items to share."
+    "placeItems": "Place items to share.",
+    "trustHintAutoAccept": "{alias} will accept your transfer automatically",
+    "trustHintLimited": "{alias} has limits set (max file: {max}, quota: {quota}) — exceeding them will be declined",
+    "trustHintBlocked": "{alias} has blocked you — the transfer will be declined"
   },
   "settingsTab": {
     "title": "Settings",

@@ -267,6 +267,16 @@ class Translations$sendTab$en {
 
   /// en: 'Place items to share.'
   String get placeItems => 'Place items to share.';
+
+  /// en: '{alias} will accept your transfer automatically'
+  String trustHintAutoAccept({required Object alias}) => '${alias} will accept your transfer automatically';
+
+  /// en: '{alias} has limits set (max file: {max}, quota: {quota}) — exceeding them will be declined'
+  String trustHintLimited({required Object alias, required Object max, required Object quota}) =>
+      '${alias} has limits set (max file: ${max}, quota: ${quota}) — exceeding them will be declined';
+
+  /// en: '{alias} has blocked you — the transfer will be declined'
+  String trustHintBlocked({required Object alias}) => '${alias} has blocked you — the transfer will be declined';
 }
 
 // Path: settingsTab

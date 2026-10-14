@@ -82,7 +82,10 @@
     },
     "sendModeHelp": "Giải thích",
     "help": "Vui lòng đảm bảo thiết bị gửi và nhận dùng chung mạng wifi.",
-    "placeItems": "Đặt các mục để chia sẻ."
+    "placeItems": "Đặt các mục để chia sẻ.",
+    "trustHintAutoAccept": "{alias} sẽ tự động nhận tệp của bạn",
+    "trustHintLimited": "{alias} đã đặt giới hạn (tệp tối đa: {max}, hạn mức: {quota}) — vượt sẽ bị từ chối",
+    "trustHintBlocked": "{alias} đã chặn bạn — tệp sẽ bị từ chối"
   },
   "settingsTab": {
     "title": "Cài đặt",

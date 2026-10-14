@@ -234,6 +234,13 @@ class _Translations$sendTab$vi extends Translations$sendTab$en {
   String get help => 'Vui lòng đảm bảo thiết bị gửi và nhận dùng chung mạng wifi.';
   @override
   String get placeItems => 'Đặt các mục để chia sẻ.';
+  @override
+  String trustHintAutoAccept({required Object alias}) => '${alias} sẽ tự động nhận tệp của bạn';
+  @override
+  String trustHintLimited({required Object alias, required Object max, required Object quota}) =>
+      '${alias} đã đặt giới hạn (tệp tối đa: ${max}, hạn mức: ${quota}) — vượt sẽ bị từ chối';
+  @override
+  String trustHintBlocked({required Object alias}) => '${alias} đã chặn bạn — tệp sẽ bị từ chối';
 }
 
 // Path: settingsTab

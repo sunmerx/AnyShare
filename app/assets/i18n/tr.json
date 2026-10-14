@@ -82,7 +82,10 @@
     },
     "sendModeHelp": "Açıklama",
     "help": "Lütfen hedef cihaz ile aynı wifi ağında olduğunuzdan emin olun.",
-    "placeItems": "Paylaşmak istediğiniz dosyayı yerleştiriniz."
+    "placeItems": "Paylaşmak istediğiniz dosyayı yerleştiriniz.",
+    "trustHintAutoAccept": "{alias} aktarımınızı otomatik kabul edecek",
+    "trustHintLimited": "{alias} sınırlar ayarladı (maks. dosya: {max}, kota: {quota}) — aşımı reddedilir",
+    "trustHintBlocked": "{alias} sizi engelledi — aktarım reddedilecek"
   },
   "settingsTab": {
     "title": "Ayarlar",

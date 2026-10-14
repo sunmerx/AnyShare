@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:localsend_app/gen/strings.g.dart';
 import 'package:localsend_app/model/cross_file.dart';
 import 'package:localsend_app/model/persistence/send_history_entry.dart';
 import 'package:localsend_app/model/send_mode.dart';
@@ -13,9 +14,12 @@ import 'package:localsend_app/pages/send_page.dart';
 import 'package:localsend_app/provider/device_info_provider.dart';
 import 'package:localsend_app/provider/file_transfer_provider.dart';
 import 'package:localsend_app/provider/http_provider.dart';
+import 'package:localsend_app/provider/pairing_provider.dart';
+import 'package:localsend_app/provider/security_provider.dart';
 import 'package:localsend_app/provider/selection/selected_sending_files_provider.dart';
 import 'package:localsend_app/provider/send_history_provider.dart';
 import 'package:localsend_app/provider/settings_provider.dart';
+import 'package:localsend_app/util/ui/snackbar.dart';
 import 'package:localsend_app/widget/dialogs/pin_dialog.dart';
 import 'package:localsend_isolates/isolate.dart';
 import 'package:localsend_isolates/model/device.dart';
@@ -27,6 +31,7 @@ import 'package:localsend_isolates/rust/api/cancel.dart' as rust_cancel;
 import 'package:localsend_isolates/rust/api/http.dart' as rust_http;
 import 'package:localsend_isolates/rust/api/model.dart' as rust_model;
 import 'package:localsend_isolates/util/file_hash.dart';
+import 'package:localsend_isolates/util/file_size_helper.dart';
 import 'package:localsend_isolates/util/rust.dart';
 import 'package:localsend_isolates/util/sleep.dart';
 import 'package:localsend_isolates/util/transfer_notification.dart';
@@ -249,6 +254,11 @@ class SendNotifier extends Notifier<Map<String, SendSessionState>> {
         for (final entry in requestState.files.entries) entry.key: entry.value.file.toRust(),
       },
     );
+
+    // AnyShare modification: non-blocking pre-send hint about how the
+    // receiver will treat this transfer (auto-accept / limits / blocked).
+    // ignore: discarded_futures
+    unawaited(_showTrustHint(sessionId, target));
 
     rust_http.PrepareUploadResult? response;
     bool invalidPin;
@@ -616,6 +626,41 @@ class SendNotifier extends Notifier<Map<String, SendSessionState>> {
               ),
             ),
       );
+    }
+  }
+
+  // AnyShare modification: pre-send trust hint via the peer's extension
+  // server (/trust/query). Silent on any failure — never blocks the send.
+  Future<void> _showTrustHint(String sessionId, Device target) async {
+    try {
+      final sessionState = state[sessionId];
+      if (sessionState == null || sessionState.files.isEmpty || target.ip == null) {
+        return;
+      }
+      final policy = await ref.queryTrustPolicy(
+        host: target.ip!,
+        extPort: 53318,
+        myFingerprint: ref.read(securityProvider).certificateHash,
+      );
+      if (policy == null || !policy.known || policy.trustLevel == 'full' || state[sessionId] == null) {
+        return;
+      }
+      final String message;
+      if (policy.blocked) {
+        message = t.sendTab.trustHintBlocked(alias: target.alias);
+      } else if (policy.trustLevel == 'limited' || policy.hasLimits) {
+        message = t.sendTab.trustHintLimited(
+          alias: target.alias,
+          max: policy.maxFileSize > 0 ? policy.maxFileSize.asReadableFileSize : '-',
+          quota: policy.quotaMode == 'absolute' ? policy.quotaValue.asReadableFileSize : '-',
+        );
+      } else {
+        message = t.sendTab.trustHintAutoAccept(alias: target.alias);
+      }
+      // ignore: use_build_context_synchronously
+      Routerino.context.showSnackBar(message);
+    } catch (_) {
+      // hint only — never interfere with the transfer
     }
   }
 

@@ -135,6 +135,25 @@ void main() {
     expect(container.read(extensionServerProvider).pending, isNull);
   });
 
+  test('trust/query reveals the policy toward the sender only', () async {
+    // unknown fingerprint
+    final (s0, b0) = await post('trust/query', {'fingerprint': 'UNKNOWN'});
+    expect(s0, 200);
+    expect(b0['known'], false);
+
+    // after pairing, the policy is known (temp, not blocked, no limits)
+    await register('TestPeer');
+    await container.redux(extensionServerProvider).dispatchAsync(AcceptPendingPairingAction());
+    final (s1, b1) = await post('trust/query', {'fingerprint': peerFingerprint});
+    expect(s1, 200);
+    expect(b1['known'], true);
+    expect(b1['trustLevel'], 'temp');
+    expect(b1['blocked'], false);
+    expect(b1['maxFileSize'], 0);
+    expect(b1['quotaMode'], 'none');
+    expect(b1.containsKey('ownerId'), false, reason: 'owner identity must not leak');
+  });
+
   test('rate limit: 6th /pair request from one IP is throttled', () async {
     // Fresh server per test: requests 1-5 pass, the 6th is throttled.
     final statuses = <int>[];

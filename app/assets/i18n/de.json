@@ -82,7 +82,10 @@
     },
     "sendModeHelp": "Erklärung",
     "help": "Bitte stelle sicher, dass sich das gewünschte Ziel auch im selben WLAN-Netzwerk befindet.",
-    "placeItems": "Dateien ablegen, um zu teilen."
+    "placeItems": "Dateien ablegen, um zu teilen.",
+    "trustHintAutoAccept": "{alias} nimmt deine Übertragung automatisch an",
+    "trustHintLimited": "{alias} hat Grenzen gesetzt (max. Datei: {max}, Kontingent: {quota}) — Überschreitungen werden abgelehnt",
+    "trustHintBlocked": "{alias} hat dich blockiert — die Übertragung wird abgelehnt"
   },
   "settingsTab": {
     "title": "Einstellungen",
