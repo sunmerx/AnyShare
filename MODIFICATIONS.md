@@ -53,6 +53,13 @@
 - `pubspec.lock`:8 个 build 工具链传递依赖小版本再解析(archive/build_config/build_daemon 等,仅 codegen 使用;官方源解析,运行时依赖零漂移)
 - `app/pubspec.yaml`:description 重写、homepage → github.com/sunmerx/AnyShare
 
+### 配对信任语义裁决批次(2026-10-14)
+
+- 产品裁决:**配对 = 接收方一次性确认**。已配对设备(含临时信任)传输不再弹确认;信任等级仅决定限额是否生效(temp/full 行为一致,limited 走限额检查,blocked 拒绝);未知设备仍走原确认流
+- `app/lib/util/trust_evaluator.dart`:temp → 自动接收
+- `app/lib/provider/pairing_provider.dart`、`app/lib/provider/network/extension_server_provider.dart`:配对落库注释与默认(仍为 temp)对齐新语义
+- 文案 14 语言更新(配对完成提示/等级标签);`docs/扩展协议设计.md` §3.2/§6 同步
+
 ### 安装器 AppId 批次(2026-10-13,Stage 3)
 
 - `support/scripts/compile_windows_exe-inno.iss`:AppId 更换为新 GUID(EC7921F5-…,与 LocalSend 安装器隔离,避免升级路径串扰)
