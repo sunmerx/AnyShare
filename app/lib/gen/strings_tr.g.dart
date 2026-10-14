@@ -1134,7 +1134,7 @@ class _Translations$deviceDetailsPage$trust$tr extends Translations$deviceDetail
   @override
   String get level => 'Güven düzeyi';
   @override
-  String get levelTemp => 'Geçici (otomatik kabul)';
+  String get levelTemp => 'Geçici (alıcı onaylar)';
   @override
   String get levelLimited => 'Sınırlı güven';
   @override
@@ -1192,7 +1192,7 @@ class _Translations$deviceDetailsPage$pairing$tr extends Translations$deviceDeta
   String get mismatch => 'Kodlar farklı';
   @override
   String done({required Object name}) =>
-      '${name} ile eşleştirildi. Eşleştirilmiş cihazlardan gelen aktarımlar otomatik kabul edilir — gerekirse aşağıdan sınır koyun.';
+      '${name} ile eşleştirildi. Aktarımları alıcı onaylar (tam güven: otomatik) — gerekirse aşağıdan sınır koyun.';
   @override
   String get errorNotAnyShare => 'Karşı cihaz bir AnyShare uygulaması değil.';
   @override

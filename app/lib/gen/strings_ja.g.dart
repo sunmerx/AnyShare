@@ -1128,7 +1128,7 @@ class _Translations$deviceDetailsPage$trust$ja extends Translations$deviceDetail
   @override
   String get level => '信頼レベル';
   @override
-  String get levelTemp => '一時的(自動的に受け入れる)';
+  String get levelTemp => '一時的(受信側が確認)';
   @override
   String get levelLimited => '制限付き信頼';
   @override
@@ -1185,7 +1185,7 @@ class _Translations$deviceDetailsPage$pairing$ja extends Translations$deviceDeta
   @override
   String get mismatch => 'コードが一致しません';
   @override
-  String done({required Object name}) => '${name} とペアリングしました。ペアリング済みデバイスからの転送は自動的に受け入れます。制限は下で設定できます。';
+  String done({required Object name}) => '${name} とペアリングしました。転送は受信側が確認します(完全信頼は自動)。制限は下で設定できます。';
   @override
   String get errorNotAnyShare => '相手は AnyShare アプリではありません。';
   @override

@@ -228,7 +228,7 @@
     "trust": {
       "title": "Güven",
       "level": "Güven düzeyi",
-      "levelTemp": "Geçici (otomatik kabul)",
+      "levelTemp": "Geçici (alıcı onaylar)",
       "levelLimited": "Sınırlı güven",
       "levelFull": "Tam güven (sınırsız)",
       "blocked": "Engellenmiş",
@@ -254,7 +254,7 @@
       "waitingPeer": "Diğer cihaz bekleniyor…",
       "match": "Kodlar eşleşiyor",
       "mismatch": "Kodlar farklı",
-      "done": "{name} ile eşleştirildi. Eşleştirilmiş cihazlardan gelen aktarımlar otomatik kabul edilir — gerekirse aşağıdan sınır koyun.",
+      "done": "{name} ile eşleştirildi. Aktarımları alıcı onaylar (tam güven: otomatik) — gerekirse aşağıdan sınır koyun.",
       "errorNotAnyShare": "Karşı cihaz bir AnyShare uygulaması değil.",
       "errorUnreachable": "Cihaza ulaşılamadı.",
       "errorBusy": "Cihaz başka bir eşleştirmeyle meşgul.",

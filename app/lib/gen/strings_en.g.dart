@@ -1428,8 +1428,8 @@ class Translations$deviceDetailsPage$trust$en {
   /// en: 'Trust level'
   String get level => 'Trust level';
 
-  /// en: 'Temporary (auto-accept)'
-  String get levelTemp => 'Temporary (auto-accept)';
+  /// en: 'Temporary (receiver confirms)'
+  String get levelTemp => 'Temporary (receiver confirms)';
 
   /// en: 'Trusted with limits'
   String get levelLimited => 'Trusted with limits';
@@ -1509,9 +1509,9 @@ class Translations$deviceDetailsPage$pairing$en {
   /// en: 'Codes differ'
   String get mismatch => 'Codes differ';
 
-  /// en: 'Paired with {name}. Transfers from paired devices are accepted automatically — set limits below if needed.'
+  /// en: 'Paired with {name}. The receiver confirms each transfer (full trust accepts automatically) — set limits below if needed.'
   String done({required Object name}) =>
-      'Paired with ${name}. Transfers from paired devices are accepted automatically — set limits below if needed.';
+      'Paired with ${name}. The receiver confirms each transfer (full trust accepts automatically) — set limits below if needed.';
 
   /// en: 'The device is not an AnyShare app.'
   String get errorNotAnyShare => 'The device is not an AnyShare app.';

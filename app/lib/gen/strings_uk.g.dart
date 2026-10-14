@@ -1134,7 +1134,7 @@ class _Translations$deviceDetailsPage$trust$uk extends Translations$deviceDetail
   @override
   String get level => 'Рівень довіри';
   @override
-  String get levelTemp => 'Тимчасовий (приймати автоматично)';
+  String get levelTemp => 'Тимчасовий (підтверджує отримувач)';
   @override
   String get levelLimited => 'Довіра з обмеженнями';
   @override
@@ -1192,7 +1192,7 @@ class _Translations$deviceDetailsPage$pairing$uk extends Translations$deviceDeta
   String get mismatch => 'Коди відрізняються';
   @override
   String done({required Object name}) =>
-      'З\'єднано з ${name}. Передачі від з\'єднаних пристроїв приймаються автоматично — за потреби задайте ліміти нижче.';
+      'З\'єднано з ${name}. Отримувач підтверджує кожну передачу (повна довіра: автоматично) — за потреби задайте ліміти нижче.';
   @override
   String get errorNotAnyShare => 'Пристрій не є застосунком AnyShare.';
   @override

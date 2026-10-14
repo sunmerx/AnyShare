@@ -228,7 +228,7 @@
     "trust": {
       "title": "Vertrauen",
       "level": "Vertrauensstufe",
-      "levelTemp": "Temporär (automatisch annehmen)",
+      "levelTemp": "Temporär (Empfänger bestätigt)",
       "levelLimited": "Begrenzt vertraut",
       "levelFull": "Voll vertraut (ohne Grenzen)",
       "blocked": "Blockiert",
@@ -254,7 +254,7 @@
       "waitingPeer": "Warte auf das andere Gerät…",
       "match": "Codes stimmen überein",
       "mismatch": "Codes weichen ab",
-      "done": "Mit {name} gekoppelt. Übertragungen von gekoppelten Geräten werden automatisch angenommen — bei Bedarf unten Grenzen setzen.",
+      "done": "Mit {name} gekoppelt. Der Empfänger bestätigt jede Übertragung (volles Vertrauen nimmt automatisch an) — bei Bedarf unten Grenzen setzen.",
       "errorNotAnyShare": "Das Gerät ist keine AnyShare-App.",
       "errorUnreachable": "Gerät nicht erreichbar.",
       "errorBusy": "Das Gerät ist mit einer anderen Kopplung beschäftigt.",

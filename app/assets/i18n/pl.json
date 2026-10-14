@@ -228,7 +228,7 @@
     "trust": {
       "title": "Zaufanie",
       "level": "Poziom zaufania",
-      "levelTemp": "Tymczasowe (automatyczne przyjmowanie)",
+      "levelTemp": "Tymczasowe (potwierdza odbiorca)",
       "levelLimited": "Zaufanie z limitami",
       "levelFull": "Pełne zaufanie (bez limitów)",
       "blocked": "Zablokowany",
@@ -254,7 +254,7 @@
       "waitingPeer": "Oczekiwanie na drugie urządzenie…",
       "match": "Kody są zgodne",
       "mismatch": "Kody różnią się",
-      "done": "Sparowano z {name}. Transfery z sparowanych urządzeń są przyjmowane automatycznie — w razie potrzeby ustaw limity poniżej.",
+      "done": "Sparowano z {name}. Odbiorca potwierdza każdy transfer (pełne zaufanie: automatycznie) — w razie potrzeby ustaw limity poniżej.",
       "errorNotAnyShare": "To urządzenie nie jest aplikacją AnyShare.",
       "errorUnreachable": "Nie można połączyć się z urządzeniem.",
       "errorBusy": "Urządzenie jest zajęte innym parowaniem.",

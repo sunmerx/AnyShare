@@ -538,7 +538,9 @@ class PersistenceService {
   }
 
   bool isAutoFinish() {
-    return _prefs.getBool(_autoFinish) ?? false;
+    // Product decision (2026-10-14): transfers finish without a manual tap —
+    // the completion card shows for the 3s countdown, then the page closes.
+    return _prefs.getBool(_autoFinish) ?? true;
   }
 
   Future<void> setAutoFinish(bool autoFinish) async {

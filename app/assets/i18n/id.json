@@ -228,7 +228,7 @@
     "trust": {
       "title": "Kepercayaan",
       "level": "Tingkat kepercayaan",
-      "levelTemp": "Sementara (terima otomatis)",
+      "levelTemp": "Sementara (penerima mengonfirmasi)",
       "levelLimited": "Dipercaya dengan batas",
       "levelFull": "Sepenuhnya dipercaya (tanpa batas)",
       "blocked": "Diblokir",
@@ -254,7 +254,7 @@
       "waitingPeer": "Menunggu perangkat lain…",
       "match": "Kode cocok",
       "mismatch": "Kode tidak cocok",
-      "done": "Terpasang dengan {name}. Transfer dari perangkat yang terpasang diterima otomatis — atur batas di bawah bila perlu.",
+      "done": "Terpasang dengan {name}. Penerima mengonfirmasi setiap transfer (kepercayaan penuh: otomatis) — atur batas di bawah bila perlu.",
       "errorNotAnyShare": "Perangkat bukan aplikasi AnyShare.",
       "errorUnreachable": "Tidak dapat menghubungi perangkat.",
       "errorBusy": "Perangkat sedang sibuk dengan pemasangan lain.",

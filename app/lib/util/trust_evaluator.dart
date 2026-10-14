@@ -53,9 +53,10 @@ class TrustEvaluator {
       case TrustLevel.full:
         return const TrustAutoAccept();
       case TrustLevel.temp:
-        // Product decision (2026-10-14): pairing is the receiver's one-time
-        // confirmation — known devices are never re-prompted, even at temp.
-        return const TrustAutoAccept();
+        // Product decision (2026-10-14, revised): the SENDER never does
+        // anything extra; the RECEIVER taps confirm for temp transfers.
+        // Only full trust skips the tap entirely. Limits still auto-decline.
+        return const TrustConfirm();
       case TrustLevel.limited:
         if (device.maxFileSize > 0 && fileSizes.any((s) => s > device.maxFileSize)) {
           return TrustReject(TrustRejectReason.fileTooLarge, limit: device.maxFileSize);
@@ -68,7 +69,9 @@ class TrustEvaluator {
         if (quotaLimit != null && quotaLimit > 0 && receivedBytesFromSender + sessionTotalBytes > quotaLimit) {
           return TrustReject(TrustRejectReason.quotaExceeded, limit: quotaLimit, used: receivedBytesFromSender);
         }
-        return const TrustAutoAccept();
+        // Over-limit transfers were declined above; within limits the
+        // receiver still taps confirm (only full trust skips the tap).
+        return const TrustConfirm();
     }
   }
 }

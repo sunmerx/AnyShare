@@ -1128,7 +1128,7 @@ class _Translations$deviceDetailsPage$trust$ko extends Translations$deviceDetail
   @override
   String get level => '신뢰 수준';
   @override
-  String get levelTemp => '임시(자동 수락)';
+  String get levelTemp => '임시(수신 측 확인)';
   @override
   String get levelLimited => '제한적 신뢰';
   @override
@@ -1185,7 +1185,7 @@ class _Translations$deviceDetailsPage$pairing$ko extends Translations$deviceDeta
   @override
   String get mismatch => '코드 불일치';
   @override
-  String done({required Object name}) => '${name}와(과) 페어링되었습니다. 페어링된 기기의 전송은 자동으로 수신됩니다. 필요 시 아래에서 한도를 설정하세요.';
+  String done({required Object name}) => '${name}와(과) 페어링되었습니다. 전송은 수신 측이 확인합니다(완전 신뢰는 자동 수락). 필요 시 아래에서 한도를 설정하세요.';
   @override
   String get errorNotAnyShare => '상대 기기는 AnyShare 앱이 아닙니다.';
   @override

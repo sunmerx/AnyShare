@@ -1135,7 +1135,7 @@ class _Translations$deviceDetailsPage$trust$fr extends Translations$deviceDetail
   @override
   String get level => 'Niveau de confiance';
   @override
-  String get levelTemp => 'Temporaire (acceptation automatique)';
+  String get levelTemp => 'Temporaire (le récepteur confirme)';
   @override
   String get levelLimited => 'Confiance limitée';
   @override
@@ -1193,7 +1193,7 @@ class _Translations$deviceDetailsPage$pairing$fr extends Translations$deviceDeta
   String get mismatch => 'Les codes diffèrent';
   @override
   String done({required Object name}) =>
-      'Associé à ${name}. Les transferts des appareils associés sont acceptés automatiquement — définissez des limites ci-dessous si besoin.';
+      'Associé à ${name}. Le récepteur confirme chaque transfert (la confiance totale accepte automatiquement) — définissez des limites ci-dessous si besoin.';
   @override
   String get errorNotAnyShare => 'L\'appareil n\'est pas une application AnyShare.';
   @override

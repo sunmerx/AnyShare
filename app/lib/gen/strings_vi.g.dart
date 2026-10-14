@@ -1134,7 +1134,7 @@ class _Translations$deviceDetailsPage$trust$vi extends Translations$deviceDetail
   @override
   String get level => 'Mức tin cậy';
   @override
-  String get levelTemp => 'Tạm thời (tự động nhận)';
+  String get levelTemp => 'Tạm thời (bên nhận xác nhận)';
   @override
   String get levelLimited => 'Tin cậy có giới hạn';
   @override
@@ -1192,7 +1192,7 @@ class _Translations$deviceDetailsPage$pairing$vi extends Translations$deviceDeta
   String get mismatch => 'Mã không khớp';
   @override
   String done({required Object name}) =>
-      'Đã ghép cặp với ${name}. Các tệp từ thiết bị đã ghép cặp sẽ được tự động nhận — đặt giới hạn bên dưới nếu cần.';
+      'Đã ghép cặp với ${name}. Bên nhận xác nhận từng tệp (tin cậy hoàn toàn: tự động) — đặt giới hạn bên dưới nếu cần.';
   @override
   String get errorNotAnyShare => 'Thiết bị đối diện không phải ứng dụng AnyShare.';
   @override

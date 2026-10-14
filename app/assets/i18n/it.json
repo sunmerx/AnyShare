@@ -228,7 +228,7 @@
     "trust": {
       "title": "Fiducia",
       "level": "Livello di fiducia",
-      "levelTemp": "Temporaneo (accettazione automatica)",
+      "levelTemp": "Temporaneo (conferma del ricevente)",
       "levelLimited": "Fiducia con limiti",
       "levelFull": "Piena fiducia (senza limiti)",
       "blocked": "Bloccato",
@@ -254,7 +254,7 @@
       "waitingPeer": "In attesa dell'altro dispositivo…",
       "match": "I codici coincidono",
       "mismatch": "I codici differiscono",
-      "done": "Associato a {name}. I trasferimenti dai dispositivi associati vengono accettati automaticamente — imposta eventuali limiti sotto.",
+      "done": "Associato a {name}. Il ricevente conferma ogni trasferimento (fiducia piena: automatico) — imposta eventuali limiti sotto.",
       "errorNotAnyShare": "Il dispositivo non è un'app AnyShare.",
       "errorUnreachable": "Impossibile raggiungere il dispositivo.",
       "errorBusy": "Il dispositivo è occupato con un'altra associazione.",

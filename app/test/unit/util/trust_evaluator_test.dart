@@ -45,14 +45,24 @@ void main() {
       expect(decision, isA<TrustAutoAccept>());
     });
 
-    test('temp trust → auto-accept (pairing was the confirmation)', () {
+    test('temp trust → receiver confirms (sender does nothing)', () {
       final decision = TrustEvaluator.evaluate(
         entry: device(trustLevel: TrustLevel.temp),
         sessionTotalBytes: 1,
         fileSizes: [1],
         receivedBytesFromSender: 0,
       );
-      expect(decision, isA<TrustAutoAccept>());
+      expect(decision, isA<TrustConfirm>());
+    });
+
+    test('limited within limits → receiver confirms', () {
+      final decision = TrustEvaluator.evaluate(
+        entry: device(trustLevel: TrustLevel.limited),
+        sessionTotalBytes: 10,
+        fileSizes: [10],
+        receivedBytesFromSender: 0,
+      );
+      expect(decision, isA<TrustConfirm>());
     });
 
     test('blocked → reject', () {
@@ -77,14 +87,14 @@ void main() {
       expect((decision as TrustReject).reason, TrustRejectReason.fileTooLarge);
     });
 
-    test('limited: within absolute quota → auto accept', () {
+    test('limited: within absolute quota → receiver confirms', () {
       final decision = TrustEvaluator.evaluate(
         entry: device(trustLevel: TrustLevel.limited, quotaMode: QuotaMode.absolute, quotaValue: 1000),
         sessionTotalBytes: 100,
         fileSizes: [100],
         receivedBytesFromSender: 800,
       );
-      expect(decision, isA<TrustAutoAccept>());
+      expect(decision, isA<TrustConfirm>());
     });
 
     test('limited: exceeding absolute quota → reject', () {
@@ -101,7 +111,7 @@ void main() {
       expect(decision.used, 800);
     });
 
-    test('limited: percent quota computed against volume size', () {
+    test('limited: percent quota computed against volume size (within → confirm)', () {
       final decision = TrustEvaluator.evaluate(
         entry: device(trustLevel: TrustLevel.limited, quotaMode: QuotaMode.percent, quotaValue: 2000), // 20%
         sessionTotalBytes: 100,
@@ -109,7 +119,7 @@ void main() {
         receivedBytesFromSender: 0,
         destinationVolumeTotalBytes: 1 << 30, // 1 GiB → limit ≈ 204.8 MiB
       );
-      expect(decision, isA<TrustAutoAccept>());
+      expect(decision, isA<TrustConfirm>());
     });
 
     test('limited: percent quota exceeded', () {
