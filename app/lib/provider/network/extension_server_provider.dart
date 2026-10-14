@@ -307,6 +307,8 @@ extension ExtensionServerHandler on ExtensionServerService {
                 port: pending.peerPort,
                 alias: pending.peerAlias,
               ).copyWith(
+                // Product decision (2026-10-14): pairing IS the receiver's
+                // confirmation — no per-transfer prompts even at `temp`.
                 trustLevel: TrustLevel.temp,
                 ownerId: (body['ownerId'] as String?) ?? '',
                 ownerName: (body['ownerName'] as String?) ?? '',

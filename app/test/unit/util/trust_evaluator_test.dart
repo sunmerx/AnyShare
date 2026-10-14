@@ -45,14 +45,14 @@ void main() {
       expect(decision, isA<TrustAutoAccept>());
     });
 
-    test('temp trust → confirm', () {
+    test('temp trust → auto-accept (pairing was the confirmation)', () {
       final decision = TrustEvaluator.evaluate(
         entry: device(trustLevel: TrustLevel.temp),
         sessionTotalBytes: 1,
         fileSizes: [1],
         receivedBytesFromSender: 0,
       );
-      expect(decision, isA<TrustConfirm>());
+      expect(decision, isA<TrustAutoAccept>());
     });
 
     test('blocked → reject', () {

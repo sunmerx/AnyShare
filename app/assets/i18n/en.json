@@ -229,7 +229,7 @@
     "trust": {
       "title": "Trust",
       "level": "Trust level",
-      "levelTemp": "Temporary (ask every time)",
+      "levelTemp": "Temporary (auto-accept)",
       "levelLimited": "Trusted with limits",
       "levelFull": "Fully trusted (no limits)",
       "blocked": "Blocked",
@@ -255,7 +255,7 @@
       "waitingPeer": "Waiting for the other device…",
       "match": "Codes match",
       "mismatch": "Codes differ",
-      "done": "Paired with {name}. Trust level: temporary (change it below).",
+      "done": "Paired with {name}. Transfers from paired devices are accepted automatically — set limits below if needed.",
       "errorNotAnyShare": "The device is not an AnyShare app.",
       "errorUnreachable": "The device could not be reached.",
       "errorBusy": "The device is busy with another pairing.",

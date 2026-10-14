@@ -1127,7 +1127,7 @@ class _Translations$deviceDetailsPage$trust$pl extends Translations$deviceDetail
   @override
   String get level => 'Poziom zaufania';
   @override
-  String get levelTemp => 'Tymczasowe (pytaj za każdym razem)';
+  String get levelTemp => 'Tymczasowe (automatyczne przyjmowanie)';
   @override
   String get levelLimited => 'Zaufanie z limitami';
   @override
@@ -1184,7 +1184,8 @@ class _Translations$deviceDetailsPage$pairing$pl extends Translations$deviceDeta
   @override
   String get mismatch => 'Kody różnią się';
   @override
-  String done({required Object name}) => 'Sparowano z ${name}. Poziom zaufania: tymczasowy (zmień poniżej).';
+  String done({required Object name}) =>
+      'Sparowano z ${name}. Transfery z sparowanych urządzeń są przyjmowane automatycznie — w razie potrzeby ustaw limity poniżej.';
   @override
   String get errorNotAnyShare => 'To urządzenie nie jest aplikacją AnyShare.';
   @override

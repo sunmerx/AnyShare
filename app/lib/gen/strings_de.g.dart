@@ -1127,7 +1127,7 @@ class _Translations$deviceDetailsPage$trust$de extends Translations$deviceDetail
   @override
   String get level => 'Vertrauensstufe';
   @override
-  String get levelTemp => 'Temporär (jedes Mal fragen)';
+  String get levelTemp => 'Temporär (automatisch annehmen)';
   @override
   String get levelLimited => 'Begrenzt vertraut';
   @override
@@ -1184,7 +1184,8 @@ class _Translations$deviceDetailsPage$pairing$de extends Translations$deviceDeta
   @override
   String get mismatch => 'Codes weichen ab';
   @override
-  String done({required Object name}) => 'Mit ${name} gekoppelt. Vertrauensstufe: temporär (unten änderbar).';
+  String done({required Object name}) =>
+      'Mit ${name} gekoppelt. Übertragungen von gekoppelten Geräten werden automatisch angenommen — bei Bedarf unten Grenzen setzen.';
   @override
   String get errorNotAnyShare => 'Das Gerät ist keine AnyShare-App.';
   @override

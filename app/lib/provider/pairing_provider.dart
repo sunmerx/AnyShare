@@ -193,7 +193,9 @@ Future<void> finishPairing(Ref ref, PairingResult result) async {
   final updated = result.device.copyWith(
     ownerId: result.peerOwnerId,
     ownerName: result.peerOwnerName,
-    trustLevel: TrustLevel.temp, // default; adjustable in the details page
+    // Product decision (2026-10-14): pairing IS the receiver's confirmation.
+    // Paired devices never get per-transfer prompts, even at `temp` — the
+    // level only controls whether limits apply (see TrustEvaluator).
   );
   await ref.redux(favoritesProvider).dispatchAsync(AddFavoriteAction(updated));
 }

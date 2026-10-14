@@ -1127,7 +1127,7 @@ class _Translations$deviceDetailsPage$trust$id extends Translations$deviceDetail
   @override
   String get level => 'Tingkat kepercayaan';
   @override
-  String get levelTemp => 'Sementara (tanya setiap kali)';
+  String get levelTemp => 'Sementara (terima otomatis)';
   @override
   String get levelLimited => 'Dipercaya dengan batas';
   @override
@@ -1184,7 +1184,8 @@ class _Translations$deviceDetailsPage$pairing$id extends Translations$deviceDeta
   @override
   String get mismatch => 'Kode tidak cocok';
   @override
-  String done({required Object name}) => 'Terpasang dengan ${name}. Tingkat kepercayaan: sementara (ubah di bawah).';
+  String done({required Object name}) =>
+      'Terpasang dengan ${name}. Transfer dari perangkat yang terpasang diterima otomatis — atur batas di bawah bila perlu.';
   @override
   String get errorNotAnyShare => 'Perangkat bukan aplikasi AnyShare.';
   @override

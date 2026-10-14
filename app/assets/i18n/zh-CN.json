@@ -227,7 +227,7 @@
     "trust": {
       "title": "信任设置",
       "level": "信任等级",
-      "levelTemp": "临时传输(每次确认)",
+      "levelTemp": "临时传输(自动接收)",
       "levelLimited": "一般信任(可设限额)",
       "levelFull": "完全信任(无限制)",
       "blocked": "拉黑",
@@ -253,7 +253,7 @@
       "waitingPeer": "等待对方操作…",
       "match": "码一致",
       "mismatch": "码不一致",
-      "done": "已与 {name} 配对。信任级别:临时(可在下方修改)。",
+      "done": "已与 {name} 配对。之后来自已配对设备的传输将自动接收,如需限制可在下方设置。",
       "errorNotAnyShare": "对方不是 AnyShare 应用。",
       "errorUnreachable": "无法连接对方设备。",
       "errorBusy": "对方正在处理其他配对请求。",

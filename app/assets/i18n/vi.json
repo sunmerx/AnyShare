@@ -225,7 +225,7 @@
     "trust": {
       "title": "Tin cậy",
       "level": "Mức tin cậy",
-      "levelTemp": "Tạm thời (hỏi mỗi lần)",
+      "levelTemp": "Tạm thời (tự động nhận)",
       "levelLimited": "Tin cậy có giới hạn",
       "levelFull": "Tin cậy hoàn toàn (không giới hạn)",
       "blocked": "Chặn",
@@ -251,7 +251,7 @@
       "waitingPeer": "Đang chờ thiết bị kia…",
       "match": "Mã khớp",
       "mismatch": "Mã không khớp",
-      "done": "Đã ghép cặp với {name}. Mức tin cậy: tạm thời (thay đổi bên dưới).",
+      "done": "Đã ghép cặp với {name}. Các tệp từ thiết bị đã ghép cặp sẽ được tự động nhận — đặt giới hạn bên dưới nếu cần.",
       "errorNotAnyShare": "Thiết bị đối diện không phải ứng dụng AnyShare.",
       "errorUnreachable": "Không thể kết nối tới thiết bị.",
       "errorBusy": "Thiết bị đang bận ghép cặp khác.",

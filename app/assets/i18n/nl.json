@@ -225,7 +225,7 @@
     "trust": {
       "title": "Vertrouwen",
       "level": "Vertrouwensniveau",
-      "levelTemp": "Tijdelijk (elke keer vragen)",
+      "levelTemp": "Tijdelijk (automatisch accepteren)",
       "levelLimited": "Beperkt vertrouwen",
       "levelFull": "Volledig vertrouwen (zonder limiet)",
       "blocked": "Geblokkeerd",
@@ -251,7 +251,7 @@
       "waitingPeer": "Wachten op het andere apparaat…",
       "match": "Codes komen overeen",
       "mismatch": "Codes verschillen",
-      "done": "Gekoppeld met {name}. Vertrouwensniveau: tijdelijk (onderaan te wijzigen).",
+      "done": "Gekoppeld met {name}. Overdrachten van gekoppelde apparaten worden automatisch geaccepteerd — stel zonodig limieten in onderaan.",
       "errorNotAnyShare": "Het apparaat is geen AnyShare-app.",
       "errorUnreachable": "Apparaat niet bereikbaar.",
       "errorBusy": "Het apparaat is bezig met een andere koppeling.",

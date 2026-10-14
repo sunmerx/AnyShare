@@ -1213,7 +1213,7 @@ class Translations$deviceDetailsPage$trust$zh_CN extends Translations$deviceDeta
   @override
   String get level => '信任等级';
   @override
-  String get levelTemp => '临时传输(每次确认)';
+  String get levelTemp => '临时传输(自动接收)';
   @override
   String get levelLimited => '一般信任(可设限额)';
   @override
@@ -1270,7 +1270,7 @@ class Translations$deviceDetailsPage$pairing$zh_CN extends Translations$deviceDe
   @override
   String get mismatch => '码不一致';
   @override
-  String done({required Object name}) => '已与 ${name} 配对。信任级别:临时(可在下方修改)。';
+  String done({required Object name}) => '已与 ${name} 配对。之后来自已配对设备的传输将自动接收,如需限制可在下方设置。';
   @override
   String get errorNotAnyShare => '对方不是 AnyShare 应用。';
   @override

@@ -1128,7 +1128,7 @@ class _Translations$deviceDetailsPage$trust$nl extends Translations$deviceDetail
   @override
   String get level => 'Vertrouwensniveau';
   @override
-  String get levelTemp => 'Tijdelijk (elke keer vragen)';
+  String get levelTemp => 'Tijdelijk (automatisch accepteren)';
   @override
   String get levelLimited => 'Beperkt vertrouwen';
   @override
@@ -1185,7 +1185,8 @@ class _Translations$deviceDetailsPage$pairing$nl extends Translations$deviceDeta
   @override
   String get mismatch => 'Codes verschillen';
   @override
-  String done({required Object name}) => 'Gekoppeld met ${name}. Vertrouwensniveau: tijdelijk (onderaan te wijzigen).';
+  String done({required Object name}) =>
+      'Gekoppeld met ${name}. Overdrachten van gekoppelde apparaten worden automatisch geaccepteerd — stel zonodig limieten in onderaan.';
   @override
   String get errorNotAnyShare => 'Het apparaat is geen AnyShare-app.';
   @override

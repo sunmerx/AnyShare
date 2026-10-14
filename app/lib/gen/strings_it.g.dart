@@ -1127,7 +1127,7 @@ class _Translations$deviceDetailsPage$trust$it extends Translations$deviceDetail
   @override
   String get level => 'Livello di fiducia';
   @override
-  String get levelTemp => 'Temporaneo (chiedi sempre)';
+  String get levelTemp => 'Temporaneo (accettazione automatica)';
   @override
   String get levelLimited => 'Fiducia con limiti';
   @override
@@ -1184,7 +1184,8 @@ class _Translations$deviceDetailsPage$pairing$it extends Translations$deviceDeta
   @override
   String get mismatch => 'I codici differiscono';
   @override
-  String done({required Object name}) => 'Associato a ${name}. Livello di fiducia: temporaneo (modificabile sotto).';
+  String done({required Object name}) =>
+      'Associato a ${name}. I trasferimenti dai dispositivi associati vengono accettati automaticamente — imposta eventuali limiti sotto.';
   @override
   String get errorNotAnyShare => 'Il dispositivo non è un\'app AnyShare.';
   @override

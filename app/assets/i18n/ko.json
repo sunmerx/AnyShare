@@ -225,7 +225,7 @@
     "trust": {
       "title": "신뢰",
       "level": "신뢰 수준",
-      "levelTemp": "임시(매번 확인)",
+      "levelTemp": "임시(자동 수락)",
       "levelLimited": "제한적 신뢰",
       "levelFull": "완전 신뢰(제한 없음)",
       "blocked": "차단",
@@ -251,7 +251,7 @@
       "waitingPeer": "상대 기기를 기다리는 중…",
       "match": "코드 일치",
       "mismatch": "코드 불일치",
-      "done": "{name}와(과) 페어링되었습니다. 신뢰 수준: 임시(아래에서 변경 가능).",
+      "done": "{name}와(과) 페어링되었습니다. 페어링된 기기의 전송은 자동으로 수신됩니다. 필요 시 아래에서 한도를 설정하세요.",
       "errorNotAnyShare": "상대 기기는 AnyShare 앱이 아닙니다.",
       "errorUnreachable": "기기에 연결할 수 없습니다.",
       "errorBusy": "상대 기기가 다른 페어링 중입니다.",

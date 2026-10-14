@@ -225,7 +225,7 @@
     "trust": {
       "title": "Confiance",
       "level": "Niveau de confiance",
-      "levelTemp": "Temporaire (demander à chaque fois)",
+      "levelTemp": "Temporaire (acceptation automatique)",
       "levelLimited": "Confiance limitée",
       "levelFull": "Confiance totale (sans limite)",
       "blocked": "Bloqué",
@@ -251,7 +251,7 @@
       "waitingPeer": "En attente de l'autre appareil…",
       "match": "Les codes correspondent",
       "mismatch": "Les codes diffèrent",
-      "done": "Associé à {name}. Niveau de confiance : temporaire (modifiable ci-dessous).",
+      "done": "Associé à {name}. Les transferts des appareils associés sont acceptés automatiquement — définissez des limites ci-dessous si besoin.",
       "errorNotAnyShare": "L'appareil n'est pas une application AnyShare.",
       "errorUnreachable": "Impossible de joindre l'appareil.",
       "errorBusy": "L'appareil est occupé avec une autre association.",

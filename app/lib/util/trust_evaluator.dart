@@ -53,7 +53,9 @@ class TrustEvaluator {
       case TrustLevel.full:
         return const TrustAutoAccept();
       case TrustLevel.temp:
-        return const TrustConfirm();
+        // Product decision (2026-10-14): pairing is the receiver's one-time
+        // confirmation — known devices are never re-prompted, even at temp.
+        return const TrustAutoAccept();
       case TrustLevel.limited:
         if (device.maxFileSize > 0 && fileSizes.any((s) => s > device.maxFileSize)) {
           return TrustReject(TrustRejectReason.fileTooLarge, limit: device.maxFileSize);

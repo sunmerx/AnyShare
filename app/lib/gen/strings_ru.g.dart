@@ -1128,7 +1128,7 @@ class _Translations$deviceDetailsPage$trust$ru extends Translations$deviceDetail
   @override
   String get level => 'Уровень доверия';
   @override
-  String get levelTemp => 'Временный (спрашивать каждый раз)';
+  String get levelTemp => 'Временный (принимать автоматически)';
   @override
   String get levelLimited => 'Доверие с ограничениями';
   @override
@@ -1185,7 +1185,8 @@ class _Translations$deviceDetailsPage$pairing$ru extends Translations$deviceDeta
   @override
   String get mismatch => 'Коды различаются';
   @override
-  String done({required Object name}) => 'Сопряжено с ${name}. Уровень доверия: временный (можно изменить ниже).';
+  String done({required Object name}) =>
+      'Сопряжено с ${name}. Передачи от сопряжённых устройств принимаются автоматически — при необходимости задайте лимиты ниже.';
   @override
   String get errorNotAnyShare => 'Устройство не является приложением AnyShare.';
   @override
