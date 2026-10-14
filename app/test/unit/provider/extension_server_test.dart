@@ -33,8 +33,7 @@ void main() {
     container = RefenaContainer();
     final prefs = await SharedPreferences.getInstance();
     final persistence = PersistenceService.test(prefs);
-    container.set(persistenceProvider.overrideWithValue(persistence));
-    // ignore: unawaited_futures
+    await container.set(persistenceProvider.overrideWithValue(persistence));
     await container.redux(extensionServerProvider).dispatchAsync(StartExtensionServerAction(port: 0));
     port = container.read(extensionServerProvider).port ?? 0;
   });
