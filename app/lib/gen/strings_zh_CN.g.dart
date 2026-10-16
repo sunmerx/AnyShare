@@ -72,6 +72,10 @@ class TranslationsZhCn extends Translations with BaseTranslations<AppLocale, Tra
   @override
   late final Translations$progressPage$zh_CN progressPage = Translations$progressPage$zh_CN.internal(_root);
   @override
+  late final Translations$transferCompleteNotification$zh_CN transferCompleteNotification = Translations$transferCompleteNotification$zh_CN.internal(
+    _root,
+  );
+  @override
   late final Translations$webSharePage$zh_CN webSharePage = Translations$webSharePage$zh_CN.internal(_root);
   @override
   late final Translations$webReceivePage$zh_CN webReceivePage = Translations$webReceivePage$zh_CN.internal(_root);
@@ -476,6 +480,27 @@ class Translations$progressPage$zh_CN extends Translations$progressPage$en {
   late final Translations$progressPage$total$zh_CN total = Translations$progressPage$total$zh_CN.internal(_root);
   @override
   late final Translations$progressPage$remainingTime$zh_CN remainingTime = Translations$progressPage$remainingTime$zh_CN.internal(_root);
+}
+
+// Path: transferCompleteNotification
+class Translations$transferCompleteNotification$zh_CN extends Translations$transferCompleteNotification$en {
+  Translations$transferCompleteNotification$zh_CN.internal(TranslationsZhCn root) : this._root = root, super.internal(root);
+
+  final TranslationsZhCn _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get receivedTitle => '接收完成';
+  @override
+  String get sentTitle => '发送完成';
+  @override
+  String received({required Object count}) => '已接收 ${count} 个文件';
+  @override
+  String receivedWithErrors({required Object count, required Object failed}) => '已接收 ${count} 个文件,${failed} 个失败';
+  @override
+  String sent({required Object count}) => '已发送 ${count} 个文件';
+  @override
+  String sentWithErrors({required Object count, required Object failed}) => '已发送 ${count} 个文件,${failed} 个失败';
 }
 
 // Path: webSharePage
@@ -1026,6 +1051,8 @@ class Translations$settingsTab$receive$zh_CN extends Translations$settingsTab$re
   String get requirePin => _root.webSharePage.requirePin;
   @override
   String get autoFinish => '自动完成传输任务';
+  @override
+  String get transferCompleteNotification => '传输完成时通知';
   @override
   String get destination => '保存目录';
   @override

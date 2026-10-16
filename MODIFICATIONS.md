@@ -53,6 +53,19 @@
 - `pubspec.lock`:8 个 build 工具链传递依赖小版本再解析(archive/build_config/build_daemon 等,仅 codegen 使用;官方源解析,运行时依赖零漂移)
 - `app/pubspec.yaml`:description 重写、homepage → github.com/sunmerx/AnyShare
 
+### 传输完成通知批次(2026-10-15,PRD F-INT-R3)
+
+- `app/lib/util/native/transfer_complete_notification.dart`(新增):系统级"传输完成"通知(桌面用 `local_notifier`,Android 走通知渠道);点击回前台并打开目标目录(单文件成功时选中该文件)
+- `app/lib/util/native/channel/android_channel.dart`:新增通知显示与点击回传的方法通道封装
+- `app/android/app/src/main/kotlin/io/anyshare/app/MainActivity.kt`:通知显示、点击转发(含冷启动重放机制)、POST_NOTIFICATIONS 未授权时静默跳过
+- `app/android/app/src/main/res/drawable/ic_stat_transfer.xml`(新增):通知小图标
+- `app/lib/config/init.dart`:preInit 初始化通知设施
+- `app/lib/provider/network/send_provider.dart`、`app/lib/provider/network/server/controller/receive_controller.dart`:会话正常结束时触发通知(取消/拒绝不通知;接收方携带目标目录)
+- `app/lib/model/state/settings_state.dart`(+ `.mapper.dart`)、`app/lib/provider/settings_provider.dart`、`app/lib/provider/persistence_provider.dart`(键 `ls_transfer_complete_notification`,默认开)、`app/lib/pages/tabs/settings_tab.dart`:接收设置区新增开关
+- `app/assets/i18n/{en,zh-CN,zh-HK,zh-TW}.json`(+ `app/lib/gen/strings_*.g.dart`):通知文案
+- `app/pubspec.yaml`(+ `pubspec.lock`):新增运行时依赖 `local_notifier 0.1.6`(桌面通知;平台注册文件随之更新)
+- `app/test/unit/util/transfer_complete_notification_test.dart`(新增):文件状态汇总计数单测
+
 ### 配对信任语义裁决批次(2026-10-14)
 
 - 产品裁决:**配对 = 接收方一次性确认**。已配对设备(含临时信任)传输不再弹确认;信任等级仅决定限额是否生效(temp/full 行为一致,limited 走限额检查,blocked 拒绝);未知设备仍走原确认流
@@ -121,6 +134,6 @@
 ## 待办(TODO)
 
 - [ ] 全套应用图标/启动图替换(不得复用上游图形资产)——首次对外分发前必须完成
-- [ ] 应用内 About 页与 pubspec homepage 切换为 AnyShare 自有仓库 URL(仓库创建后回填)
-- [ ] Inno 安装器 AppId GUID 更换(新产品身份)——Stage 5 打包时
+- [x] 应用内 About 页与 pubspec homepage 切换为 AnyShare 自有仓库 URL(已完成:github.com/sunmerx/AnyShare)
+- [x] Inno 安装器 AppId GUID 更换(已完成,见"安装器 AppId 批次 2026-10-13")
 - [ ] `support/scripts` 打包脚本的仓库目录名假设与 MSIX 逻辑复核 —— Stage 5

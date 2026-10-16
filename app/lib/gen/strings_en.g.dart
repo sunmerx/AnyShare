@@ -61,6 +61,7 @@ class Translations with BaseTranslations<AppLocale, Translations> {
   late final Translations$receiveOptionsPage$en receiveOptionsPage = Translations$receiveOptionsPage$en.internal(_root);
   late final Translations$sendPage$en sendPage = Translations$sendPage$en.internal(_root);
   late final Translations$progressPage$en progressPage = Translations$progressPage$en.internal(_root);
+  late final Translations$transferCompleteNotification$en transferCompleteNotification = Translations$transferCompleteNotification$en.internal(_root);
   late final Translations$webSharePage$en webSharePage = Translations$webSharePage$en.internal(_root);
   late final Translations$webReceivePage$en webReceivePage = Translations$webReceivePage$en.internal(_root);
   late final Translations$aboutPage$en aboutPage = Translations$aboutPage$en.internal(_root);
@@ -542,6 +543,33 @@ class Translations$progressPage$en {
 
   late final Translations$progressPage$total$en total = Translations$progressPage$total$en.internal(_root);
   late final Translations$progressPage$remainingTime$en remainingTime = Translations$progressPage$remainingTime$en.internal(_root);
+}
+
+// Path: transferCompleteNotification
+class Translations$transferCompleteNotification$en {
+  Translations$transferCompleteNotification$en.internal(this._root);
+
+  final Translations _root; // ignore: unused_field
+
+  // Translations
+
+  /// en: 'Files received'
+  String get receivedTitle => 'Files received';
+
+  /// en: 'Files sent'
+  String get sentTitle => 'Files sent';
+
+  /// en: 'Received {count} files'
+  String received({required Object count}) => 'Received ${count} files';
+
+  /// en: 'Received {count} files, {failed} failed'
+  String receivedWithErrors({required Object count, required Object failed}) => 'Received ${count} files, ${failed} failed';
+
+  /// en: 'Sent {count} files'
+  String sent({required Object count}) => 'Sent ${count} files';
+
+  /// en: 'Sent {count} files, {failed} failed'
+  String sentWithErrors({required Object count, required Object failed}) => 'Sent ${count} files, ${failed} failed';
 }
 
 // Path: webSharePage
@@ -1183,6 +1211,9 @@ class Translations$settingsTab$receive$en {
 
   /// en: 'Auto Finish'
   String get autoFinish => 'Auto Finish';
+
+  /// en: 'Notify when a transfer completes'
+  String get transferCompleteNotification => 'Notify when a transfer completes';
 
   /// en: 'Save to folder'
   String get destination => 'Save to folder';

@@ -123,6 +123,7 @@
       "quickSaveFromFavorites": "@:general.quickSaveFromFavorites",
       "requirePin": "@:webSharePage.requirePin",
       "autoFinish": "自动完成传输任务",
+      "transferCompleteNotification": "传输完成时通知",
       "destination": "保存目录",
       "downloads": "(下载)",
       "saveToGallery": "保存到相册",
@@ -318,6 +319,14 @@
       "minutes": "{m}:{ss}",
       "hours": "@:.hoursUnit @:.minutesUnit"
     }
+  },
+  "transferCompleteNotification": {
+    "receivedTitle": "接收完成",
+    "sentTitle": "发送完成",
+    "received": "已接收 {count} 个文件",
+    "receivedWithErrors": "已接收 {count} 个文件,{failed} 个失败",
+    "sent": "已发送 {count} 个文件",
+    "sentWithErrors": "已发送 {count} 个文件,{failed} 个失败"
   },
   "webSharePage": {
     "title": "分享为链接",

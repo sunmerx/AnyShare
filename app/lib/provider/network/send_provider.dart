@@ -19,6 +19,7 @@ import 'package:localsend_app/provider/security_provider.dart';
 import 'package:localsend_app/provider/selection/selected_sending_files_provider.dart';
 import 'package:localsend_app/provider/send_history_provider.dart';
 import 'package:localsend_app/provider/settings_provider.dart';
+import 'package:localsend_app/util/native/transfer_complete_notification.dart';
 import 'package:localsend_app/util/ui/snackbar.dart';
 import 'package:localsend_app/widget/dialogs/pin_dialog.dart';
 import 'package:localsend_isolates/isolate.dart';
@@ -533,6 +534,22 @@ class SendNotifier extends Notifier<Map<String, SendSessionState>> {
       _logger.info('Transfer was canceled.');
     } else {
       final hasError = ref.read(fileTransferProvider).getStatuses(sessionId).any((status) => status == FileStatus.failed);
+
+      // AnyShare modification (2026-10-15): system-level completion notification.
+      // Only sessions that ran to the end are announced; canceled or declined ones are not.
+      if (ref.read(settingsProvider).transferCompleteNotification) {
+        final summary = TransferCompleteNotification.summarize(ref.read(fileTransferProvider).getStatuses(sessionId));
+        if (summary.completed > 0 || summary.failed > 0) {
+          final text = t.transferCompleteNotification;
+          unawaited(
+            TransferCompleteNotification.show(
+              title: text.sentTitle,
+              body: summary.failed > 0 ? text.sentWithErrors(count: summary.completed, failed: summary.failed) : text.sent(count: summary.completed),
+            ),
+          );
+        }
+      }
+
       if (!hasError && sessionState.background == true) {
         // close session because everything is fine and it is in background
         closeSession(sessionId);

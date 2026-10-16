@@ -88,6 +88,45 @@ Future<void> openGallery() async {
   await _methodChannel.invokeMethod('openGallery');
 }
 
+/// AnyShare modification (2026-10-15): transfer-complete notifications
+/// (see `TransferCompleteNotification`). A tap opens [folderPath] and selects
+/// [fileName] inside it.
+Future<void> showTransferCompleteNotification({
+  required String title,
+  required String body,
+  required String channelName,
+  String? folderPath,
+  String? fileName,
+}) async {
+  await _methodChannel.invokeMethod('showTransferCompleteNotification', {
+    'title': title,
+    'body': body,
+    'channelName': channelName,
+    'folderPath': folderPath,
+    'fileName': fileName,
+  });
+}
+
+/// Registers the handler for taps on the completion notification.
+void setTransferCompleteNotificationTapHandler(void Function(String? folderPath, String? fileName) handler) {
+  _methodChannel.setMethodCallHandler((call) async {
+    if (call.method == 'transferCompleteNotificationTapped') {
+      final args = (call.arguments as Map).cast<String, dynamic>();
+      handler(args['folderPath'] as String?, args['fileName'] as String?);
+    }
+  });
+}
+
+/// Tells MainActivity that the Dart side is ready to receive completion-notification
+/// taps, so a tap that started the app can be replayed.
+Future<void> flushPendingTransferCompleteTaps() async {
+  try {
+    await _methodChannel.invokeMethod('transferNotificationReady');
+  } catch (e) {
+    _logger.warning('Could not flush pending transfer notification taps', e);
+  }
+}
+
 @MappableClass()
 class PickDirectoryResult with PickDirectoryResultMappable {
   final String directoryUri;

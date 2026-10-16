@@ -118,6 +118,7 @@
       "quickSaveFromFavorites": "@:general.quickSaveFromFavorites",
       "requirePin": "@:webSharePage.requirePin",
       "autoFinish": "完成後自動關閉傳輸畫面",
+      "transferCompleteNotification": "傳輸完成嗰陣通知",
       "destination": "儲存位置",
       "downloads": "（下載資料夾）",
       "saveToGallery": "Save 落相簿",
@@ -278,6 +279,14 @@
       "minutes": "{m}:{ss}",
       "hours": "@:.hoursUnit @:.minutesUnit"
     }
+  },
+  "transferCompleteNotification": {
+    "receivedTitle": "接收完成",
+    "sentTitle": "傳送完成",
+    "received": "已接收 {count} 個檔案",
+    "receivedWithErrors": "已接收 {count} 個檔案,{failed} 個失敗",
+    "sent": "已傳送 {count} 個檔案",
+    "sentWithErrors": "已傳送 {count} 個檔案,{failed} 個失敗"
   },
   "webSharePage": {
     "title": "@:sendTab.sendModes.link",

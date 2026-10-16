@@ -65,6 +65,7 @@ class SettingsService extends PureNotifier<SettingsState> {
     quickSaveFromFavorites: _persistence.getQuickSave() == QuickSaveMode.paired,
     receivePin: _persistence.getReceivePin(),
     autoFinish: _persistence.isAutoFinish(),
+    transferCompleteNotification: _persistence.isTransferCompleteNotification(),
     minimizeToTray: _persistence.isMinimizeToTray(),
     https: _persistence.isHttps(),
     sendMode: _persistence.getSendMode(),
@@ -220,6 +221,13 @@ class SettingsService extends PureNotifier<SettingsState> {
     await _persistence.setAutoFinish(autoFinish);
     state = state.copyWith(
       autoFinish: autoFinish,
+    );
+  }
+
+  Future<void> setTransferCompleteNotification(bool enabled) async {
+    await _persistence.setTransferCompleteNotification(enabled);
+    state = state.copyWith(
+      transferCompleteNotification: enabled,
     );
   }
 

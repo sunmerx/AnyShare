@@ -89,6 +89,7 @@ const _saveToHistory = 'ls_save_to_history';
 const _quickSave = 'ls_quick_save'; // a QuickSaveMode; was a bool until storage version 2 ('ls_quick_save_from_favorites' is merged into this key)
 const _receivePin = 'ls_receive_pin';
 const _autoFinish = 'ls_auto_finish';
+const _transferCompleteNotification = 'ls_transfer_complete_notification';
 const _minimizeToTray = 'ls_minimize_to_tray';
 const _https = 'ls_https';
 const _sendMode = 'ls_send_mode';
@@ -545,6 +546,16 @@ class PersistenceService {
 
   Future<void> setAutoFinish(bool autoFinish) async {
     await _prefs.setBool(_autoFinish, autoFinish);
+  }
+
+  // AnyShare modification (2026-10-15): system notification when a transfer completes.
+  // Default on; the transfer itself is unaffected when notifications are off or denied.
+  bool isTransferCompleteNotification() {
+    return _prefs.getBool(_transferCompleteNotification) ?? true;
+  }
+
+  Future<void> setTransferCompleteNotification(bool enabled) async {
+    await _prefs.setBool(_transferCompleteNotification, enabled);
   }
 
   bool isMinimizeToTray() {

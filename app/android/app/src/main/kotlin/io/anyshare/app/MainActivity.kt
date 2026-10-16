@@ -2,6 +2,10 @@ package io.anyshare.app
 
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.ContentResolver
 import android.content.Context
 import android.content.Intent
@@ -29,6 +33,12 @@ private const val REQUEST_CODE_PICK_DIRECTORY_PATH = 2
 private const val REQUEST_CODE_PICK_FILE = 3
 private const val REQUEST_CODE_LOCAL_NETWORK = 4
 
+// AnyShare modification (2026-10-15): transfer-complete notification.
+private const val NOTIFICATION_CHANNEL_TRANSFER_COMPLETE = "transfer_complete"
+private const val NOTIFICATION_ID_TRANSFER_COMPLETE = 2
+private const val EXTRA_NOTIFICATION_FOLDER = "io.anyshare.app.extra.notificationFolderPath"
+private const val EXTRA_NOTIFICATION_FILE = "io.anyshare.app.extra.notificationFileName"
+
 // Not available as a constant in compileSdk 36.
 private const val PERMISSION_ACCESS_LOCAL_NETWORK = "android.permission.ACCESS_LOCAL_NETWORK"
 private const val API_LEVEL_ANDROID_17 = 37
@@ -45,12 +55,45 @@ class MainActivity : FlutterActivity() {
     private val pendingShareIntents = mutableListOf<Intent>()
     private var shareIntentReady = false
 
+    /// AnyShare modification (2026-10-15): the MethodChannel is kept around so that a
+    /// transfer-complete notification tap can be forwarded to the Dart side.
+    private var methodChannel: MethodChannel? = null
+
+    /// A notification tap that arrived before the Dart side registered its handler
+    /// (e.g. when the tap started the app). Replayed once Dart reports readiness.
+    private var pendingNotificationTap: Map<String, String?>? = null
+    private var transferNotificationReady = false
+
     override fun onNewIntent(intent: Intent) {
+        captureNotificationTap(intent)
         if (!shareIntentReady && (intent.action == Intent.ACTION_SEND || intent.action == Intent.ACTION_SEND_MULTIPLE)) {
             pendingShareIntents.add(intent)
             return
         }
         super.onNewIntent(intent)
+    }
+
+    /// Reads a transfer-complete notification tap out of [intent] (if any) and holds
+    /// it until the Dart side is listening.
+    private fun captureNotificationTap(intent: Intent?) {
+        val folderPath = intent?.getStringExtra(EXTRA_NOTIFICATION_FOLDER) ?: return
+        pendingNotificationTap = mapOf(
+            "folderPath" to folderPath,
+            "fileName" to intent.getStringExtra(EXTRA_NOTIFICATION_FILE),
+        )
+        // The intent instance can be redelivered; a tap must not be replayed twice.
+        intent.removeExtra(EXTRA_NOTIFICATION_FOLDER)
+        intent.removeExtra(EXTRA_NOTIFICATION_FILE)
+        flushPendingNotificationTap()
+    }
+
+    private fun flushPendingNotificationTap() {
+        if (!transferNotificationReady) {
+            return
+        }
+        val tap = pendingNotificationTap ?: return
+        pendingNotificationTap = null
+        methodChannel?.invokeMethod("transferCompleteNotificationTapped", tap)
     }
 
     private fun onShareIntentReady() {
@@ -76,10 +119,15 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        MethodChannel(
+        val channel = MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             CHANNEL
-        ).setMethodCallHandler { call, result ->
+        )
+        methodChannel = channel
+        // The tap that launched the app (if any) is handled like a tap arriving later on:
+        // held back until the Dart side reports readiness.
+        captureNotificationTap(intent)
+        channel.setMethodCallHandler { call, result ->
             when (call.method) {
                 "pickDirectory" -> {
                     pendingResult = result
@@ -116,6 +164,14 @@ class MainActivity : FlutterActivity() {
 
                 "shareIntentReady" -> {
                     onShareIntentReady()
+                    result.success(null)
+                }
+
+                "showTransferCompleteNotification" -> handleShowTransferCompleteNotification(call, result)
+
+                "transferNotificationReady" -> {
+                    transferNotificationReady = true
+                    flushPendingNotificationTap()
                     result.success(null)
                 }
 
@@ -493,6 +549,72 @@ class MainActivity : FlutterActivity() {
         intent.action = Intent.ACTION_VIEW
         intent.type = "image/*"
         startActivity(intent)
+    }
+
+    /// AnyShare modification (2026-10-15): shows the "transfer complete" notification.
+    /// Tapping it opens [folderPath] (and selects [fileName]) through the Dart side.
+    ///
+    /// Silently does nothing when the POST_NOTIFICATIONS permission (Android 13+) was
+    /// denied: the foreground service asks for it when a transfer starts, and a transfer
+    /// must never fail over a missing notification.
+    private fun handleShowTransferCompleteNotification(call: MethodCall, result: MethodChannel.Result) {
+        val title = call.argument<String>("title")
+        val body = call.argument<String>("body")
+        if (title == null || body == null) {
+            result.error("INVALID_ARGUMENT", "Missing title or body", null)
+            return
+        }
+
+        if (Build.VERSION.SDK_INT >= 33 &&
+            checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            result.success(null)
+            return
+        }
+
+        try {
+            val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                // Only the first creation defines the channel; later name changes are ignored by Android.
+                val channelName = call.argument<String>("channelName") ?: title
+                manager.createNotificationChannel(
+                    NotificationChannel(NOTIFICATION_CHANNEL_TRANSFER_COMPLETE, channelName, NotificationManager.IMPORTANCE_DEFAULT)
+                )
+            }
+
+            val tapIntent = Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                putExtra(EXTRA_NOTIFICATION_FOLDER, call.argument<String>("folderPath"))
+                putExtra(EXTRA_NOTIFICATION_FILE, call.argument<String>("fileName"))
+            }
+            val pendingIntent = PendingIntent.getActivity(
+                this,
+                0,
+                tapIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+
+            val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                Notification.Builder(this, NOTIFICATION_CHANNEL_TRANSFER_COMPLETE)
+            } else {
+                @Suppress("DEPRECATION")
+                Notification.Builder(this)
+            }
+
+            val notification = builder
+                .setSmallIcon(R.drawable.ic_stat_transfer)
+                .setContentTitle(title)
+                .setContentText(body)
+                .setStyle(Notification.BigTextStyle().bigText(body))
+                .setAutoCancel(true)
+                .setContentIntent(pendingIntent)
+                .build()
+
+            manager.notify(NOTIFICATION_ID_TRANSFER_COMPLETE, notification)
+            result.success(null)
+        } catch (e: Exception) {
+            result.error("NOTIFICATION_FAILED", e.message ?: "Failed to show the notification", null)
+        }
     }
 }
 

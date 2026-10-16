@@ -125,6 +125,7 @@
       "quickSaveFromFavorites": "@:general.quickSaveFromFavorites",
       "requirePin": "@:webSharePage.requirePin",
       "autoFinish": "Auto Finish",
+      "transferCompleteNotification": "Notify when a transfer completes",
       "destination": "Save to folder",
       "downloads": "(Downloads)",
       "saveToGallery": "Save media to gallery",
@@ -320,6 +321,14 @@
       "minutes": "{m}:{ss}",
       "hours": "@:.hoursUnit @:.minutesUnit"
     }
+  },
+  "transferCompleteNotification": {
+    "receivedTitle": "Files received",
+    "sentTitle": "Files sent",
+    "received": "Received {count} files",
+    "receivedWithErrors": "Received {count} files, {failed} failed",
+    "sent": "Sent {count} files",
+    "sentWithErrors": "Sent {count} files, {failed} failed"
   },
   "webSharePage": {
     "title": "Share via link",

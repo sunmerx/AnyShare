@@ -27,6 +27,7 @@ import 'package:localsend_app/provider/settings_provider.dart';
 import 'package:localsend_app/provider/trust_provider.dart';
 import 'package:localsend_app/util/native/directories.dart';
 import 'package:localsend_app/util/native/platform_check.dart';
+import 'package:localsend_app/util/native/transfer_complete_notification.dart';
 import 'package:localsend_app/util/native/tray_helper.dart';
 import 'package:localsend_app/util/trust_evaluator.dart';
 import 'package:localsend_app/util/ui/snackbar.dart';
@@ -469,6 +470,26 @@ class ReceiveController {
         ),
       );
       final settings = server.ref.read(settingsProvider);
+
+      // AnyShare modification (2026-10-15): system-level completion notification (PRD F-INT-R3).
+      if (settings.transferCompleteNotification) {
+        final summary = TransferCompleteNotification.summarize(statuses);
+        if (summary.completed > 0 || summary.failed > 0) {
+          final text = t.transferCompleteNotification;
+          unawaited(
+            TransferCompleteNotification.show(
+              title: text.receivedTitle,
+              body: summary.failed > 0
+                  ? text.receivedWithErrors(count: summary.completed, failed: summary.failed)
+                  : text.received(count: summary.completed),
+              folderPath: session.destinationDirectory,
+              // Select the file in the opened folder when there is exactly one received file.
+              fileName: summary.completed == 1 && summary.failed == 0 ? receivingFile.desiredName : null,
+            ),
+          );
+        }
+      }
+
       // Only auto-close fully successful sessions: a failed file may still be
       // retried by the sender (e.g. after a checksum mismatch), which requires
       // the session to stay open.

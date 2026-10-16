@@ -36,6 +36,7 @@ import 'package:localsend_app/util/native/cross_file_converters.dart';
 import 'package:localsend_app/util/native/device_info_helper.dart';
 import 'package:localsend_app/util/native/macos_channel.dart';
 import 'package:localsend_app/util/native/platform_check.dart';
+import 'package:localsend_app/util/native/transfer_complete_notification.dart';
 import 'package:localsend_app/util/native/tray_helper.dart';
 import 'package:localsend_app/util/notification_strings.dart';
 import 'package:localsend_app/util/ui/dynamic_colors.dart';
@@ -97,6 +98,9 @@ Future<RefenaContainer> preInit(List<String> args) async {
   await initI18n();
 
   TransferNotification.init(notificationStrings);
+
+  // AnyShare modification (2026-10-15): transfer-complete notifications (PRD F-INT-R3).
+  await TransferCompleteNotification.init();
 
   bool startHidden = false;
   if (checkPlatformIsDesktop()) {
