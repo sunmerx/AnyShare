@@ -2,7 +2,7 @@
 //! reporting frame / idle / dirty-rect statistics once per second.
 //!
 //! Usage:
-//!   ss-probe [--list] [--output <index|name-substr>] [--seconds N] [--timeout-ms N]
+//!   ss-probe [--list] [--vfr] [--output <index|name-substr>] [--seconds N] [--timeout-ms N]
 
 use std::time::{Duration, Instant};
 
@@ -36,6 +36,7 @@ fn run() -> anyhow::Result<()> {
 
     let args: Vec<String> = std::env::args().skip(1).collect();
     let mut list_only = false;
+    let mut vfr_enabled = false;
     let mut want_output: Option<String> = None;
     let mut seconds = 10u64;
     let mut timeout_ms = 500u32;
@@ -44,6 +45,7 @@ fn run() -> anyhow::Result<()> {
     while i < args.len() {
         match args[i].as_str() {
             "--list" => list_only = true,
+            "--vfr" => vfr_enabled = true,
             "--output" => want_output = Some(next_value(&args, &mut i, "--output")?),
             "--seconds" => {
                 let raw = next_value(&args, &mut i, "--seconds")?;
@@ -57,7 +59,7 @@ fn run() -> anyhow::Result<()> {
                     .parse()
                     .map_err(|_| anyhow::anyhow!("invalid --timeout-ms value {raw:?}"))?;
             }
-            other => anyhow::bail!("unknown argument {other:?} (usage: ss-probe [--list] [--output <index|name>] [--seconds N] [--timeout-ms N])"),
+            other => anyhow::bail!("unknown argument {other:?} (usage: ss-probe [--list] [--vfr] [--output <index|name>] [--seconds N] [--timeout-ms N])"),
         }
         i += 1;
     }
@@ -124,6 +126,13 @@ fn run() -> anyhow::Result<()> {
     let mut dup = Duplicator::new(target.index)?;
     let area = target.desktop_rect.area().max(1);
 
+    let mut gate = if vfr_enabled {
+        use screen_stream::vfr::{VfrConfig, VfrGate};
+        Some(VfrGate::new(VfrConfig::default()))
+    } else {
+        None
+    };
+
     let started = Instant::now();
     let mut window_start = Instant::now();
 
@@ -134,6 +143,8 @@ fn run() -> anyhow::Result<()> {
     let mut win_moved = 0u64;
     let mut win_pointer = 0u64;
     let mut win_present_zero = 0u64;
+    let mut win_vfr_enc = 0u64;
+    let mut win_vfr_kf = 0u64;
 
     let mut tot_frames = 0u64;
     let mut tot_idle = 0u64;
@@ -143,6 +154,10 @@ fn run() -> anyhow::Result<()> {
             Acquire::Idle => {
                 win_idle += 1;
                 tot_idle += 1;
+                if let Some(gate) = gate.as_mut() {
+                    use screen_stream::types::FrameMeta;
+                    let _ = gate.decide(&FrameMeta::default(), Instant::now());
+                }
             }
             Acquire::Frame(meta) => {
                 win_frames += 1;
@@ -156,13 +171,27 @@ fn run() -> anyhow::Result<()> {
                 if meta.last_present_time == 0 {
                     win_present_zero += 1;
                 }
+                if let Some(gate) = gate.as_mut() {
+                    use screen_stream::vfr::EncodeDecision;
+                    if let EncodeDecision::Encode { keyframe } = gate.decide(&meta, Instant::now()) {
+                        win_vfr_enc += 1;
+                        if keyframe {
+                            win_vfr_kf += 1;
+                        }
+                    }
+                }
             }
         }
 
         if window_start.elapsed() >= Duration::from_secs(1) {
             let dirty_pct = (win_dirty_area as f64) / (area as f64) * 100.0;
+            let vfr_part = if gate.is_some() {
+                format!(" vfr_enc={win_vfr_enc:<4} kf={win_vfr_kf}")
+            } else {
+                String::new()
+            };
             println!(
-                "t={:>3}s frames={win_frames:<4} idle={win_idle:<4} dirty={win_dirty_rects:<4}({:>5.1}% area) moved={win_moved:<3} pointer_upd={win_pointer:<3} zero_present={win_present_zero}",
+                "t={:>3}s frames={win_frames:<4} idle={win_idle:<4} dirty={win_dirty_rects:<4}({:>5.1}% area) moved={win_moved:<3} pointer_upd={win_pointer:<3} zero_present={win_present_zero}{vfr_part}",
                 started.elapsed().as_secs(),
                 dirty_pct
             );
@@ -174,6 +203,8 @@ fn run() -> anyhow::Result<()> {
             win_moved = 0;
             win_pointer = 0;
             win_present_zero = 0;
+            win_vfr_enc = 0;
+            win_vfr_kf = 0;
         }
     }
 
@@ -184,5 +215,12 @@ fn run() -> anyhow::Result<()> {
         if total == 0 { 0.0 } else { (tot_idle as f64) / (total as f64) * 100.0 },
         dup.rebuild_count()
     );
+    if let Some(gate) = gate.as_ref() {
+        let stats = gate.stats();
+        println!(
+            "vfr summary: encoded={} keyframes={} skipped={} (static={}, rate_limited={})",
+            stats.encoded, stats.keyframes, stats.skipped, stats.skipped_static, stats.skipped_rate_limited
+        );
+    }
     Ok(())
 }

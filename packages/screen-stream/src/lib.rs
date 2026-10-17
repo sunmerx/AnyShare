@@ -5,12 +5,18 @@
 //! workspace still builds everywhere.
 
 pub mod types;
+pub mod vfr;
 
 #[cfg(windows)]
 pub mod windows_capture;
 
 #[cfg(windows)]
+pub mod windows_encoders;
+
+#[cfg(windows)]
 pub use windows_capture::{enumerate_outputs, Duplicator};
+#[cfg(windows)]
+pub use windows_encoders::{list_h264_encoders, EncoderKind, EncoderMftInfo};
 
 #[cfg(not(windows))]
 mod stub {

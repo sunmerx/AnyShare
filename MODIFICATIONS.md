@@ -53,6 +53,13 @@
 - `pubspec.lock`:8 个 build 工具链传递依赖小版本再解析(archive/build_config/build_daemon 等,仅 codegen 使用;官方源解析,运行时依赖零漂移)
 - `app/pubspec.yaml`:description 重写、homepage → github.com/sunmerx/AnyShare
 
+### E-2 VFR 门控与编码器探测批次(2026-10-17)
+
+- `packages/screen-stream/src/vfr.rs`(新增):VFR 编码门控(按需编码:指针帧跳过、变化帧 60fps 上限合并、2s 关键帧节奏、可选静止心跳)+ 6 项单元测试
+- `packages/screen-stream/src/windows_encoders.rs`(新增)+ `src/bin/ss-encoders.rs`(新增):Media Foundation H.264 编码器 MFT 枚举(硬件优先、软件兜底),为"独显>核显>CPU"探测链第一层
+- `packages/screen-stream/src/bin/ss-probe.rs`:新增 `--vfr` 集成(空闲超时同样 tick 门控,支持心跳语义)
+- 实测:静止削减 ~60 倍编码(约 1 次/秒系统小刷新触发);活动场景 ~43-56 原始帧/秒收敛到 ~27-31 编码/秒;本机探测到 2×AMD 硬件编码器 + 微软软编
+
 ### E-2 屏幕采集引擎批次(2026-10-17)
 
 - `packages/screen-stream/`(新增):E-2 屏幕推流引擎原型 crate。本批含 DXGI Desktop Duplication 采集层(脏区/移动区/空闲检测,平台门控:非 Windows 为空实现)+ 探针二进制 `ss-probe`;不触碰 core 协议层
