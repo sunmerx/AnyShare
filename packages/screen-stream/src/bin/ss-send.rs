@@ -99,8 +99,13 @@ fn run() -> anyhow::Result<()> {
         anyhow::bail!("capturing rotated outputs is not supported yet");
     }
 
-    let socket = UdpSocket::bind("0.0.0.0:0")?;
-    socket.connect(&target)?;
+    let socket = {
+        let raw = socket2::Socket::new(socket2::Domain::IPV4, socket2::Type::DGRAM, None)?;
+        raw.set_send_buffer_size(8 * 1024 * 1024)?;
+        raw.connect(&target.parse::<std::net::SocketAddr>()?.into())?;
+        let std_socket: UdpSocket = raw.into();
+        std_socket
+    };
 
     let session = (SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos() & 0xFFFF_FFFF) as u32 | 1;
 
@@ -130,8 +135,9 @@ fn run() -> anyhow::Result<()> {
     let mut last_rebuild_count = dup.rebuild_count();
     let mut last_send_time_100ns: i64 = -1;
 
-    if let Some(header) = encoder.take_sequence_header() {
-        let packets = packetize(session, 0, FLAG_HEADER, 0, &header);
+    let mut sequence_header: Option<Vec<u8>> = encoder.take_sequence_header();
+    if let Some(header) = &sequence_header {
+        let packets = packetize(session, 0, FLAG_HEADER, 0, header);
         for packet in &packets {
             socket.send(&packet.encode())?;
             packets_sent += 1;
@@ -181,10 +187,12 @@ fn run() -> anyhow::Result<()> {
                         for packet in &packets {
                             socket.send(&packet.encode())?;
                             packets_sent += 1;
+                            window_packets += 1;
                             bytes_sent += packet.payload.len() as u64;
                             window_bytes += packet.payload.len() as u64;
                         }
                         frame_id = frame_id.wrapping_add(1);
+                        sequence_header = Some(header);
                     }
 
                     let outputs = encoder.encode(&i420, t100, duration, discontinuity, keyframe)?;
@@ -197,7 +205,22 @@ fn run() -> anyhow::Result<()> {
                     }
                     let had_output = !outputs.is_empty();
                     for chunk in &outputs {
-                        let packets = packetize(session, frame_id, flags, t100 as u64, chunk);
+                        let with_header;
+                        let payload: &[u8] = if keyframe {
+                            match &sequence_header {
+                                Some(header) => {
+                                    let mut combined = Vec::with_capacity(header.len() + chunk.len());
+                                    combined.extend_from_slice(header);
+                                    combined.extend_from_slice(chunk);
+                                    with_header = combined;
+                                    &with_header
+                                }
+                                None => chunk,
+                            }
+                        } else {
+                            chunk
+                        };
+                        let packets = packetize(session, frame_id, flags, t100 as u64, payload);
                         for packet in &packets {
                             socket.send(&packet.encode())?;
                             packets_sent += 1;
@@ -210,6 +233,9 @@ fn run() -> anyhow::Result<()> {
                     }
                     if keyframe && had_output {
                         keyframes_sent += 1;
+                    }
+                    if last_enc_time_100ns < 0 && started.elapsed() > Duration::from_secs(5) {
+                        anyhow::bail!("encoder produced no output within 5s (activating-but-mute MFT?)");
                     }
                     last_enc_time_100ns = t100;
                     last_send_time_100ns = t100;

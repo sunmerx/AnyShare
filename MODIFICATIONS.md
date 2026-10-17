@@ -53,6 +53,14 @@
 - `pubspec.lock`:8 个 build 工具链传递依赖小版本再解析(archive/build_config/build_daemon 等,仅 codegen 使用;官方源解析,运行时依赖零漂移)
 - `app/pubspec.yaml`:description 重写、homepage → github.com/sunmerx/AnyShare
 
+### E-2 接收端原生播放器批次(2026-10-17)
+
+- `packages/screen-stream/src/bin/ss-view.rs`(新增):原生播放器(接收→重组→解码→minifb 窗口);解码默认 ffmpeg 子进程管道(H.264→MJPEG→Rust JPEG 解码),openh264 纯 Rust 路径为实验选项;有界背压、发布顺序、窗口呈现全部自有
+- `packages/screen-stream/src/bin/ss-send.rs`:序列头拼接至每个关键帧(解决接收端无参数集);socket2 8MB 发送缓冲;首输出 5s 超时验证(静默 MFT 检测);统计修正
+- `packages/screen-stream/src/windows_encoder.rs`:移除生产路径试编(试编帧滞留异步管道污染正式流;双实例/FLUSH 均破坏 AMD MFT 事件流——详见 Step6 设计文档);事件泵宽容化(空闲恢复)
+- `packages/screen-stream/Cargo.toml`:`viewer` feature(minifb/openh264/image 可选依赖)+ socket2
+- 实测:跨机 413 帧/22091 包 0 丢包,Ubuntu 原生窗口 16-19fps;独立审查 9 项修复
+
 ### E-2 传输层批次(2026-10-17)
 
 - `packages/screen-stream/src/transport.rs`(新增):UDP 传输协议 v1(magic/会话/帧号/时间戳/标志)+ XOR FEC(8+1,校验包携带总长前缀,短块精确恢复)+ 重组器(乱序有序交付、缺口 300ms 超时、会话空闲 2s 接管、未信任输入边界校验);21 项单测

@@ -309,17 +309,22 @@ impl H264Encoder {
 
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
         if self.event_driven {
-            self.pump_events(&mut outputs, EventPumpMode::UntilNeedInput, deadline)?;
+            self.pump_events(&mut outputs, EventPumpMode::NonBlocking, deadline)?;
+            self.pump_events(
+                &mut outputs,
+                EventPumpMode::UntilNeedInput,
+                std::time::Instant::now() + std::time::Duration::from_millis(50),
+            )?;
         }
 
         loop {
+            if std::time::Instant::now() >= deadline {
+                bail!("timed out pushing a frame into the MFT (persistent NOT_ACCEPTING)");
+            }
             let result = unsafe { self.transform.ProcessInput(0, &sample, 0) };
             match result {
                 Ok(()) => break,
                 Err(e) if e.code().0 == HRESULT_NOT_ACCEPTING => {
-                    if std::time::Instant::now() >= deadline {
-                        bail!("timed out pushing a frame into the MFT (persistent NOT_ACCEPTING)");
-                    }
                     if self.event_driven {
                         self.pump_events(&mut outputs, EventPumpMode::UntilNeedInput, deadline)?;
                     } else {
@@ -364,10 +369,7 @@ impl H264Encoder {
             .ok_or_else(|| anyhow::anyhow!("event-driven MFT without event generator"))?;
         loop {
             if std::time::Instant::now() >= deadline {
-                match mode {
-                    EventPumpMode::NonBlocking => return Ok(()),
-                    EventPumpMode::UntilNeedInput => bail!("timed out waiting for METransformNeedInput"),
-                }
+                return Ok(());
             }
             match unsafe { events.GetEvent(MF_EVENT_FLAG_NO_WAIT) } {
                 Ok(event) => {
@@ -546,8 +548,15 @@ fn make_output_sample(capacity: u32) -> Result<IMFSample> {
     Ok(sample)
 }
 
-/// Creates the best available encoder: candidates in priority order, each
-/// validated by a trial encode; hardware failures fall back to software.
+/// Creates the best available encoder: candidates in enumeration order
+/// (hardware first, software fallback). The first candidate that activates and
+/// negotiates both media types wins.
+///
+/// Note: a functional trial encode was tried in Step 4 but had to be removed —
+/// trial frames linger in the (asynchronous) MFT pipeline and leak into the
+/// real stream as reference-less P-frames, and neither a second instance nor
+/// COMMAND_FLUSH reset the AMD MFT's event flow. Activation success is now the
+/// arbitration criterion; stream validation happens on the first real keyframe.
 pub fn create_best_encoder(config: &EncoderConfig) -> Result<H264Encoder> {
     let candidates = h264_encoder_candidates()?;
     if candidates.is_empty() {
@@ -556,33 +565,11 @@ pub fn create_best_encoder(config: &EncoderConfig) -> Result<H264Encoder> {
 
     let mut failures: Vec<String> = Vec::new();
     for (info, activate) in candidates {
-        let attempt = H264Encoder::from_activate(&info.friendly_name, &activate, config).and_then(|mut encoder| {
-            trial_encode(&mut encoder)?;
-            Ok(encoder)
-        });
-        match attempt {
+        match H264Encoder::from_activate(&info.friendly_name, &activate, config) {
             Ok(encoder) => return Ok(encoder),
             Err(e) => failures.push(format!("{}: {e:#}", info.friendly_name)),
         }
     }
 
     bail!("all encoder candidates failed: {}", failures.join(" | "))
-}
-
-fn trial_encode(encoder: &mut H264Encoder) -> Result<()> {
-    let width = encoder.config.width as usize;
-    let height = encoder.config.height as usize;
-    let mut frame = vec![0u8; width * height * 3 / 2];
-    for y in 0..height {
-        for x in 0..width {
-            frame[y * width + x] = ((x + y) % 256) as u8;
-        }
-    }
-    for i in 0..3 {
-        let outputs = encoder.encode(&frame, i64::from(i) * 333_333, 333_333, false, i == 0)?;
-        if !outputs.is_empty() {
-            return Ok(());
-        }
-    }
-    bail!("trial encode produced no output")
 }
