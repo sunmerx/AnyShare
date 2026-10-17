@@ -5,6 +5,7 @@
 //! workspace still builds everywhere.
 
 pub mod convert;
+pub mod transport;
 pub mod types;
 pub mod vfr;
 

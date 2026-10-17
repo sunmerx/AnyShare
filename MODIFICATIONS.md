@@ -53,6 +53,13 @@
 - `pubspec.lock`:8 个 build 工具链传递依赖小版本再解析(archive/build_config/build_daemon 等,仅 codegen 使用;官方源解析,运行时依赖零漂移)
 - `app/pubspec.yaml`:description 重写、homepage → github.com/sunmerx/AnyShare
 
+### E-2 传输层批次(2026-10-17)
+
+- `packages/screen-stream/src/transport.rs`(新增):UDP 传输协议 v1(magic/会话/帧号/时间戳/标志)+ XOR FEC(8+1,校验包携带总长前缀,短块精确恢复)+ 重组器(乱序有序交付、缺口 300ms 超时、会话空闲 2s 接管、未信任输入边界校验);21 项单测
+- `packages/screen-stream/src/bin/ss-recv.rs`(新增):跨平台接收端(重组→stdout Annex-B,`ss-recv | ffplay -f h264 -` 即直播)
+- `packages/screen-stream/src/bin/ss-send.rs`(新增):Windows 发送端(采集→VFR→编码→分片+FEC→UDP)
+- 实测:本机回环 FEC 恢复 3 包解码通过;跨机 Windows→Ubuntu 28843 包 0 丢包、30 秒实时画面;独立审查 10 项修复(含僵尸条目高危)
+
 ### E-2 编码器实编与试编仲裁批次(2026-10-17)
 
 - `packages/screen-stream/src/windows_encoder.rs`(新增):MF H.264 编码器封装。同步(软编)/事件泵(硬编,MF_TRANSFORM_ASYNC_UNLOCK)双路径;输入类型协商(NV12 优先,直试回退);试编仲裁(硬件先行、失败降级软编);SPS/PPS 序列头提取;ICodecAPI 关键帧强制(VT_UI4);输出样本复用与缓冲区溢出扩容
