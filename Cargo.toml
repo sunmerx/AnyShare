@@ -4,6 +4,7 @@ members = [
     "cli",
     "packages/core",
     "packages/localsend_isolates/rust",
+    "packages/screen-stream",
     "server",
 ]
 

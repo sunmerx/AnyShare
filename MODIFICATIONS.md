@@ -53,6 +53,11 @@
 - `pubspec.lock`:8 个 build 工具链传递依赖小版本再解析(archive/build_config/build_daemon 等,仅 codegen 使用;官方源解析,运行时依赖零漂移)
 - `app/pubspec.yaml`:description 重写、homepage → github.com/sunmerx/AnyShare
 
+### E-2 屏幕采集引擎批次(2026-10-17)
+
+- `packages/screen-stream/`(新增):E-2 屏幕推流引擎原型 crate。本批含 DXGI Desktop Duplication 采集层(脏区/移动区/空闲检测,平台门控:非 Windows 为空实现)+ 探针二进制 `ss-probe`;不触碰 core 协议层
+- `Cargo.toml`(workspace 根):新增成员 `packages/screen-stream`
+
 ### E-2 屏鼠共享工具批次(2026-10-17)
 
 - `tools/e2-latency-clock/`(新增):玻璃到玻璃延迟测量工具(双窗毫秒时钟,单张照片同框对比物理屏/虚拟屏读数);含 README 操作规程与注意事项。内部测量工具,不随产品分发
