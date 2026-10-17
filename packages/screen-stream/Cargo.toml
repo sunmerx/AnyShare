@@ -6,13 +6,12 @@ description = "AnyShare E-2 screen streaming engine prototype (capture layer)"
 
 [dependencies]
 anyhow = "1.0.104"
-image = { version = "0.25", default-features = false, features = ["jpeg"], optional = true }
 minifb = { version = "0.29", optional = true }
 openh264 = { version = "0.9", optional = true }
 socket2 = "0.5"
 
 [features]
-viewer = ["dep:openh264", "dep:minifb", "dep:image"]
+viewer = ["dep:openh264", "dep:minifb"]
 
 [[bin]]
 name = "ss-view"

@@ -53,6 +53,12 @@
 - `pubspec.lock`:8 个 build 工具链传递依赖小版本再解析(archive/build_config/build_daemon 等,仅 codegen 使用;官方源解析,运行时依赖零漂移)
 - `app/pubspec.yaml`:description 重写、homepage → github.com/sunmerx/AnyShare
 
+### E-2 播放器管道提速与硬解参数批次(2026-10-17,Step 7)
+
+- `packages/screen-stream/src/bin/ss-view.rs`:管道格式 MJPEG→BMP(自有 BMP 解析,含边界校验),Rust 侧处理 22ms→3.5ms(Windows)/10-14ms(Ubuntu);新增 `--hwaccel/--hwaccel-device` 透传(VAAPI 等;审查修复:hwdownload 多余导致硬解路径必然失败)
+- `packages/screen-stream/Cargo.toml`:移除 `image` 依赖(JPEG 解码不再需要)
+- 独立审查 3 项修复;跨机与回环回归通过
+
 ### E-2 接收端原生播放器批次(2026-10-17)
 
 - `packages/screen-stream/src/bin/ss-view.rs`(新增):原生播放器(接收→重组→解码→minifb 窗口);解码默认 ffmpeg 子进程管道(H.264→MJPEG→Rust JPEG 解码),openh264 纯 Rust 路径为实验选项;有界背压、发布顺序、窗口呈现全部自有

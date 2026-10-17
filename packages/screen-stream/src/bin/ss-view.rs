@@ -56,6 +56,8 @@ fn run() -> Result<()> {
     let mut verbose = false;
     let mut decoder_kind = "ffmpeg".to_string();
     let mut ffmpeg_path = "ffmpeg".to_string();
+    let mut hwaccel: Option<String> = None;
+    let mut hwaccel_device: Option<String> = None;
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
@@ -73,9 +75,11 @@ fn run() -> Result<()> {
             }
             "--decoder" => decoder_kind = next_value(&args, &mut i, "--decoder")?,
             "--ffmpeg-path" => ffmpeg_path = next_value(&args, &mut i, "--ffmpeg-path")?,
+            "--hwaccel" => hwaccel = Some(next_value(&args, &mut i, "--hwaccel")?),
+            "--hwaccel-device" => hwaccel_device = Some(next_value(&args, &mut i, "--hwaccel-device")?),
             "--verbose" => verbose = true,
             other => anyhow::bail!(
-                "unknown argument {other:?} (usage: ss-view [--port N] [--seconds N] [--scale N] [--decoder ffmpeg|openh264] [--ffmpeg-path PATH] [--verbose])"
+                "unknown argument {other:?} (usage: ss-view [--port N] [--seconds N] [--scale N] [--decoder ffmpeg|openh264] [--ffmpeg-path PATH] [--hwaccel NAME] [--hwaccel-device PATH] [--verbose])"
             ),
         }
         i += 1;
@@ -93,7 +97,7 @@ fn run() -> Result<()> {
         let shared = Arc::clone(&shared);
         let decoder_kind = decoder_kind.clone();
         std::thread::spawn(move || {
-            if let Err(e) = media_loop(shared, port, verbose, &decoder_kind, &ffmpeg_path) {
+            if let Err(e) = media_loop(shared, port, verbose, &decoder_kind, &ffmpeg_path, hwaccel.as_deref(), hwaccel_device.as_deref()) {
                 eprintln!("ss-view media thread: {e:#}");
             }
         });
@@ -165,7 +169,15 @@ fn run() -> Result<()> {
     Ok(())
 }
 
-fn media_loop(shared: Arc<Shared>, port: u16, verbose: bool, decoder_kind: &str, ffmpeg_path: &str) -> Result<()> {
+fn media_loop(
+    shared: Arc<Shared>,
+    port: u16,
+    verbose: bool,
+    decoder_kind: &str,
+    ffmpeg_path: &str,
+    hwaccel: Option<&str>,
+    hwaccel_device: Option<&str>,
+) -> Result<()> {
     let (tx, rx) = std::sync::mpsc::sync_channel::<Delivered>(128);
 
     {
@@ -178,7 +190,7 @@ fn media_loop(shared: Arc<Shared>, port: u16, verbose: bool, decoder_kind: &str,
     }
 
     if decoder_kind == "ffmpeg" {
-        return ffmpeg_loop(shared, rx, verbose, ffmpeg_path);
+        return ffmpeg_loop(shared, rx, verbose, ffmpeg_path, hwaccel, hwaccel_device);
     }
     openh264_loop(shared, rx, verbose)
 }
@@ -188,28 +200,33 @@ fn ffmpeg_loop(
     rx: std::sync::mpsc::Receiver<Delivered>,
     verbose: bool,
     ffmpeg_path: &str,
+    hwaccel: Option<&str>,
+    hwaccel_device: Option<&str>,
 ) -> Result<()> {
     use std::io::Write;
 
+    let mut args: Vec<String> = vec![
+        "-hide_banner".into(),
+        "-loglevel".into(),
+        "error".into(),
+        "-fflags".into(),
+        "nobuffer".into(),
+        "-flags".into(),
+        "low_delay".into(),
+    ];
+    if let Some(name) = hwaccel {
+        args.push("-hwaccel".into());
+        args.push(name.into());
+        if let Some(device) = hwaccel_device {
+            args.push("-hwaccel_device".into());
+            args.push(device.into());
+        }
+    }
+    args.extend(["-f".into(), "h264".into(), "-i".into(), "-".into()]);
+    args.extend(["-c:v".into(), "bmp".into(), "-f".into(), "image2pipe".into(), "-".into()]);
+
     let mut child = std::process::Command::new(ffmpeg_path)
-        .args([
-            "-hide_banner",
-            "-loglevel",
-            "error",
-            "-fflags",
-            "nobuffer",
-            "-flags",
-            "low_delay",
-            "-f",
-            "h264",
-            "-i",
-            "-",
-            "-f",
-            "mjpeg",
-            "-q:v",
-            "3",
-            "-",
-        ])
+        .args(&args)
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::inherit())
@@ -221,7 +238,7 @@ fn ffmpeg_loop(
 
     let reader_shared = Arc::clone(&shared);
     let reader = std::thread::spawn(move || {
-        if let Err(e) = mjpeg_reader(stdout, reader_shared, verbose) {
+        if let Err(e) = bmp_reader(stdout, reader_shared, verbose) {
             eprintln!("ss-view decoder thread: {e:#}");
         }
     });
@@ -254,11 +271,11 @@ fn ffmpeg_loop(
     }
 }
 
-fn mjpeg_reader(mut stdout: std::process::ChildStdout, shared: Arc<Shared>, _verbose: bool) -> Result<()> {
+fn bmp_reader(mut stdout: std::process::ChildStdout, shared: Arc<Shared>, _verbose: bool) -> Result<()> {
     use std::io::Read;
 
     let mut buffer: Vec<u8> = Vec::with_capacity(4 * 1024 * 1024);
-    let mut chunk = vec![0u8; 256 * 1024];
+    let mut chunk = vec![0u8; 1024 * 1024];
     let mut frames: u64 = 0;
     let mut decode_ms_sum: f64 = 0.0;
     let mut last_stats = Instant::now();
@@ -269,54 +286,81 @@ fn mjpeg_reader(mut stdout: std::process::ChildStdout, shared: Arc<Shared>, _ver
             break;
         }
         buffer.extend_from_slice(&chunk[..read]);
-        if buffer.len() > 64 * 1024 * 1024 {
-            eprintln!("ss-view: jpeg buffer exceeded 64 MiB, resetting");
+        if buffer.len() > 256 * 1024 * 1024 {
+            eprintln!("ss-view: bmp buffer exceeded 256 MiB, resetting");
             buffer.clear();
         }
 
         loop {
-            let Some(start) = find_marker(&buffer, 0, &[0xFF, 0xD8]) else {
+            let Some(start) = find_bmp(&buffer) else {
                 if buffer.len() > 2 {
-                    let keep = buffer.len() - 1;
+                    let keep = buffer.len() - 2;
                     buffer.drain(..keep);
                 }
                 break;
             };
-            let Some(end) = find_marker(&buffer, start + 2, &[0xFF, 0xD9]) else {
-                if start > 0 {
-                    buffer.drain(..start);
-                }
-                break;
-            };
-            let jpeg = &buffer[start..end + 2];
-            let t0 = Instant::now();
-            match image::load_from_memory_with_format(jpeg, image::ImageFormat::Jpeg) {
-                Ok(img) => {
-                    let rgb = img.to_rgb8();
-                    let (width, height) = (rgb.width() as usize, rgb.height() as usize);
-                    let mut argb = Vec::with_capacity(width * height);
-                    for pixel in rgb.pixels() {
-                        argb.push((u32::from(pixel[0]) << 16) | (u32::from(pixel[1]) << 8) | u32::from(pixel[2]));
-                    }
-                    publish(
-                        &shared,
-                        Frame {
-                            width,
-                            height,
-                            argb,
-                        },
-                    );
-                    frames += 1;
-                    decode_ms_sum += t0.elapsed().as_secs_f64() * 1000.0;
-                }
-                Err(e) => eprintln!("ss-view: jpeg decode failed: {e}"),
+            if start > 0 {
+                buffer.drain(..start);
             }
-            buffer.drain(..end + 2);
+            if buffer.len() < 54 {
+                break;
+            }
+            let total = u32::from_le_bytes(buffer[2..6].try_into().unwrap()) as usize;
+            if !(54..=64 * 1024 * 1024).contains(&total) {
+                buffer.drain(..2);
+                continue;
+            }
+            if buffer.len() < total {
+                break;
+            }
+            let pixel_offset = u32::from_le_bytes(buffer[10..14].try_into().unwrap()) as usize;
+            let width = i32::from_le_bytes(buffer[18..22].try_into().unwrap());
+            let height = i32::from_le_bytes(buffer[22..26].try_into().unwrap());
+            let bpp = u16::from_le_bytes(buffer[28..30].try_into().unwrap());
+            let (width, height, bottom_up) = (width as usize, height.unsigned_abs() as usize, height > 0);
+            let row_bytes = width * (bpp as usize / 8);
+            let row_stride = (row_bytes + 3) & !3;
+            let data_end = pixel_offset.saturating_add(height.saturating_mul(row_stride));
+            if width == 0
+                || height == 0
+                || width > 8192
+                || height > 8192
+                || (bpp != 24 && bpp != 32)
+                || pixel_offset < 54
+                || data_end > total
+            {
+                buffer.drain(..2);
+                continue;
+            }
+
+            let t0 = Instant::now();
+            let mut argb = Vec::with_capacity(width * height);
+            for row in 0..height {
+                let src_row = if bottom_up { height - 1 - row } else { row };
+                let row_start = pixel_offset + src_row * row_stride;
+                let row_slice = &buffer[row_start..row_start + row_bytes];
+                for x in 0..width {
+                    let px = &row_slice[x * (bpp as usize / 8)..];
+                    let (b, g, r) = (px[0], px[1], px[2]);
+                    argb.push((u32::from(r) << 16) | (u32::from(g) << 8) | u32::from(b));
+                }
+            }
+            publish(
+                &shared,
+                Frame {
+                    width,
+                    height,
+                    argb,
+                },
+            );
+            frames += 1;
+            decode_ms_sum += t0.elapsed().as_secs_f64() * 1000.0;
+            buffer.drain(..total);
         }
 
         if last_stats.elapsed() >= Duration::from_secs(1) {
             let avg_ms = if frames == 0 { 0.0 } else { decode_ms_sum / frames as f64 };
-            eprintln!("media: decoded={frames} avg_decode_ms={avg_ms:.1} (ffmpeg pipe)");
+            eprintln!("media: decoded={frames} avg_parse_ms={avg_ms:.1} (ffmpeg bmp pipe)");
             frames = 0;
             decode_ms_sum = 0.0;
             last_stats = Instant::now();
@@ -325,14 +369,19 @@ fn mjpeg_reader(mut stdout: std::process::ChildStdout, shared: Arc<Shared>, _ver
     Ok(())
 }
 
-fn find_marker(buffer: &[u8], from: usize, marker: &[u8; 2]) -> Option<usize> {
-    if buffer.len() < from + 2 {
-        return None;
+fn find_bmp(buffer: &[u8]) -> Option<usize> {
+    let mut i = 0;
+    while i + 54 <= buffer.len() {
+        if buffer[i] == b'B' && buffer[i + 1] == b'M' {
+            let total = u32::from_le_bytes(buffer[i + 2..i + 6].try_into().unwrap()) as usize;
+            let dib = u32::from_le_bytes(buffer[i + 14..i + 18].try_into().unwrap());
+            if (54..=64 * 1024 * 1024).contains(&total) && dib >= 40 {
+                return Some(i);
+            }
+        }
+        i += 1;
     }
-    buffer[from..]
-        .windows(2)
-        .position(|w| w == marker)
-        .map(|i| i + from)
+    None
 }
 
 fn openh264_loop(shared: Arc<Shared>, rx: std::sync::mpsc::Receiver<Delivered>, verbose: bool) -> Result<()> {
