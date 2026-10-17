@@ -53,6 +53,10 @@
 - `pubspec.lock`:8 个 build 工具链传递依赖小版本再解析(archive/build_config/build_daemon 等,仅 codegen 使用;官方源解析,运行时依赖零漂移)
 - `app/pubspec.yaml`:description 重写、homepage → github.com/sunmerx/AnyShare
 
+### E-2 屏鼠共享工具批次(2026-10-17)
+
+- `tools/e2-latency-clock/`(新增):玻璃到玻璃延迟测量工具(双窗毫秒时钟,单张照片同框对比物理屏/虚拟屏读数);含 README 操作规程与注意事项。内部测量工具,不随产品分发
+
 ### 传输完成通知批次(2026-10-15,PRD F-INT-R3)
 
 - `app/lib/util/native/transfer_complete_notification.dart`(新增):系统级"传输完成"通知(桌面用 `local_notifier`,Android 走通知渠道);点击回前台并打开目标目录(单文件成功时选中该文件)
