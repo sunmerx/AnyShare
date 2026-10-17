@@ -59,3 +59,11 @@ pub enum Acquire {
     /// No frame arrived within the acquire timeout (desktop is idle).
     Idle,
 }
+
+/// Captured pixels in compact rows (stride = width * 4), BGRA8.
+#[derive(Clone, Debug)]
+pub struct FramePixels {
+    pub width: u32,
+    pub height: u32,
+    pub bgra: Vec<u8>,
+}

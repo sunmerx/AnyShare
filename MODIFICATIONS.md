@@ -53,6 +53,15 @@
 - `pubspec.lock`:8 个 build 工具链传递依赖小版本再解析(archive/build_config/build_daemon 等,仅 codegen 使用;官方源解析,运行时依赖零漂移)
 - `app/pubspec.yaml`:description 重写、homepage → github.com/sunmerx/AnyShare
 
+### E-2 编码器实编与试编仲裁批次(2026-10-17)
+
+- `packages/screen-stream/src/windows_encoder.rs`(新增):MF H.264 编码器封装。同步(软编)/事件泵(硬编,MF_TRANSFORM_ASYNC_UNLOCK)双路径;输入类型协商(NV12 优先,直试回退);试编仲裁(硬件先行、失败降级软编);SPS/PPS 序列头提取;ICodecAPI 关键帧强制(VT_UI4);输出样本复用与缓冲区溢出扩容
+- `packages/screen-stream/src/convert.rs`(新增):BGRA→I420/NV12 标量转换 + YV12 平面交换;11 项单测
+- `packages/screen-stream/src/windows_capture.rs`:像素通路(Staging 纹理拷贝/按 RowPitch 紧凑化,缓冲复用 `recycle_pixels`)
+- `packages/screen-stream/src/windows_encoders.rs`:候选枚举返回 IMFActivate;MF 初始化结果缓存(OnceLock)
+- `packages/screen-stream/src/bin/ss-probe.rs`:`--encode/--bitrate/--dump` 全链路模式;旋转屏拒绝(防静默错帧);实际帧间隔时间戳与 discontinuity;关闭时 drain 尾帧
+- 实测:AMD 硬件编码 1080p **6.40ms/帧**(release),码流 ffmpeg 全量解码通过;独立审查 14 项修复
+
 ### E-2 VFR 门控与编码器探测批次(2026-10-17)
 
 - `packages/screen-stream/src/vfr.rs`(新增):VFR 编码门控(按需编码:指针帧跳过、变化帧 60fps 上限合并、2s 关键帧节奏、可选静止心跳)+ 6 项单元测试

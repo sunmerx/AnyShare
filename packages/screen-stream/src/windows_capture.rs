@@ -7,10 +7,13 @@ use windows::core::Interface;
 use windows::Win32::Foundation::{HINSTANCE, RECT};
 use windows::Win32::Graphics::Direct3D::D3D_DRIVER_TYPE_UNKNOWN;
 use windows::Win32::Graphics::Direct3D11::{
-    D3D11CreateDevice, ID3D11Device, ID3D11DeviceContext, D3D11_CREATE_DEVICE_BGRA_SUPPORT, D3D11_SDK_VERSION,
+    D3D11CreateDevice, ID3D11Device, ID3D11DeviceContext, ID3D11Texture2D, D3D11_CPU_ACCESS_READ,
+    D3D11_CREATE_DEVICE_BGRA_SUPPORT, D3D11_MAP_READ, D3D11_MAPPED_SUBRESOURCE, D3D11_SDK_VERSION,
+    D3D11_TEXTURE2D_DESC, D3D11_USAGE_STAGING,
 };
 use windows::Win32::Graphics::Dxgi::Common::{
-    DXGI_MODE_ROTATION_IDENTITY, DXGI_MODE_ROTATION_ROTATE180, DXGI_MODE_ROTATION_ROTATE270, DXGI_MODE_ROTATION_ROTATE90,
+    DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_MODE_ROTATION_IDENTITY, DXGI_MODE_ROTATION_ROTATE180,
+    DXGI_MODE_ROTATION_ROTATE270, DXGI_MODE_ROTATION_ROTATE90, DXGI_SAMPLE_DESC,
 };
 use windows::Win32::Graphics::Dxgi::{
     CreateDXGIFactory1, IDXGIAdapter, IDXGIAdapter1, IDXGIFactory1, IDXGIOutput, IDXGIOutput1, IDXGIOutputDuplication,
@@ -18,7 +21,7 @@ use windows::Win32::Graphics::Dxgi::{
     DXGI_ERROR_WAIT_TIMEOUT, DXGI_OUTDUPL_FRAME_INFO, DXGI_OUTDUPL_MOVE_RECT, DXGI_OUTPUT_DESC,
 };
 
-use crate::types::{Acquire, FrameMeta, MoveRect, OutputInfo, Rect};
+use crate::types::{Acquire, FrameMeta, FramePixels, MoveRect, OutputInfo, Rect};
 
 const MAX_METADATA_BYTES: usize = 16 * 1024 * 1024;
 
@@ -36,7 +39,7 @@ fn rect_from_dxgi(r: &RECT) -> Rect {
     }
 }
 
-fn create_d3d11_device(adapter: &IDXGIAdapter1) -> Result<ID3D11Device> {
+fn create_d3d11_device(adapter: &IDXGIAdapter1) -> Result<(ID3D11Device, ID3D11DeviceContext)> {
     let adapter_base: IDXGIAdapter = adapter.cast().context("cast adapter -> IDXGIAdapter failed")?;
     let mut device: Option<ID3D11Device> = None;
     let mut context: Option<ID3D11DeviceContext> = None;
@@ -54,7 +57,10 @@ fn create_d3d11_device(adapter: &IDXGIAdapter1) -> Result<ID3D11Device> {
         )
         .context("D3D11CreateDevice failed")?;
     }
-    device.context("D3D11CreateDevice returned no device")
+    Ok((
+        device.context("D3D11CreateDevice returned no device")?,
+        context.context("D3D11CreateDevice returned no context")?,
+    ))
 }
 
 fn enumerate_raw() -> Result<Vec<(OutputInfo, IDXGIOutput, IDXGIAdapter1)>> {
@@ -105,12 +111,16 @@ pub fn enumerate_outputs() -> Result<Vec<OutputInfo>> {
 /// Desktop Duplication session for one output.
 pub struct Duplicator {
     device: ID3D11Device,
+    context: ID3D11DeviceContext,
     output: IDXGIOutput,
     duplication: Option<IDXGIOutputDuplication>,
     output_info: OutputInfo,
     frame_index: u64,
     rebuild_count: u64,
     metadata_buffer: Vec<u32>,
+    staging: Option<ID3D11Texture2D>,
+    staging_size: (u32, u32),
+    pixel_buffer: Vec<u8>,
 }
 
 impl Duplicator {
@@ -121,16 +131,20 @@ impl Duplicator {
             .find(|(info, _, _)| info.index == output_index)
             .with_context(|| format!("output index {output_index} not found"))?;
 
-        let device = create_d3d11_device(&adapter)?;
+        let (device, context) = create_d3d11_device(&adapter)?;
         let duplication = duplicate(&device, &output)?;
         Ok(Self {
             device,
+            context,
             output,
             duplication: Some(duplication),
             output_info: info,
             frame_index: 0,
             rebuild_count: 0,
             metadata_buffer: Vec::new(),
+            staging: None,
+            staging_size: (0, 0),
+            pixel_buffer: Vec::new(),
         })
     }
 
@@ -143,9 +157,32 @@ impl Duplicator {
         self.rebuild_count
     }
 
-    /// Acquires the next frame. `Idle` means nothing changed within the timeout.
+    /// Acquires the next frame metadata only. `Idle` means nothing changed within the timeout.
     /// Session resets (ACCESS_LOST etc.) are rebuilt transparently and reported as `Idle`.
     pub fn acquire(&mut self, timeout_ms: u32) -> Result<Acquire> {
+        Ok(match self.acquire_internal(timeout_ms, false)? {
+            None => Acquire::Idle,
+            Some((meta, _)) => Acquire::Frame(meta),
+        })
+    }
+
+    /// Acquires the next frame together with its pixels (compact BGRA8 rows).
+    /// `None` means nothing changed within the timeout.
+    pub fn acquire_full(&mut self, timeout_ms: u32) -> Result<Option<(FrameMeta, FramePixels)>> {
+        match self.acquire_internal(timeout_ms, true)? {
+            None => Ok(None),
+            Some((meta, pixels)) => Ok(Some((
+                meta,
+                pixels.context("pixel copy requested but not produced")?,
+            ))),
+        }
+    }
+
+    fn acquire_internal(
+        &mut self,
+        timeout_ms: u32,
+        copy_pixels: bool,
+    ) -> Result<Option<(FrameMeta, Option<FramePixels>)>> {
         let mut info = DXGI_OUTDUPL_FRAME_INFO::default();
         let mut resource: Option<IDXGIResource> = None;
 
@@ -162,6 +199,16 @@ impl Duplicator {
                     let buffer = &mut self.metadata_buffer;
                     unsafe { read_metadata(dup, buffer, self.frame_index, &info) }
                 };
+
+                let pixels = if copy_pixels {
+                    match resource.as_ref() {
+                        Some(resource) => Some(unsafe { self.copy_pixels(resource) }),
+                        None => Some(Err(anyhow::anyhow!("no desktop resource in frame"))),
+                    }
+                } else {
+                    None
+                };
+
                 drop(resource);
                 let released = {
                     let dup = self.duplication.as_ref().context("duplication session missing")?;
@@ -169,21 +216,86 @@ impl Duplicator {
                 };
                 if released.is_err() {
                     self.rebuild().context("rebuilding after ReleaseFrame failure failed")?;
-                    return Ok(Acquire::Idle);
+                    return Ok(None);
                 }
-                Ok(Acquire::Frame(meta?))
+                Ok(Some((meta?, pixels.transpose()?)))
             }
-            Err(e) if e.code() == DXGI_ERROR_WAIT_TIMEOUT => Ok(Acquire::Idle),
+            Err(e) if e.code() == DXGI_ERROR_WAIT_TIMEOUT => Ok(None),
             Err(e)
                 if e.code() == DXGI_ERROR_ACCESS_LOST
                     || e.code() == DXGI_ERROR_INVALID_CALL
                     || e.code() == DXGI_ERROR_ACCESS_DENIED =>
             {
                 self.rebuild().context("rebuilding duplication session failed")?;
-                Ok(Acquire::Idle)
+                Ok(None)
             }
             Err(e) => Err(e).context("AcquireNextFrame failed"),
         }
+    }
+
+    unsafe fn copy_pixels(&mut self, resource: &IDXGIResource) -> Result<FramePixels> {
+        let texture: ID3D11Texture2D = resource.cast().context("cast frame resource -> ID3D11Texture2D failed")?;
+        let mut desc = D3D11_TEXTURE2D_DESC::default();
+        texture.GetDesc(&mut desc);
+        if desc.Format != DXGI_FORMAT_B8G8R8A8_UNORM {
+            bail!("unsupported capture pixel format {:?} (expected BGRA8)", desc.Format.0);
+        }
+        let (width, height) = (desc.Width, desc.Height);
+
+        if self.staging.is_none() || self.staging_size != (width, height) {
+            let staging_desc = D3D11_TEXTURE2D_DESC {
+                Width: width,
+                Height: height,
+                MipLevels: 1,
+                ArraySize: 1,
+                Format: desc.Format,
+                SampleDesc: DXGI_SAMPLE_DESC { Count: 1, Quality: 0 },
+                Usage: D3D11_USAGE_STAGING,
+                BindFlags: 0,
+                CPUAccessFlags: D3D11_CPU_ACCESS_READ.0 as u32,
+                MiscFlags: 0,
+            };
+            let mut staging: Option<ID3D11Texture2D> = None;
+            self.device
+                .CreateTexture2D(&staging_desc, None, Some(&mut staging))
+                .context("CreateTexture2D(staging) failed")?;
+            self.staging = staging;
+            self.staging_size = (width, height);
+        }
+
+        let staging = self.staging.as_ref().context("staging texture missing")?;
+        self.context.CopyResource(staging, &texture);
+
+        let mut mapped = D3D11_MAPPED_SUBRESOURCE::default();
+        self.context
+            .Map(staging, 0, D3D11_MAP_READ, 0, Some(&mut mapped))
+            .context("Map(staging) failed")?;
+
+        let pitch = mapped.RowPitch as usize;
+        let row_bytes = width as usize * 4;
+        let total = row_bytes * height as usize;
+        self.pixel_buffer.resize(total, 0);
+        {
+            let src = std::slice::from_raw_parts(mapped.pData as *const u8, pitch * height as usize);
+            for row in 0..height as usize {
+                let src_row = &src[row * pitch..row * pitch + row_bytes];
+                let start = row * row_bytes;
+                self.pixel_buffer[start..start + row_bytes].copy_from_slice(src_row);
+            }
+        }
+        self.context.Unmap(staging, 0);
+
+        Ok(FramePixels {
+            width,
+            height,
+            bgra: std::mem::take(&mut self.pixel_buffer),
+        })
+    }
+
+    /// Returns the pixel buffer to the duplicator so the next capture can reuse
+    /// its allocation instead of re-allocating ~8 MiB per frame.
+    pub fn recycle_pixels(&mut self, pixels: FramePixels) {
+        self.pixel_buffer = pixels.bgra;
     }
 
     fn rebuild(&mut self) -> Result<()> {

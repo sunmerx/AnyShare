@@ -4,6 +4,7 @@
 //! every other platform currently exposes an empty/unsupported stub so the
 //! workspace still builds everywhere.
 
+pub mod convert;
 pub mod types;
 pub mod vfr;
 
@@ -11,10 +12,15 @@ pub mod vfr;
 pub mod windows_capture;
 
 #[cfg(windows)]
+pub mod windows_encoder;
+
+#[cfg(windows)]
 pub mod windows_encoders;
 
 #[cfg(windows)]
 pub use windows_capture::{enumerate_outputs, Duplicator};
+#[cfg(windows)]
+pub use windows_encoder::{create_best_encoder, EncoderConfig, H264Encoder};
 #[cfg(windows)]
 pub use windows_encoders::{list_h264_encoders, EncoderKind, EncoderMftInfo};
 
