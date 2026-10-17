@@ -7,6 +7,7 @@ import 'package:localsend_app/model/persistence/favorite_device.dart';
 import 'package:localsend_app/provider/favorites_provider.dart';
 import 'package:localsend_app/provider/network/server/server_provider.dart';
 import 'package:localsend_app/provider/owner_provider.dart';
+import 'package:localsend_app/provider/screen/screen_provider.dart';
 import 'package:localsend_app/provider/security_provider.dart';
 import 'package:localsend_app/util/sas.dart';
 import 'package:localsend_app/widget/dialogs/pairing_dialog.dart';
@@ -207,6 +208,49 @@ extension ExtensionServerHandler on ExtensionServerService {
       return;
     }
 
+    if (request.method == 'POST' && path == '/api/anyshare/v1/screen/accept') {
+      // The receiver confirmed a pending offer and is listening now.
+      // Exempt from the shared rate limiter: session callbacks are bursty and
+      // a 429 here would silently break an accepted session.
+      try {
+        final body = await _readJson(request);
+        if (body == null || body['session'] is! String) {
+          await _json(request, {'error': 'bad_request'}, status: 400);
+          return;
+        }
+        await ref.redux(screenProvider).dispatchAsync(
+              IncomingScreenAcceptAction(
+                sessionId: body['session'] as String,
+                port: (body['port'] as num?)?.toInt() ?? kScreenDataPort,
+              ),
+            );
+        await _json(request, {'ok': true});
+      } catch (e, st) {
+        _logger.warning('screen/accept failed: $e\n$st');
+        await _json(request, {'error': 'internal'}, status: 500);
+      }
+      return;
+    }
+
+    if (request.method == 'POST' && path == '/api/anyshare/v1/screen/stop') {
+      // Either side ends the session (user stop, denial, window closed, ...).
+      // Also exempt from the rate limiter (see accept).
+      try {
+        final body = await _readJson(request);
+        await ref.redux(screenProvider).dispatchAsync(
+              IncomingScreenStopAction(
+                reason: (body?['reason'] as String?) ?? 'remote_stop',
+                session: body?['session'] as String?,
+              ),
+            );
+        await _json(request, {'ok': true});
+      } catch (e, st) {
+        _logger.warning('screen/stop failed: $e\n$st');
+        await _json(request, {'error': 'internal'}, status: 500);
+      }
+      return;
+    }
+
     if (_rateLimited(request)) {
       await _json(request, {'error': 'rate_limited'}, status: 429);
       return;
@@ -293,6 +337,30 @@ extension ExtensionServerHandler on ExtensionServerService {
         'quotaMode': entry.quotaMode.name,
         'quotaValue': entry.quotaValue,
       });
+      return;
+    }
+
+    if (request.method == 'POST' && path == '/api/anyshare/v1/screen/offer') {
+      // E-2 screen share: the sender offers to stream its screen to us.
+      // The trust chain (D2) decides; the response is immediate (auto-accept)
+      // or `pending` while the local user is asked (W3 dialog).
+      final body = await _readJson(request);
+      if (body == null || body['fingerprint'] is! String) {
+        await _json(request, {'error': 'bad_request'}, status: 400);
+        return;
+      }
+      final action = HandleScreenOfferAction(
+        peerIp: request.connectionInfo!.remoteAddress.address.replaceAll('::ffff:', ''),
+        peerFingerprint: body['fingerprint'] as String,
+        peerAlias: (body['alias'] as String?) ?? '???',
+      );
+      try {
+        final (_, result) = await ref.redux(screenProvider).dispatchAsyncWithResult(action);
+        await _json(request, result.body, status: result.status);
+      } catch (e, st) {
+        _logger.warning('screen/offer failed: $e\n$st');
+        await _json(request, {'error': 'internal'}, status: 500);
+      }
       return;
     }
 

@@ -3470,6 +3470,7 @@ dependencies = [
  "bytes",
  "flutter_rust_bridge",
  "localsend",
+ "screen-stream",
  "tokio",
  "tokio-util",
  "tracing",

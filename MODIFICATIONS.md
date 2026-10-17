@@ -53,6 +53,18 @@
 - `pubspec.lock`:8 个 build 工具链传递依赖小版本再解析(archive/build_config/build_daemon 等,仅 codegen 使用;官方源解析,运行时依赖零漂移)
 - `app/pubspec.yaml`:description 重写、homepage → github.com/sunmerx/AnyShare
 
+### E-2 FRB 桥与控制面批次(2026-10-17,Step 9 W2)
+
+- `packages/screen-stream/src/{events,sender,receiver}.rs`(新增):推流引擎库化(sender/receiver 句柄、事件流、统计;原 ss-send/ss-view 主循环搬入;Drop 不阻塞 finalizer、SO_REUSEADDR、错误路径事件化)
+- `packages/screen-stream/src/bin/{ss-send,ss-view}.rs`:改薄壳(CLI 兼容)
+- `packages/localsend_isolates/rust/`:新增 `build.rs`(cfg(desktop))与 `src/api/screen.rs`(FRB 面:start_screen_sender/receiver、listen 事件流、stop/stats;平台运行时门控);Cargo.toml 目标依赖 screen-stream(viewer);codegen 2.12.0 产物更新
+- `packages/localsend_isolates/lib/src/screen/screen_session.dart`(新增):Dart 包装(ScreenSender/ReceiverSession + 事件模型)
+- `app/lib/provider/screen/screen_provider.dart`(新增):屏共会话状态机(offer/accept/stop 流、信任分档、60s 超时、15s 接收看门狗、会话 ID 关联校验、流关闭兜底)
+- `app/lib/util/screen_trust.dart`(新增):屏共信任判定(D2;自动接受要求源地址与配对记录一致,防明文指纹重放)
+- `app/lib/provider/network/extension_server_provider.dart`:53318 新增 `/screen/offer|accept|stop`(回调端点豁免限速;异常回 500)
+- `app/test/unit/{util/screen_trust_test,provider/screen_offer_test}.dart`(新增):18 项测试(信任分档/源地址降级/端点/会话关联/陈旧 stop 拒绝)
+- 独立审查 21 项发现修复;验证:app 135 测试全绿、analyze 干净;Rust 三平台编译;跨机实弹 0 丢包 0 解码错误
+
 ### E-2 原生 VAAPI 解码器批次(2026-10-17,Step 9 W1)
 
 - `packages/screen-stream/src/vaapi/`(新增):原生 VAAPI H.264 解码器(libloading 直连 libva,无子进程/无 libavcodec)。`ffi.rs` 结构转录自 libva 2.20 va.h 并经头文件逐字段核对;`h264.rs` 极简解析器(EPB 去除、SPS/PPS/slice header;修复 ref_pic_list_modification_flag_l0 漏读导致的位错位,以真实抓包帧做回归测试);`mod.rs` VaapiDecoder(DPB/POC 管理、参考列表按 POC 排序、IQ 矩阵缓冲、错误路径资源回收)

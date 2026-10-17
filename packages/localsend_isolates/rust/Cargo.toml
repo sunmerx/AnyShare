@@ -22,3 +22,8 @@ uuid = { version = "1.24.0", features = ["v4"] }
 
 [target.'cfg(target_os = "android")'.dependencies]
 tracing-android = "0.2"
+
+# E-2 screen sharing engine: desktop only (mobile builds stay clean; the
+# screen API exists everywhere but reports "not supported" at runtime).
+[target.'cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))'.dependencies]
+screen-stream = { path = "../../screen-stream", features = ["viewer"] }

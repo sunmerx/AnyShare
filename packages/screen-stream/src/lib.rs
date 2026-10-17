@@ -5,12 +5,19 @@
 //! workspace still builds everywhere.
 
 pub mod convert;
+pub mod events;
 pub mod transport;
 pub mod types;
 pub mod vfr;
 
 #[cfg(all(target_os = "linux", feature = "viewer"))]
 pub mod vaapi;
+
+#[cfg(feature = "viewer")]
+pub mod receiver;
+
+#[cfg(windows)]
+pub mod sender;
 
 #[cfg(windows)]
 pub mod windows_capture;

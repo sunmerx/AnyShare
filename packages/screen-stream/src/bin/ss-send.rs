@@ -1,5 +1,4 @@
-//! ss-send: capture -> VFR gate -> H.264 encode -> packetize + FEC -> UDP.
-//! Windows-only (capture/encode layers are Windows for now).
+//! ss-send: CLI wrapper around the screen-stream sender library (Windows-only).
 //! Usage: ss-send [--output <index|name>] [--target IP:PORT] [--bitrate BPS]
 //!                [--seconds N] [--timeout-ms N]
 
@@ -21,13 +20,10 @@ fn main() {
 
 #[cfg(windows)]
 fn run() -> anyhow::Result<()> {
-    use std::net::UdpSocket;
-    use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+    use std::time::{Duration, Instant};
 
-    use screen_stream::transport::{packetize, FLAG_DISCONTINUITY, FLAG_HEADER, FLAG_KEYFRAME};
-    use screen_stream::types::{Acquire, FrameMeta};
-    use screen_stream::vfr::{EncodeDecision, VfrConfig, VfrGate};
-    use screen_stream::{enumerate_outputs, Duplicator};
+    use screen_stream::events::{EndReason, StreamEvent};
+    use screen_stream::sender::{start_sender, SenderConfig};
 
     fn next_value(args: &[String], i: &mut usize, name: &str) -> anyhow::Result<String> {
         *i += 1;
@@ -40,20 +36,20 @@ fn run() -> anyhow::Result<()> {
         .skip(1)
         .map(|a| a.to_string_lossy().into_owned())
         .collect();
-    let mut want_output: Option<String> = None;
-    let mut target = "127.0.0.1:53320".to_string();
-    let mut bitrate_bps = 8_000_000u32;
+    let mut config = SenderConfig {
+        target: "127.0.0.1:53320".to_string(),
+        ..SenderConfig::default()
+    };
     let mut seconds = 30u64;
-    let mut timeout_ms = 500u32;
 
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
-            "--output" => want_output = Some(next_value(&args, &mut i, "--output")?),
-            "--target" => target = next_value(&args, &mut i, "--target")?,
+            "--output" => config.output = Some(next_value(&args, &mut i, "--output")?),
+            "--target" => config.target = next_value(&args, &mut i, "--target")?,
             "--bitrate" => {
                 let raw = next_value(&args, &mut i, "--bitrate")?;
-                bitrate_bps = raw.parse().map_err(|_| anyhow::anyhow!("invalid --bitrate {raw:?}"))?;
+                config.bitrate_bps = raw.parse().map_err(|_| anyhow::anyhow!("invalid --bitrate {raw:?}"))?;
             }
             "--seconds" => {
                 let raw = next_value(&args, &mut i, "--seconds")?;
@@ -61,7 +57,7 @@ fn run() -> anyhow::Result<()> {
             }
             "--timeout-ms" => {
                 let raw = next_value(&args, &mut i, "--timeout-ms")?;
-                timeout_ms = raw.parse().map_err(|_| anyhow::anyhow!("invalid --timeout-ms {raw:?}"))?;
+                config.timeout_ms = raw.parse().map_err(|_| anyhow::anyhow!("invalid --timeout-ms {raw:?}"))?;
             }
             other => anyhow::bail!(
                 "unknown argument {other:?} (usage: ss-send [--output <index|name>] [--target IP:PORT] [--bitrate BPS] [--seconds N] [--timeout-ms N])"
@@ -70,207 +66,41 @@ fn run() -> anyhow::Result<()> {
         i += 1;
     }
 
-    let outputs = enumerate_outputs()?;
-    let targets: Vec<_> = outputs.iter().filter(|o| o.attached).cloned().collect();
-    let target_output = match &want_output {
-        Some(spec) => {
-            if let Ok(idx) = spec.parse::<usize>() {
-                outputs
-                    .iter()
-                    .find(|o| o.index == idx)
-                    .cloned()
-                    .ok_or_else(|| anyhow::anyhow!("output index {idx} not found"))?
-            } else {
-                outputs
-                    .iter()
-                    .find(|o| o.device_name.to_ascii_lowercase().contains(&spec.to_ascii_lowercase()))
-                    .cloned()
-                    .ok_or_else(|| anyhow::anyhow!("no output name matches {spec:?}"))?
-            }
-        }
-        None => targets
-            .iter()
-            .min_by_key(|o| o.desktop_rect.area())
-            .cloned()
-            .ok_or_else(|| anyhow::anyhow!("no attached output to auto-pick"))?,
-    };
-
-    if screen_stream::windows_capture::rotation_name(target_output.rotation) != "identity" {
-        anyhow::bail!("capturing rotated outputs is not supported yet");
-    }
-
-    let socket = {
-        let raw = socket2::Socket::new(socket2::Domain::IPV4, socket2::Type::DGRAM, None)?;
-        raw.set_send_buffer_size(8 * 1024 * 1024)?;
-        raw.connect(&target.parse::<std::net::SocketAddr>()?.into())?;
-        let std_socket: UdpSocket = raw.into();
-        std_socket
-    };
-
-    let session = (SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos() & 0xFFFF_FFFF) as u32 | 1;
-
-    let config = screen_stream::EncoderConfig {
-        width: target_output.desktop_rect.width() as u32,
-        height: target_output.desktop_rect.height() as u32,
-        bitrate_bps,
-        fps: 60,
-    };
-    let mut encoder = screen_stream::create_best_encoder(&config)?;
-    println!(
-        "encoder: {} (input {}, session {session:#010x}), target {target}",
-        encoder.name(),
-        encoder.input_format().name()
-    );
-
-    let mut dup = Duplicator::new(target_output.index)?;
-    let mut gate = VfrGate::new(VfrConfig::default());
-    let mut i420: Vec<u8> = Vec::new();
-
-    let mut frame_id: u32 = 1;
-    let mut packets_sent: u64 = 0;
-    let mut bytes_sent: u64 = 0;
-    let mut frames_sent: u64 = 0;
-    let mut keyframes_sent: u64 = 0;
-    let mut last_enc_time_100ns: i64 = -1;
-    let mut last_rebuild_count = dup.rebuild_count();
-    let mut last_send_time_100ns: i64 = -1;
-
-    let mut sequence_header: Option<Vec<u8>> = encoder.take_sequence_header();
-    if let Some(header) = &sequence_header {
-        let packets = packetize(session, 0, FLAG_HEADER, 0, header);
-        for packet in &packets {
-            socket.send(&packet.encode())?;
-            packets_sent += 1;
-            bytes_sent += packet.payload.len() as u64;
-        }
-        println!("sequence header sent: {} bytes", header.len());
-    }
+    let (event_tx, event_rx) = std::sync::mpsc::channel::<StreamEvent>();
+    // Same semantics as before the refactor: --seconds 0 exits immediately.
+    config.duration = Some(Duration::from_secs(seconds));
+    let handle = start_sender(config, event_tx)?;
 
     let started = Instant::now();
-    let mut last_stats = Instant::now();
-    let mut window_packets: u64 = 0;
-    let mut window_bytes: u64 = 0;
-
-    while started.elapsed() < Duration::from_secs(seconds) {
-        match dup.acquire_full(timeout_ms)? {
-            None => {
-                let _ = gate.decide(&FrameMeta::default(), Instant::now());
+    let mut failed = false;
+    for event in event_rx {
+        match event {
+            StreamEvent::Status(_) => {}
+            StreamEvent::Stats(stats) => {
+                println!(
+                    "t={:>3}s frames={} kf={} packets={} {:.2} Mbps",
+                    started.elapsed().as_secs(),
+                    stats.frames,
+                    stats.keyframes,
+                    stats.packets,
+                    stats.mbps
+                );
             }
-            Some((meta, pixels)) => {
-                let rebuild_changed = dup.rebuild_count() != last_rebuild_count;
-                last_rebuild_count = dup.rebuild_count();
-
-                if let EncodeDecision::Encode { keyframe } = gate.decide(&meta, Instant::now()) {
-                    {
-                        use screen_stream::windows_encoder::InputPixelFormat;
-                        match encoder.input_format() {
-                            InputPixelFormat::Nv12 => {
-                                screen_stream::convert::bgra_to_nv12(&pixels.bgra, pixels.width, pixels.height, &mut i420)
-                            }
-                            InputPixelFormat::I420 => {
-                                screen_stream::convert::bgra_to_i420(&pixels.bgra, pixels.width, pixels.height, &mut i420)
-                            }
-                            InputPixelFormat::Yv12 => {
-                                screen_stream::convert::bgra_to_i420(&pixels.bgra, pixels.width, pixels.height, &mut i420);
-                                screen_stream::convert::i420_to_yv12_in_place(&mut i420, pixels.width, pixels.height);
-                            }
-                        }
-                    }
-
-                    let t100 = started.elapsed().as_nanos() as i64 / 100;
-                    let delta = if last_enc_time_100ns >= 0 { t100 - last_enc_time_100ns } else { 10_000_000 / 60 };
-                    let duration = delta.clamp(10_000, 5_000_000);
-                    let discontinuity = rebuild_changed || delta > 2_000_000;
-
-                    if let Some(header) = encoder.take_sequence_header() {
-                        let packets = packetize(session, frame_id, FLAG_HEADER, t100 as u64, &header);
-                        for packet in &packets {
-                            socket.send(&packet.encode())?;
-                            packets_sent += 1;
-                            window_packets += 1;
-                            bytes_sent += packet.payload.len() as u64;
-                            window_bytes += packet.payload.len() as u64;
-                        }
-                        frame_id = frame_id.wrapping_add(1);
-                        sequence_header = Some(header);
-                    }
-
-                    let outputs = encoder.encode(&i420, t100, duration, discontinuity, keyframe)?;
-                    let mut flags = 0u8;
-                    if keyframe {
-                        flags |= FLAG_KEYFRAME;
-                    }
-                    if discontinuity {
-                        flags |= FLAG_DISCONTINUITY;
-                    }
-                    let had_output = !outputs.is_empty();
-                    for chunk in &outputs {
-                        let with_header;
-                        let payload: &[u8] = if keyframe {
-                            match &sequence_header {
-                                Some(header) => {
-                                    let mut combined = Vec::with_capacity(header.len() + chunk.len());
-                                    combined.extend_from_slice(header);
-                                    combined.extend_from_slice(chunk);
-                                    with_header = combined;
-                                    &with_header
-                                }
-                                None => chunk,
-                            }
-                        } else {
-                            chunk
-                        };
-                        let packets = packetize(session, frame_id, flags, t100 as u64, payload);
-                        for packet in &packets {
-                            socket.send(&packet.encode())?;
-                            packets_sent += 1;
-                            window_packets += 1;
-                            bytes_sent += packet.payload.len() as u64;
-                            window_bytes += packet.payload.len() as u64;
-                        }
-                        frame_id = frame_id.wrapping_add(1);
-                        frames_sent += 1;
-                    }
-                    if keyframe && had_output {
-                        keyframes_sent += 1;
-                    }
-                    if last_enc_time_100ns < 0 && started.elapsed() > Duration::from_secs(5) {
-                        anyhow::bail!("encoder produced no output within 5s (activating-but-mute MFT?)");
-                    }
-                    last_enc_time_100ns = t100;
-                    last_send_time_100ns = t100;
+            StreamEvent::Error(message) => {
+                eprintln!("ss-send: {message}");
+                failed = true;
+            }
+            StreamEvent::Ended(reason) => {
+                if reason == EndReason::Error {
+                    failed = true;
                 }
-                dup.recycle_pixels(pixels);
+                break;
             }
         }
-
-        if last_stats.elapsed() >= Duration::from_secs(1) {
-            let mbps = window_bytes as f64 * 8.0 / 1_000_000.0;
-            println!(
-                "t={:>3}s frames={frames_sent} kf={keyframes_sent} packets={window_packets} {mbps:.2} Mbps",
-                started.elapsed().as_secs()
-            );
-            window_packets = 0;
-            window_bytes = 0;
-            last_stats = Instant::now();
-        }
     }
-
-    for chunk in encoder.shutdown()? {
-        let packets = packetize(session, frame_id, 0, last_send_time_100ns.max(0) as u64, &chunk);
-        for packet in &packets {
-            socket.send(&packet.encode())?;
-            packets_sent += 1;
-            bytes_sent += packet.payload.len() as u64;
-        }
-        frame_id = frame_id.wrapping_add(1);
+    handle.join();
+    if failed {
+        std::process::exit(1);
     }
-
-    println!(
-        "summary: frames={frames_sent} keyframes={keyframes_sent} packets={packets_sent} sent={:.2} MiB in {}s",
-        bytes_sent as f64 / 1048576.0,
-        started.elapsed().as_secs()
-    );
-    let _ = Acquire::Idle;
     Ok(())
 }
