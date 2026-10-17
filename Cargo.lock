@@ -3644,6 +3644,7 @@ name = "screen-stream"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "libloading",
  "minifb",
  "openh264",
  "socket2 0.5.10",

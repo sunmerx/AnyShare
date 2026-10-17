@@ -53,6 +53,14 @@
 - `pubspec.lock`:8 个 build 工具链传递依赖小版本再解析(archive/build_config/build_daemon 等,仅 codegen 使用;官方源解析,运行时依赖零漂移)
 - `app/pubspec.yaml`:description 重写、homepage → github.com/sunmerx/AnyShare
 
+### E-2 原生 VAAPI 解码器批次(2026-10-17,Step 9 W1)
+
+- `packages/screen-stream/src/vaapi/`(新增):原生 VAAPI H.264 解码器(libloading 直连 libva,无子进程/无 libavcodec)。`ffi.rs` 结构转录自 libva 2.20 va.h 并经头文件逐字段核对;`h264.rs` 极简解析器(EPB 去除、SPS/PPS/slice header;修复 ref_pic_list_modification_flag_l0 漏读导致的位错位,以真实抓包帧做回归测试);`mod.rs` VaapiDecoder(DPB/POC 管理、参考列表按 POC 排序、IQ 矩阵缓冲、错误路径资源回收)
+- `packages/screen-stream/src/bin/ss-view.rs`:新增 `--decoder vaapi` 与 `--vaapi-device`(默认 /dev/dri/renderD128)
+- `packages/screen-stream/src/bin/ss-h264dbg.rs`(新增):Annex-B 解析调试工具(与 ffmpeg trace_headers 真值对账用)
+- `packages/screen-stream/Cargo.toml`:`libloading` 可选依赖并入 viewer feature;ss-h264dbg 声明 required-features
+- 实测:Windows→Ubuntu 0 丢包、0 解码错误、17-21fps 满速显示;独立审查 12 项修复;26 项单测全绿
+
 ### E-2 播放器管道提速与硬解参数批次(2026-10-17,Step 7)
 
 - `packages/screen-stream/src/bin/ss-view.rs`:管道格式 MJPEG→BMP(自有 BMP 解析,含边界校验),Rust 侧处理 22ms→3.5ms(Windows)/10-14ms(Ubuntu);新增 `--hwaccel/--hwaccel-device` 透传(VAAPI 等;审查修复:hwdownload 多余导致硬解路径必然失败)

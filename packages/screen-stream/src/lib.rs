@@ -9,6 +9,9 @@ pub mod transport;
 pub mod types;
 pub mod vfr;
 
+#[cfg(all(target_os = "linux", feature = "viewer"))]
+pub mod vaapi;
+
 #[cfg(windows)]
 pub mod windows_capture;
 

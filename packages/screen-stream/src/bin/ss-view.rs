@@ -58,6 +58,7 @@ fn run() -> Result<()> {
     let mut ffmpeg_path = "ffmpeg".to_string();
     let mut hwaccel: Option<String> = None;
     let mut hwaccel_device: Option<String> = None;
+    let mut vaapi_device = "/dev/dri/renderD128".to_string();
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
@@ -77,15 +78,16 @@ fn run() -> Result<()> {
             "--ffmpeg-path" => ffmpeg_path = next_value(&args, &mut i, "--ffmpeg-path")?,
             "--hwaccel" => hwaccel = Some(next_value(&args, &mut i, "--hwaccel")?),
             "--hwaccel-device" => hwaccel_device = Some(next_value(&args, &mut i, "--hwaccel-device")?),
+            "--vaapi-device" => vaapi_device = next_value(&args, &mut i, "--vaapi-device")?,
             "--verbose" => verbose = true,
             other => anyhow::bail!(
-                "unknown argument {other:?} (usage: ss-view [--port N] [--seconds N] [--scale N] [--decoder ffmpeg|openh264] [--ffmpeg-path PATH] [--hwaccel NAME] [--hwaccel-device PATH] [--verbose])"
+                "unknown argument {other:?} (usage: ss-view [--port N] [--seconds N] [--scale N] [--decoder ffmpeg|openh264|vaapi] [--ffmpeg-path PATH] [--hwaccel NAME] [--hwaccel-device PATH] [--vaapi-device PATH] [--verbose])"
             ),
         }
         i += 1;
     }
-    if decoder_kind != "ffmpeg" && decoder_kind != "openh264" {
-        anyhow::bail!("unknown decoder {decoder_kind:?} (expected ffmpeg or openh264)");
+    if decoder_kind != "ffmpeg" && decoder_kind != "openh264" && decoder_kind != "vaapi" {
+        anyhow::bail!("unknown decoder {decoder_kind:?} (expected ffmpeg, openh264 or vaapi)");
     }
 
     let shared = Arc::new(Shared {
@@ -96,8 +98,18 @@ fn run() -> Result<()> {
     {
         let shared = Arc::clone(&shared);
         let decoder_kind = decoder_kind.clone();
+        let vaapi_device = vaapi_device.clone();
         std::thread::spawn(move || {
-            if let Err(e) = media_loop(shared, port, verbose, &decoder_kind, &ffmpeg_path, hwaccel.as_deref(), hwaccel_device.as_deref()) {
+            if let Err(e) = media_loop(
+                shared,
+                port,
+                verbose,
+                &decoder_kind,
+                &ffmpeg_path,
+                hwaccel.as_deref(),
+                hwaccel_device.as_deref(),
+                &vaapi_device,
+            ) {
                 eprintln!("ss-view media thread: {e:#}");
             }
         });
@@ -177,6 +189,7 @@ fn media_loop(
     ffmpeg_path: &str,
     hwaccel: Option<&str>,
     hwaccel_device: Option<&str>,
+    vaapi_device: &str,
 ) -> Result<()> {
     let (tx, rx) = std::sync::mpsc::sync_channel::<Delivered>(128);
 
@@ -191,6 +204,17 @@ fn media_loop(
 
     if decoder_kind == "ffmpeg" {
         return ffmpeg_loop(shared, rx, verbose, ffmpeg_path, hwaccel, hwaccel_device);
+    }
+    if decoder_kind == "vaapi" {
+        #[cfg(target_os = "linux")]
+        {
+            return vaapi_loop(shared, rx, verbose, vaapi_device);
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            let _ = vaapi_device;
+            anyhow::bail!("the vaapi decoder is Linux-only");
+        }
     }
     openh264_loop(shared, rx, verbose)
 }
@@ -382,6 +406,57 @@ fn find_bmp(buffer: &[u8]) -> Option<usize> {
         i += 1;
     }
     None
+}
+
+#[cfg(target_os = "linux")]
+fn vaapi_loop(shared: Arc<Shared>, rx: std::sync::mpsc::Receiver<Delivered>, _verbose: bool, device: &str) -> Result<()> {
+    use screen_stream::vaapi::VaapiDecoder;
+
+    let mut decoder = VaapiDecoder::new(device)?;
+    eprintln!("ss-view: vaapi decoder ready ({device})");
+    let mut frames: u64 = 0;
+    let mut decode_ms_sum: f64 = 0.0;
+    let mut errors: u64 = 0;
+    let mut last_stats = Instant::now();
+
+    loop {
+        match rx.recv_timeout(Duration::from_millis(50)) {
+            Ok(frame) => {
+                let t0 = Instant::now();
+                match decoder.decode(&frame.payload) {
+                    Ok(Some((width, height, argb))) => {
+                        publish(
+                            &shared,
+                            Frame {
+                                width: width as usize,
+                                height: height as usize,
+                                argb,
+                            },
+                        );
+                        frames += 1;
+                        decode_ms_sum += t0.elapsed().as_secs_f64() * 1000.0;
+                    }
+                    Ok(None) => {}
+                    Err(e) => {
+                        errors += 1;
+                        if errors <= 10 || errors.is_multiple_of(300) {
+                            eprintln!("ss-view: vaapi decode error #{errors}: {e:#}");
+                        }
+                    }
+                }
+            }
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
+        }
+        if last_stats.elapsed() >= Duration::from_secs(1) {
+            let avg_ms = if frames == 0 { 0.0 } else { decode_ms_sum / frames as f64 };
+            eprintln!("media: decoded={frames} avg_decode_ms={avg_ms:.1} (vaapi) errors={errors}");
+            frames = 0;
+            decode_ms_sum = 0.0;
+            last_stats = Instant::now();
+        }
+    }
+    Ok(())
 }
 
 fn openh264_loop(shared: Arc<Shared>, rx: std::sync::mpsc::Receiver<Delivered>, verbose: bool) -> Result<()> {

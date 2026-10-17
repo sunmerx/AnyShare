@@ -6,16 +6,22 @@ description = "AnyShare E-2 screen streaming engine prototype (capture layer)"
 
 [dependencies]
 anyhow = "1.0.104"
+libloading = { version = "0.8", optional = true }
 minifb = { version = "0.29", optional = true }
 openh264 = { version = "0.9", optional = true }
 socket2 = "0.5"
 
 [features]
-viewer = ["dep:openh264", "dep:minifb"]
+viewer = ["dep:openh264", "dep:minifb", "dep:libloading"]
 
 [[bin]]
 name = "ss-view"
 path = "src/bin/ss-view.rs"
+required-features = ["viewer"]
+
+[[bin]]
+name = "ss-h264dbg"
+path = "src/bin/ss-h264dbg.rs"
 required-features = ["viewer"]
 
 [target.'cfg(windows)'.dependencies]
