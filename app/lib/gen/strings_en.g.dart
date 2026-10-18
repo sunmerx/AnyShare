@@ -76,6 +76,7 @@ class Translations with BaseTranslations<AppLocale, Translations> {
   late final Translations$assetPicker$en assetPicker = Translations$assetPicker$en.internal(_root);
   late final Translations$sendHistoryPage$en sendHistoryPage = Translations$sendHistoryPage$en.internal(_root);
   late final Translations$pairingIncoming$en pairingIncoming = Translations$pairingIncoming$en.internal(_root);
+  late final Translations$ui2$en ui2 = Translations$ui2$en.internal(_root);
 }
 
 // Path: general
@@ -1030,6 +1031,32 @@ class Translations$pairingIncoming$en {
 
   /// en: 'Codes differ'
   String get mismatch => 'Codes differ';
+}
+
+// Path: ui2
+class Translations$ui2$en {
+  Translations$ui2$en.internal(this._root);
+
+  final Translations _root; // ignore: unused_field
+
+  // Translations
+  late final Translations$ui2$nav$en nav = Translations$ui2$nav$en.internal(_root);
+
+  /// en: 'Online'
+  String get online => 'Online';
+
+  /// en: 'Offline'
+  String get offline => 'Offline';
+
+  /// en: 'Cancel'
+  String get cancel => 'Cancel';
+
+  late final Translations$ui2$myDevices$en myDevices = Translations$ui2$myDevices$en.internal(_root);
+  late final Translations$ui2$deviceList$en deviceList = Translations$ui2$deviceList$en.internal(_root);
+  late final Translations$ui2$card$en card = Translations$ui2$card$en.internal(_root);
+  late final Translations$ui2$blocklist$en blocklist = Translations$ui2$blocklist$en.internal(_root);
+  late final Translations$ui2$settings$en settings = Translations$ui2$settings$en.internal(_root);
+  late final Translations$ui2$trust$en trust = Translations$ui2$trust$en.internal(_root);
 }
 
 // Path: receiveTab.infoBox
@@ -2034,6 +2061,204 @@ class Translations$dialogs$zoom$en {
 
   /// en: 'URL'
   String get title => 'URL';
+}
+
+// Path: ui2.nav
+class Translations$ui2$nav$en {
+  Translations$ui2$nav$en.internal(this._root);
+
+  final Translations _root; // ignore: unused_field
+
+  // Translations
+
+  /// en: 'My Devices'
+  String get myDevices => 'My Devices';
+
+  /// en: 'Devices'
+  String get deviceList => 'Devices';
+
+  /// en: 'Blocklist'
+  String get blocklist => 'Blocklist';
+
+  /// en: 'Settings'
+  String get settings => 'Settings';
+}
+
+// Path: ui2.myDevices
+class Translations$ui2$myDevices$en {
+  Translations$ui2$myDevices$en.internal(this._root);
+
+  final Translations _root; // ignore: unused_field
+
+  // Translations
+
+  /// en: 'My Devices'
+  String get title => 'My Devices';
+
+  /// en: 'Owner: {owner} · devices of the same owner skip confirmation'
+  String subtitle({required Object owner}) => 'Owner: ${owner} · devices of the same owner skip confirmation';
+
+  /// en: 'This device'
+  String get self => 'This device';
+
+  /// en: 'Mine'
+  String get mine => 'Mine';
+
+  /// en: 'Receiving'
+  String get receiving => 'Receiving';
+
+  /// en: 'Devices with the owner set to "{owner}" will appear here automatically.'
+  String empty({required Object owner}) => 'Devices with the owner set to "${owner}" will appear here automatically.';
+}
+
+// Path: ui2.deviceList
+class Translations$ui2$deviceList$en {
+  Translations$ui2$deviceList$en.internal(this._root);
+
+  final Translations _root; // ignore: unused_field
+
+  // Translations
+
+  /// en: 'Devices'
+  String get title => 'Devices';
+
+  /// en: 'Nearby devices · paired devices'
+  String get subtitle => 'Nearby devices · paired devices';
+
+  /// en: 'Nearby'
+  String get nearby => 'Nearby';
+
+  /// en: 'Paired'
+  String get paired => 'Paired';
+
+  /// en: 'No devices found nearby. Make sure the other device has AnyShare open on the same network.'
+  String get nearbyEmpty => 'No devices found nearby.\nMake sure the other device has AnyShare open on the same network.';
+
+  /// en: 'No paired devices yet. Tap "Pair" on a nearby device to get started.'
+  String get pairedEmpty => 'No paired devices yet.\nTap "Pair" on a nearby device to get started.';
+
+  /// en: 'Enter address manually'
+  String get manualAddress => 'Enter address manually';
+
+  /// en: 'Scan again'
+  String get rescan => 'Scan again';
+
+  /// en: 'Pair by QR code'
+  String get qrPairing => 'Pair by QR code';
+
+  /// en: 'Send mode'
+  String get sendMode => 'Send mode';
+
+  /// en: 'Device is offline'
+  String get offlineHint => 'Device is offline';
+}
+
+// Path: ui2.card
+class Translations$ui2$card$en {
+  Translations$ui2$card$en.internal(this._root);
+
+  final Translations _root; // ignore: unused_field
+
+  // Translations
+
+  /// en: 'Send files'
+  String get sendFiles => 'Send files';
+
+  /// en: 'Share screen'
+  String get shareScreen => 'Share screen';
+
+  /// en: 'Share mouse & keyboard'
+  String get shareMouse => 'Share mouse & keyboard';
+
+  /// en: 'Browse shared folder'
+  String get browseDir => 'Browse shared folder';
+
+  /// en: 'Pair'
+  String get pair => 'Pair';
+
+  /// en: 'Temporary devices cannot receive screen shares'
+  String get tempNoScreen => 'Temporary devices cannot receive screen shares';
+
+  /// en: 'Coming soon'
+  String get comingSoon => 'Coming soon';
+
+  /// en: 'Experimental'
+  String get experimental => 'Experimental';
+}
+
+// Path: ui2.blocklist
+class Translations$ui2$blocklist$en {
+  Translations$ui2$blocklist$en.internal(this._root);
+
+  final Translations _root; // ignore: unused_field
+
+  // Translations
+
+  /// en: 'Blocklist'
+  String get title => 'Blocklist';
+
+  /// en: 'Blocked devices cannot send files, share screens or browse folders'
+  String get subtitle => 'Blocked devices cannot send files, share screens or browse folders';
+
+  /// en: 'No blocked devices'
+  String get empty => 'No blocked devices';
+
+  /// en: 'Unblock'
+  String get unblock => 'Unblock';
+
+  /// en: 'Unblock "{alias}"?'
+  String unblockTitle({required Object alias}) => 'Unblock "${alias}"?';
+
+  /// en: 'The device will be treated as "Limited trust" afterwards.'
+  String get unblockBody => 'The device will be treated as "Limited trust" afterwards.';
+
+  /// en: 'Remove record'
+  String get remove => 'Remove record';
+
+  /// en: 'Remove "{alias}"?'
+  String removeTitle({required Object alias}) => 'Remove "${alias}"?';
+
+  /// en: 'This also removes the pairing and trust settings.'
+  String get removeBody => 'This also removes the pairing and trust settings.';
+}
+
+// Path: ui2.settings
+class Translations$ui2$settings$en {
+  Translations$ui2$settings$en.internal(this._root);
+
+  final Translations _root; // ignore: unused_field
+
+  // Translations
+
+  /// en: 'This device'
+  String get local => 'This device';
+
+  /// en: 'Owner name'
+  String get ownerName => 'Owner name';
+
+  /// en: 'Shared folders'
+  String get sharedDir => 'Shared folders';
+
+  /// en: 'Screen sharing'
+  String get screenShare => 'Screen sharing';
+}
+
+// Path: ui2.trust
+class Translations$ui2$trust$en {
+  Translations$ui2$trust$en.internal(this._root);
+
+  final Translations _root; // ignore: unused_field
+
+  // Translations
+
+  /// en: 'Temporary'
+  String get temp => 'Temporary';
+
+  /// en: 'Limited'
+  String get limited => 'Limited';
+
+  /// en: 'Full'
+  String get full => 'Full';
 }
 
 // Path: settingsTab.general.brightnessOptions

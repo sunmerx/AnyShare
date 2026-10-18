@@ -53,6 +53,20 @@
 - `pubspec.lock`:8 个 build 工具链传递依赖小版本再解析(archive/build_config/build_daemon 等,仅 codegen 使用;官方源解析,运行时依赖零漂移)
 - `app/pubspec.yaml`:description 重写、homepage → github.com/sunmerx/AnyShare
 
+### UI 重设计批次一:四区导航(2026-10-18,UI-1)
+
+- `app/lib/pages/home_page.dart`(重写):四区导航(我的设备/设备列表/黑名单/设置);落地页=我的设备;拖拽落文件→设备列表选择发送
+- `app/lib/pages/tabs/{my_devices_tab,device_list_tab,blocklist_tab}.dart`(新增):我的设备(归属者分组+本机置顶+免确认提示)、设备列表(附近+已配对分组、信任徽章、临时设备投屏禁用、扫码配对占位)、黑名单(解除拉黑/删除记录)
+- `app/lib/pages/tabs/{send_tab,send_tab_vm,receive_tab}.dart`(删除):发现列表逻辑迁入 device_list_tab 与 `util/send_flow.dart`;接收入口(网页分享/接收历史/发送历史/问题排查)迁入设置页
+- `app/lib/widget/{device_card,circular_popup_button,multi_send_info,selection_banner}.dart`(新增):统一设备卡片(徽章/状态/操作/多发送进度)、圆形弹出按钮、多发送会话信息构建器、文件选择横幅(编辑/清除)
+- `app/lib/util/{device_groups,send_flow}.dart`(新增):分组纯函数(我的/已配对/附近/黑名单)+ 共享发送流程(单发/多发送/手动地址/网页分享)
+- `app/lib/pages/tabs/settings_tab.dart`:新增 本机(归属者名称编辑)、共享目录占位、屏幕共享占位(显示 1080p·60fps·8Mbps,D5)分组;接收组补 网页分享/接收历史/发送历史/问题排查入口
+- `app/lib/config/init.dart`、`app/lib/main.dart`、`app/lib/provider/network/send_provider.dart`、`app/lib/provider/network/server/controller/receive_controller.dart`、`app/lib/widget/watcher/shortcut_watcher.dart`:标签跳转目标更新(send→deviceList、receive→myDevices)
+- i18n:`app/assets/i18n/{en,zh-CN,zh-HK,zh-TW}.json` 新增 `ui2` 块(导航/设备卡片/黑名单/设置),slang 重新生成 `app/lib/gen/strings_*.g.dart`
+- `app/test/unit/util/device_groups_test.dart`(新增):6 项分组与设备匹配单测
+- 独立审查 14 项修复(高危:多发送模式恢复会话感知重入与进度显示;中危:在线/离线文案 i18n、多网卡子网扫描回退、选择横幅、发送历史入口恢复)
+- 验证:analyze 0 issues、141 测试全绿、Windows debug 构建 + 启动截图确认
+
 ### E-2 FRB 桥与控制面批次(2026-10-17,Step 9 W2)
 
 - `packages/screen-stream/src/{events,sender,receiver}.rs`(新增):推流引擎库化(sender/receiver 句柄、事件流、统计;原 ss-send/ss-view 主循环搬入;Drop 不阻塞 finalizer、SO_REUSEADDR、错误路径事件化)

@@ -512,5 +512,69 @@
     "sActionUseCameraHint": "使用相機",
     "sNameDurationLabel": "持續時間",
     "sUnitAssetCountLabel": "計數"
+  },
+  "ui2": {
+    "nav": {
+      "myDevices": "我的裝置",
+      "deviceList": "裝置清單",
+      "blocklist": "黑名單",
+      "settings": "設定"
+    },
+    "online": "線上",
+    "offline": "離線",
+    "cancel": "取消",
+    "myDevices": {
+      "title": "我的裝置",
+      "subtitle": "歸屬者:{owner} · 同一歸屬者的裝置互相免確認",
+      "self": "本機",
+      "mine": "我的",
+      "receiving": "接收中",
+      "empty": "其他裝置安裝 AnyShare 並把歸屬者設定為「{owner}」後,會自動出現在這裡。"
+    },
+    "deviceList": {
+      "title": "裝置清單",
+      "subtitle": "附近發現的裝置 · 已配對的裝置",
+      "nearby": "附近的裝置",
+      "paired": "已配對",
+      "nearbyEmpty": "附近沒有發現裝置。\n請確認對方已開啟 AnyShare 且在同一網路。",
+      "pairedEmpty": "還沒有配對的裝置。\n在附近裝置上點擊「配對」建立關係。",
+      "manualAddress": "手動輸入位址",
+      "rescan": "重新掃描",
+      "qrPairing": "掃碼配對",
+      "sendMode": "傳送模式",
+      "offlineHint": "裝置離線,無法傳送"
+    },
+    "card": {
+      "sendFiles": "傳送檔案",
+      "shareScreen": "分享螢幕",
+      "shareMouse": "鍵鼠共享",
+      "browseDir": "瀏覽目錄",
+      "pair": "配對",
+      "tempNoScreen": "臨時裝置不可投放螢幕",
+      "comingSoon": "即將開放",
+      "experimental": "實驗性"
+    },
+    "blocklist": {
+      "title": "黑名單",
+      "subtitle": "被封鎖的裝置不能傳送檔案、投放螢幕或瀏覽目錄",
+      "empty": "沒有被封鎖的裝置",
+      "unblock": "解除封鎖",
+      "unblockTitle": "解除封鎖「{alias}」?",
+      "unblockBody": "解除後,該裝置將按「一般信任」處理。",
+      "remove": "刪除記錄",
+      "removeTitle": "刪除「{alias}」的記錄?",
+      "removeBody": "將同時移除配對關係與信任設定。"
+    },
+    "settings": {
+      "local": "本機",
+      "ownerName": "歸屬者名稱",
+      "sharedDir": "共享目錄",
+      "screenShare": "螢幕分享"
+    },
+    "trust": {
+      "temp": "臨時",
+      "limited": "一般",
+      "full": "完全"
+    }
   }
 }

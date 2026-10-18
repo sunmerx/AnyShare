@@ -6,9 +6,14 @@ import 'package:localsend_app/model/persistence/color_mode.dart';
 import 'package:localsend_app/pages/about/about_page.dart';
 import 'package:localsend_app/pages/changelog_page.dart';
 import 'package:localsend_app/pages/donation/donation_page.dart';
+import 'package:localsend_app/pages/receive_history_page.dart';
+import 'package:localsend_app/pages/send_history_page.dart';
 import 'package:localsend_app/pages/settings/network_interfaces_page.dart';
 import 'package:localsend_app/pages/tabs/settings_tab_controller.dart';
+import 'package:localsend_app/pages/troubleshoot_page.dart';
+import 'package:localsend_app/pages/web_share_page.dart';
 import 'package:localsend_app/provider/network/server/server_provider.dart';
+import 'package:localsend_app/provider/owner_provider.dart';
 import 'package:localsend_app/provider/settings_provider.dart';
 import 'package:localsend_app/provider/version_provider.dart';
 import 'package:localsend_app/util/alias_generator.dart';
@@ -34,6 +39,33 @@ import 'package:refena_flutter/refena_flutter.dart';
 import 'package:routerino/routerino.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+/// AnyShare modification (2026-10-18): edit the local owner name (UI-1).
+Future<void> _editOwnerName(BuildContext context, Ref ref) async {
+  final controller = TextEditingController(text: ref.read(ownerProvider).name);
+  final result = await showDialog<String>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text(t.ui2.settings.ownerName),
+      content: TextField(
+        controller: controller,
+        autofocus: true,
+        decoration: const InputDecoration(hintText: ''),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(t.ui2.cancel)),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(controller.text.trim()),
+          child: Text(t.general.save),
+        ),
+      ],
+    ),
+  );
+  if (result != null && result.isNotEmpty) {
+    ref.redux(ownerProvider).dispatch(SetOwnerNameAction(result));
+  }
+  controller.dispose();
+}
+
 class SettingsTab extends StatelessWidget {
   const SettingsTab();
 
@@ -51,6 +83,38 @@ class SettingsTab extends StatelessWidget {
               child: Text(t.settingsTab.title, style: Theme.of(context).textTheme.titleLarge, textAlign: TextAlign.center),
             ),
             const SizedBox(height: 30),
+            // AnyShare modification (2026-10-18): UI-1 — local identity plus
+            // E-3/E-2 placeholder groups (visible but disabled, per D5).
+            _SettingsSection(
+              title: t.ui2.settings.local,
+              children: [
+                _ButtonEntry(
+                  label: t.ui2.settings.ownerName,
+                  buttonLabel: ref.watch(ownerProvider).name.isEmpty ? '—' : ref.watch(ownerProvider).name,
+                  onTap: () => _editOwnerName(context, ref),
+                ),
+              ],
+            ),
+            _SettingsSection(
+              title: '${t.ui2.settings.sharedDir} · ${t.ui2.card.comingSoon}',
+              children: [
+                _ButtonEntry(
+                  label: t.ui2.settings.sharedDir,
+                  buttonLabel: t.ui2.card.comingSoon,
+                  onTap: null,
+                ),
+              ],
+            ),
+            _SettingsSection(
+              title: '${t.ui2.settings.screenShare} · ${t.ui2.card.comingSoon}',
+              children: [
+                _ButtonEntry(
+                  label: t.ui2.settings.screenShare,
+                  buttonLabel: '1080p · 60fps · 8 Mbps',
+                  onTap: null,
+                ),
+              ],
+            ),
             _SettingsSection(
               title: t.settingsTab.general.title,
               children: [
@@ -289,6 +353,28 @@ class SettingsTab extends StatelessWidget {
                       }
                     },
                   ),
+                // AnyShare modification (2026-10-18): moved from the former
+                // receive tab (UI-1).
+                _ButtonEntry(
+                  label: t.receiveTab.link,
+                  buttonLabel: t.receiveTab.link,
+                  onTap: () async => await context.push(() => const WebSharePage()),
+                ),
+                _ButtonEntry(
+                  label: t.receiveHistoryPage.title,
+                  buttonLabel: t.receiveHistoryPage.title,
+                  onTap: () async => await context.push(() => const ReceiveHistoryPage()),
+                ),
+                _ButtonEntry(
+                  label: t.sendHistoryPage.title,
+                  buttonLabel: t.sendHistoryPage.title,
+                  onTap: () async => await context.push(() => const SendHistoryPage()),
+                ),
+                _ButtonEntry(
+                  label: t.troubleshootPage.title,
+                  buttonLabel: t.troubleshootPage.title,
+                  onTap: () async => await context.push(() => const TroubleshootPage()),
+                ),
               ],
             ),
             if (vm.advanced)
@@ -712,7 +798,7 @@ class _BooleanEntry extends StatelessWidget {
 class _ButtonEntry extends StatelessWidget {
   final String label;
   final String buttonLabel;
-  final void Function() onTap;
+  final void Function()? onTap;
 
   const _ButtonEntry({
     required this.label,

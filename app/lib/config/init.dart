@@ -270,7 +270,7 @@ Future<void> postInit(BuildContext context, Ref ref, bool appStart) async {
         for (final string in pendingStrings) {
           ref.redux(selectedSendingFilesProvider).dispatch(AddMessageAction(message: string));
         }
-        ref.redux(homePageControllerProvider).dispatch(ChangeTabAction(HomeTab.send));
+        ref.redux(homePageControllerProvider).dispatch(ChangeTabAction(HomeTab.deviceList));
       });
 
       await setupMethodCallHandler();
@@ -366,7 +366,7 @@ class _HandleShareIntentAction extends AsyncGlobalAction {
           ),
         );
 
-    ref.redux(homePageControllerProvider).dispatch(ChangeTabAction(HomeTab.send));
+    ref.redux(homePageControllerProvider).dispatch(ChangeTabAction(HomeTab.deviceList));
   }
 }
 
@@ -381,7 +381,7 @@ class _HandleAppStartArgumentsAction extends AsyncGlobalAction {
   Future<void> reduce() async {
     final filesAdded = await ref.redux(selectedSendingFilesProvider).dispatchAsyncTakeResult(LoadSelectionFromArgsAction(args));
     if (filesAdded) {
-      ref.redux(homePageControllerProvider).dispatch(ChangeTabAction(HomeTab.send));
+      ref.redux(homePageControllerProvider).dispatch(ChangeTabAction(HomeTab.deviceList));
     }
   }
 }

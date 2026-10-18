@@ -103,6 +103,8 @@ class TranslationsZhCn extends Translations with BaseTranslations<AppLocale, Tra
   late final Translations$sendHistoryPage$zh_CN sendHistoryPage = Translations$sendHistoryPage$zh_CN.internal(_root);
   @override
   late final Translations$pairingIncoming$zh_CN pairingIncoming = Translations$pairingIncoming$zh_CN.internal(_root);
+  @override
+  late final Translations$ui2$zh_CN ui2 = Translations$ui2$zh_CN.internal(_root);
 }
 
 // Path: general
@@ -913,6 +915,35 @@ class Translations$pairingIncoming$zh_CN extends Translations$pairingIncoming$en
   String get mismatch => '码不一致';
 }
 
+// Path: ui2
+class Translations$ui2$zh_CN extends Translations$ui2$en {
+  Translations$ui2$zh_CN.internal(TranslationsZhCn root) : this._root = root, super.internal(root);
+
+  final TranslationsZhCn _root; // ignore: unused_field
+
+  // Translations
+  @override
+  late final Translations$ui2$nav$zh_CN nav = Translations$ui2$nav$zh_CN.internal(_root);
+  @override
+  String get online => '在线';
+  @override
+  String get offline => '离线';
+  @override
+  String get cancel => '取消';
+  @override
+  late final Translations$ui2$myDevices$zh_CN myDevices = Translations$ui2$myDevices$zh_CN.internal(_root);
+  @override
+  late final Translations$ui2$deviceList$zh_CN deviceList = Translations$ui2$deviceList$zh_CN.internal(_root);
+  @override
+  late final Translations$ui2$card$zh_CN card = Translations$ui2$card$zh_CN.internal(_root);
+  @override
+  late final Translations$ui2$blocklist$zh_CN blocklist = Translations$ui2$blocklist$zh_CN.internal(_root);
+  @override
+  late final Translations$ui2$settings$zh_CN settings = Translations$ui2$settings$zh_CN.internal(_root);
+  @override
+  late final Translations$ui2$trust$zh_CN trust = Translations$ui2$trust$zh_CN.internal(_root);
+}
+
 // Path: receiveTab.infoBox
 class Translations$receiveTab$infoBox$zh_CN extends Translations$receiveTab$infoBox$en {
   Translations$receiveTab$infoBox$zh_CN.internal(TranslationsZhCn root) : this._root = root, super.internal(root);
@@ -1721,6 +1752,159 @@ class Translations$dialogs$zoom$zh_CN extends Translations$dialogs$zoom$en {
   // Translations
   @override
   String get title => 'URL';
+}
+
+// Path: ui2.nav
+class Translations$ui2$nav$zh_CN extends Translations$ui2$nav$en {
+  Translations$ui2$nav$zh_CN.internal(TranslationsZhCn root) : this._root = root, super.internal(root);
+
+  final TranslationsZhCn _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get myDevices => '我的设备';
+  @override
+  String get deviceList => '设备列表';
+  @override
+  String get blocklist => '黑名单';
+  @override
+  String get settings => '设置';
+}
+
+// Path: ui2.myDevices
+class Translations$ui2$myDevices$zh_CN extends Translations$ui2$myDevices$en {
+  Translations$ui2$myDevices$zh_CN.internal(TranslationsZhCn root) : this._root = root, super.internal(root);
+
+  final TranslationsZhCn _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get title => '我的设备';
+  @override
+  String subtitle({required Object owner}) => '归属者:${owner} · 同一归属者的设备互相免确认';
+  @override
+  String get self => '本机';
+  @override
+  String get mine => '我的';
+  @override
+  String get receiving => '接收中';
+  @override
+  String empty({required Object owner}) => '其他设备安装 AnyShare 并把归属者设置为「${owner}」后,会自动出现在这里。';
+}
+
+// Path: ui2.deviceList
+class Translations$ui2$deviceList$zh_CN extends Translations$ui2$deviceList$en {
+  Translations$ui2$deviceList$zh_CN.internal(TranslationsZhCn root) : this._root = root, super.internal(root);
+
+  final TranslationsZhCn _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get title => '设备列表';
+  @override
+  String get subtitle => '附近发现的设备 · 已配对的设备';
+  @override
+  String get nearby => '附近的设备';
+  @override
+  String get paired => '已配对';
+  @override
+  String get nearbyEmpty => '附近没有发现设备。\n请确认对方已打开 AnyShare 且在同一网络。';
+  @override
+  String get pairedEmpty => '还没有配对的设备。\n在附近设备上点击「配对」建立关系。';
+  @override
+  String get manualAddress => '手动输入地址';
+  @override
+  String get rescan => '重新扫描';
+  @override
+  String get qrPairing => '扫码配对';
+  @override
+  String get sendMode => '发送模式';
+  @override
+  String get offlineHint => '设备离线,无法发送';
+}
+
+// Path: ui2.card
+class Translations$ui2$card$zh_CN extends Translations$ui2$card$en {
+  Translations$ui2$card$zh_CN.internal(TranslationsZhCn root) : this._root = root, super.internal(root);
+
+  final TranslationsZhCn _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get sendFiles => '发送文件';
+  @override
+  String get shareScreen => '共享屏幕';
+  @override
+  String get shareMouse => '键鼠共享';
+  @override
+  String get browseDir => '浏览目录';
+  @override
+  String get pair => '配对';
+  @override
+  String get tempNoScreen => '临时设备不可投屏';
+  @override
+  String get comingSoon => '即将开放';
+  @override
+  String get experimental => '实验性';
+}
+
+// Path: ui2.blocklist
+class Translations$ui2$blocklist$zh_CN extends Translations$ui2$blocklist$en {
+  Translations$ui2$blocklist$zh_CN.internal(TranslationsZhCn root) : this._root = root, super.internal(root);
+
+  final TranslationsZhCn _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get title => '黑名单';
+  @override
+  String get subtitle => '被拉黑的设备不能传输文件、投屏或浏览目录';
+  @override
+  String get empty => '没有被拉黑的设备';
+  @override
+  String get unblock => '解除拉黑';
+  @override
+  String unblockTitle({required Object alias}) => '解除拉黑「${alias}」?';
+  @override
+  String get unblockBody => '解除后,该设备将按「一般信任」处理。';
+  @override
+  String get remove => '删除记录';
+  @override
+  String removeTitle({required Object alias}) => '删除「${alias}」的记录?';
+  @override
+  String get removeBody => '将同时移除配对关系与信任设置。';
+}
+
+// Path: ui2.settings
+class Translations$ui2$settings$zh_CN extends Translations$ui2$settings$en {
+  Translations$ui2$settings$zh_CN.internal(TranslationsZhCn root) : this._root = root, super.internal(root);
+
+  final TranslationsZhCn _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get local => '本机';
+  @override
+  String get ownerName => '归属者名称';
+  @override
+  String get sharedDir => '共享目录';
+  @override
+  String get screenShare => '屏幕共享';
+}
+
+// Path: ui2.trust
+class Translations$ui2$trust$zh_CN extends Translations$ui2$trust$en {
+  Translations$ui2$trust$zh_CN.internal(TranslationsZhCn root) : this._root = root, super.internal(root);
+
+  final TranslationsZhCn _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get temp => '临时';
+  @override
+  String get limited => '一般';
+  @override
+  String get full => '完全';
 }
 
 // Path: settingsTab.general.brightnessOptions

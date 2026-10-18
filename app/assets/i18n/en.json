@@ -635,5 +635,69 @@
     "body": "{name} wants to pair. Verify both screens show the same code:",
     "match": "Codes match",
     "mismatch": "Codes differ"
+  },
+  "ui2": {
+    "nav": {
+      "myDevices": "My Devices",
+      "deviceList": "Devices",
+      "blocklist": "Blocklist",
+      "settings": "Settings"
+    },
+    "online": "Online",
+    "offline": "Offline",
+    "cancel": "Cancel",
+    "myDevices": {
+      "title": "My Devices",
+      "subtitle": "Owner: {owner} · devices of the same owner skip confirmation",
+      "self": "This device",
+      "mine": "Mine",
+      "receiving": "Receiving",
+      "empty": "Devices with the owner set to \"{owner}\" will appear here automatically."
+    },
+    "deviceList": {
+      "title": "Devices",
+      "subtitle": "Nearby devices · paired devices",
+      "nearby": "Nearby",
+      "paired": "Paired",
+      "nearbyEmpty": "No devices found nearby.\nMake sure the other device has AnyShare open on the same network.",
+      "pairedEmpty": "No paired devices yet.\nTap \"Pair\" on a nearby device to get started.",
+      "manualAddress": "Enter address manually",
+      "rescan": "Scan again",
+      "qrPairing": "Pair by QR code",
+      "sendMode": "Send mode",
+      "offlineHint": "Device is offline"
+    },
+    "card": {
+      "sendFiles": "Send files",
+      "shareScreen": "Share screen",
+      "shareMouse": "Share mouse & keyboard",
+      "browseDir": "Browse shared folder",
+      "pair": "Pair",
+      "tempNoScreen": "Temporary devices cannot receive screen shares",
+      "comingSoon": "Coming soon",
+      "experimental": "Experimental"
+    },
+    "blocklist": {
+      "title": "Blocklist",
+      "subtitle": "Blocked devices cannot send files, share screens or browse folders",
+      "empty": "No blocked devices",
+      "unblock": "Unblock",
+      "unblockTitle": "Unblock \"{alias}\"?",
+      "unblockBody": "The device will be treated as \"Limited trust\" afterwards.",
+      "remove": "Remove record",
+      "removeTitle": "Remove \"{alias}\"?",
+      "removeBody": "This also removes the pairing and trust settings."
+    },
+    "settings": {
+      "local": "This device",
+      "ownerName": "Owner name",
+      "sharedDir": "Shared folders",
+      "screenShare": "Screen sharing"
+    },
+    "trust": {
+      "temp": "Temporary",
+      "limited": "Limited",
+      "full": "Full"
+    }
   }
 }

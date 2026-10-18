@@ -97,6 +97,8 @@ class TranslationsZhTw extends Translations with BaseTranslations<AppLocale, Tra
   late final Translations$web$zh_TW web = Translations$web$zh_TW.internal(_root);
   @override
   late final Translations$assetPicker$zh_TW assetPicker = Translations$assetPicker$zh_TW.internal(_root);
+  @override
+  late final Translations$ui2$zh_TW ui2 = Translations$ui2$zh_TW.internal(_root);
 }
 
 // Path: general
@@ -780,6 +782,35 @@ class Translations$assetPicker$zh_TW extends Translations$assetPicker$en {
   String get sNameDurationLabel => '持續時間';
   @override
   String get sUnitAssetCountLabel => '計數';
+}
+
+// Path: ui2
+class Translations$ui2$zh_TW extends Translations$ui2$en {
+  Translations$ui2$zh_TW.internal(TranslationsZhTw root) : this._root = root, super.internal(root);
+
+  final TranslationsZhTw _root; // ignore: unused_field
+
+  // Translations
+  @override
+  late final Translations$ui2$nav$zh_TW nav = Translations$ui2$nav$zh_TW.internal(_root);
+  @override
+  String get online => '線上';
+  @override
+  String get offline => '離線';
+  @override
+  String get cancel => '取消';
+  @override
+  late final Translations$ui2$myDevices$zh_TW myDevices = Translations$ui2$myDevices$zh_TW.internal(_root);
+  @override
+  late final Translations$ui2$deviceList$zh_TW deviceList = Translations$ui2$deviceList$zh_TW.internal(_root);
+  @override
+  late final Translations$ui2$card$zh_TW card = Translations$ui2$card$zh_TW.internal(_root);
+  @override
+  late final Translations$ui2$blocklist$zh_TW blocklist = Translations$ui2$blocklist$zh_TW.internal(_root);
+  @override
+  late final Translations$ui2$settings$zh_TW settings = Translations$ui2$settings$zh_TW.internal(_root);
+  @override
+  late final Translations$ui2$trust$zh_TW trust = Translations$ui2$trust$zh_TW.internal(_root);
 }
 
 // Path: receiveTab.infoBox
@@ -1508,6 +1539,159 @@ class Translations$dialogs$zoom$zh_TW extends Translations$dialogs$zoom$en {
   // Translations
   @override
   String get title => '網址';
+}
+
+// Path: ui2.nav
+class Translations$ui2$nav$zh_TW extends Translations$ui2$nav$en {
+  Translations$ui2$nav$zh_TW.internal(TranslationsZhTw root) : this._root = root, super.internal(root);
+
+  final TranslationsZhTw _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get myDevices => '我的裝置';
+  @override
+  String get deviceList => '裝置清單';
+  @override
+  String get blocklist => '黑名單';
+  @override
+  String get settings => '設定';
+}
+
+// Path: ui2.myDevices
+class Translations$ui2$myDevices$zh_TW extends Translations$ui2$myDevices$en {
+  Translations$ui2$myDevices$zh_TW.internal(TranslationsZhTw root) : this._root = root, super.internal(root);
+
+  final TranslationsZhTw _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get title => '我的裝置';
+  @override
+  String subtitle({required Object owner}) => '歸屬者:${owner} · 同一歸屬者的裝置互相免確認';
+  @override
+  String get self => '本機';
+  @override
+  String get mine => '我的';
+  @override
+  String get receiving => '接收中';
+  @override
+  String empty({required Object owner}) => '其他裝置安裝 AnyShare 並把歸屬者設定為「${owner}」後,會自動出現在這裡。';
+}
+
+// Path: ui2.deviceList
+class Translations$ui2$deviceList$zh_TW extends Translations$ui2$deviceList$en {
+  Translations$ui2$deviceList$zh_TW.internal(TranslationsZhTw root) : this._root = root, super.internal(root);
+
+  final TranslationsZhTw _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get title => '裝置清單';
+  @override
+  String get subtitle => '附近發現的裝置 · 已配對的裝置';
+  @override
+  String get nearby => '附近的裝置';
+  @override
+  String get paired => '已配對';
+  @override
+  String get nearbyEmpty => '附近沒有發現裝置。\n請確認對方已開啟 AnyShare 且在同一網路。';
+  @override
+  String get pairedEmpty => '還沒有配對的裝置。\n在附近裝置上點擊「配對」建立關係。';
+  @override
+  String get manualAddress => '手動輸入位址';
+  @override
+  String get rescan => '重新掃描';
+  @override
+  String get qrPairing => '掃碼配對';
+  @override
+  String get sendMode => '傳送模式';
+  @override
+  String get offlineHint => '裝置離線,無法傳送';
+}
+
+// Path: ui2.card
+class Translations$ui2$card$zh_TW extends Translations$ui2$card$en {
+  Translations$ui2$card$zh_TW.internal(TranslationsZhTw root) : this._root = root, super.internal(root);
+
+  final TranslationsZhTw _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get sendFiles => '傳送檔案';
+  @override
+  String get shareScreen => '分享螢幕';
+  @override
+  String get shareMouse => '鍵鼠共享';
+  @override
+  String get browseDir => '瀏覽目錄';
+  @override
+  String get pair => '配對';
+  @override
+  String get tempNoScreen => '臨時裝置不可投放螢幕';
+  @override
+  String get comingSoon => '即將開放';
+  @override
+  String get experimental => '實驗性';
+}
+
+// Path: ui2.blocklist
+class Translations$ui2$blocklist$zh_TW extends Translations$ui2$blocklist$en {
+  Translations$ui2$blocklist$zh_TW.internal(TranslationsZhTw root) : this._root = root, super.internal(root);
+
+  final TranslationsZhTw _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get title => '黑名單';
+  @override
+  String get subtitle => '被封鎖的裝置不能傳送檔案、投放螢幕或瀏覽目錄';
+  @override
+  String get empty => '沒有被封鎖的裝置';
+  @override
+  String get unblock => '解除封鎖';
+  @override
+  String unblockTitle({required Object alias}) => '解除封鎖「${alias}」?';
+  @override
+  String get unblockBody => '解除後,該裝置將按「一般信任」處理。';
+  @override
+  String get remove => '刪除記錄';
+  @override
+  String removeTitle({required Object alias}) => '刪除「${alias}」的記錄?';
+  @override
+  String get removeBody => '將同時移除配對關係與信任設定。';
+}
+
+// Path: ui2.settings
+class Translations$ui2$settings$zh_TW extends Translations$ui2$settings$en {
+  Translations$ui2$settings$zh_TW.internal(TranslationsZhTw root) : this._root = root, super.internal(root);
+
+  final TranslationsZhTw _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get local => '本機';
+  @override
+  String get ownerName => '歸屬者名稱';
+  @override
+  String get sharedDir => '共享目錄';
+  @override
+  String get screenShare => '螢幕分享';
+}
+
+// Path: ui2.trust
+class Translations$ui2$trust$zh_TW extends Translations$ui2$trust$en {
+  Translations$ui2$trust$zh_TW.internal(TranslationsZhTw root) : this._root = root, super.internal(root);
+
+  final TranslationsZhTw _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get temp => '臨時';
+  @override
+  String get limited => '一般';
+  @override
+  String get full => '完全';
 }
 
 // Path: settingsTab.general.brightnessOptions

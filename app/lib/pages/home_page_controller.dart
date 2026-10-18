@@ -23,7 +23,7 @@ class HomePageController extends ReduxNotifier<HomePageVm> {
   HomePageVm init() {
     return HomePageVm(
       controller: PageController(),
-      currentTab: HomeTab.receive,
+      currentTab: HomeTab.myDevices,
       changeTab: (tab) => redux.dispatch(ChangeTabAction(tab)),
     );
   }

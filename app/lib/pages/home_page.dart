@@ -6,19 +6,22 @@ import 'package:localsend_app/config/init.dart';
 import 'package:localsend_app/config/theme.dart';
 import 'package:localsend_app/gen/strings.g.dart';
 import 'package:localsend_app/pages/home_page_controller.dart';
-import 'package:localsend_app/pages/tabs/receive_tab.dart';
-import 'package:localsend_app/pages/tabs/send_tab.dart';
+import 'package:localsend_app/pages/tabs/blocklist_tab.dart';
+import 'package:localsend_app/pages/tabs/device_list_tab.dart';
+import 'package:localsend_app/pages/tabs/my_devices_tab.dart';
 import 'package:localsend_app/pages/tabs/settings_tab.dart';
 import 'package:localsend_app/provider/selection/selected_sending_files_provider.dart';
 import 'package:localsend_app/util/native/cross_file_converters.dart';
 import 'package:localsend_app/widget/responsive_builder.dart';
 import 'package:refena_flutter/refena_flutter.dart';
 
+/// AnyShare modification (2026-10-18): home navigation redesigned (UI-1).
+/// Four zones: My Devices / Devices / Blocklist / Settings.
 enum HomeTab {
-  receive(Icons.wifi),
-  send(Icons.send),
-  settings(Icons.settings)
-  ;
+  myDevices(Icons.devices),
+  deviceList(Icons.grid_view),
+  blocklist(Icons.block),
+  settings(Icons.settings);
 
   const HomeTab(this.icon);
 
@@ -26,12 +29,14 @@ enum HomeTab {
 
   String get label {
     switch (this) {
-      case HomeTab.receive:
-        return t.receiveTab.title;
-      case HomeTab.send:
-        return t.sendTab.title;
+      case HomeTab.myDevices:
+        return t.ui2.nav.myDevices;
+      case HomeTab.deviceList:
+        return t.ui2.nav.deviceList;
+      case HomeTab.blocklist:
+        return t.ui2.nav.blocklist;
       case HomeTab.settings:
-        return t.settingsTab.title;
+        return t.ui2.nav.settings;
     }
   }
 }
@@ -101,7 +106,8 @@ class _HomePageState extends State<HomePage> with Refena {
                 ),
               );
         }
-        vm.changeTab(HomeTab.send);
+        // UI-1: dropped files are sent by picking a device on the devices page.
+        vm.changeTab(HomeTab.deviceList);
       },
       child: ResponsiveBuilder(
         builder: (sizingInformation) {
@@ -143,8 +149,9 @@ class _HomePageState extends State<HomePage> with Refena {
                           controller: vm.controller,
                           physics: const NeverScrollableScrollPhysics(),
                           children: const [
-                            ReceiveTab(),
-                            SendTab(),
+                            MyDevicesTab(),
+                            DeviceListTab(),
+                            BlocklistTab(),
                             SettingsTab(),
                           ],
                         ),

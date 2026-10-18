@@ -511,7 +511,7 @@ class ReceiveController {
           _logger.info('Closing session');
 
           // ignore: use_build_context_synchronously, discarded_futures
-          Routerino.context.pushRootImmediately(() => const HomePage(initialTab: HomeTab.receive, appStart: false));
+          Routerino.context.pushRootImmediately(() => const HomePage(initialTab: HomeTab.myDevices, appStart: false));
 
           // open the dialog to open file instantly
           if (filePath != null && filePath.isNotEmpty) {
@@ -600,7 +600,7 @@ class ReceiveController {
     // ignore: unawaited_futures, discarded_futures
     server.ref.redux(selectedSendingFilesProvider).dispatchAsyncTakeResult(LoadSelectionFromArgsAction(args)).then((filesAdded) {
       if (filesAdded) {
-        server.ref.redux(homePageControllerProvider).dispatch(ChangeTabAction(HomeTab.send));
+        server.ref.redux(homePageControllerProvider).dispatch(ChangeTabAction(HomeTab.deviceList));
       }
     });
   }

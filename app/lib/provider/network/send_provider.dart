@@ -403,7 +403,7 @@ class SendNotifier extends Notifier<Map<String, SendSessionState>> {
         // Pop back to the existing HomePage instead of pushing a new one:
         // a second HomePage attaches a second PageView to the shared PageController,
         // and removing routes without animation orphans a hero in flight.
-        ref.redux(homePageControllerProvider).dispatch(ChangeTabAction(HomeTab.send));
+        ref.redux(homePageControllerProvider).dispatch(ChangeTabAction(HomeTab.deviceList));
         ref.global.dispatch(NavigateAction.popUntilRoot());
       }
 
