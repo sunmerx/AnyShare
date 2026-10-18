@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:localsend_app/gen/strings.g.dart';
 import 'package:localsend_app/model/persistence/favorite_device.dart';
+import 'package:localsend_app/pages/dir_browse_page.dart';
 import 'package:localsend_app/pages/verify_page.dart';
 import 'package:localsend_app/provider/favorites_provider.dart';
 import 'package:localsend_app/provider/screen/screen_provider.dart';
@@ -122,9 +123,12 @@ class _DeviceDetailsPageState extends State<DeviceDetailsPage> with Refena {
             ],
           ),
           const SizedBox(height: 20),
-          // AnyShare modification (2026-10-18): action area (UI-2).
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+          // AnyShare modification (2026-10-18): action area (UI-2). Wrap keeps
+          // the three buttons from overflowing narrow phone widths.
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 20,
+            runSpacing: 12,
             children: [
               BigButton(
                 icon: Icons.upload,
@@ -133,7 +137,6 @@ class _DeviceDetailsPageState extends State<DeviceDetailsPage> with Refena {
                 width: 140,
                 onTap: () async => await sendToDeviceAuto(context, ref, device),
               ),
-              const SizedBox(width: 20),
               BigButton(
                 icon: Icons.screen_share,
                 label: t.ui2.card.shareScreen,
@@ -144,17 +147,33 @@ class _DeviceDetailsPageState extends State<DeviceDetailsPage> with Refena {
                   final String? reason = !canSendScreenShare()
                       ? t.ui2.screen.unsupportedSend
                       : (device.ip?.isNotEmpty != true)
-                          ? t.ui2.deviceList.offlineHint
-                          : (favoriteEntry?.trustLevel == TrustLevel.temp)
-                              ? t.ui2.card.tempNoScreen
-                              : null;
+                      ? t.ui2.deviceList.offlineHint
+                      : (favoriteEntry?.trustLevel == TrustLevel.temp)
+                      ? t.ui2.card.tempNoScreen
+                      : null;
                   if (reason != null) {
                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(reason)));
                     return;
                   }
-                  await ref.redux(screenProvider).dispatchAsync(
+                  await ref
+                      .redux(screenProvider)
+                      .dispatchAsync(
                         StartScreenShareAction(peerIp: device.ip!, peerAlias: device.alias),
                       );
+                },
+              ),
+              // AnyShare modification (2026-10-18): shared folder browser (E3-3c).
+              BigButton(
+                icon: Icons.folder_open,
+                label: t.ui2.card.browseDir,
+                filled: false,
+                width: 140,
+                onTap: () async {
+                  if (device.ip?.isNotEmpty != true) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.ui2.deviceList.offlineHint)));
+                    return;
+                  }
+                  await context.push(() => DirBrowsePage(fingerprint: device.fingerprint, host: device.ip!, title: device.alias));
                 },
               ),
             ],

@@ -941,6 +941,8 @@ class Translations$ui2$zh_CN extends Translations$ui2$en {
   @override
   late final Translations$ui2$settings$zh_CN settings = Translations$ui2$settings$zh_CN.internal(_root);
   @override
+  late final Translations$ui2$dirBrowse$zh_CN dirBrowse = Translations$ui2$dirBrowse$zh_CN.internal(_root);
+  @override
   late final Translations$ui2$qrPairing$zh_CN qrPairing = Translations$ui2$qrPairing$zh_CN.internal(_root);
   @override
   late final Translations$ui2$screen$zh_CN screen = Translations$ui2$screen$zh_CN.internal(_root);
@@ -1908,6 +1910,89 @@ class Translations$ui2$settings$zh_CN extends Translations$ui2$settings$en {
   String removeDirTitle({required Object name}) => '停止共享「${name}」?';
   @override
   String get removeDirBody => '其他设备将不再看到此目录。';
+}
+
+// Path: ui2.dirBrowse
+class Translations$ui2$dirBrowse$zh_CN extends Translations$ui2$dirBrowse$en {
+  Translations$ui2$dirBrowse$zh_CN.internal(TranslationsZhCn root) : this._root = root, super.internal(root);
+
+  final TranslationsZhCn _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get title => '共享目录';
+  @override
+  String get actions => '操作';
+  @override
+  String get up => '上一级';
+  @override
+  String get refresh => '刷新';
+  @override
+  String get retry => '重试';
+  @override
+  String get upload => '上传文件';
+  @override
+  String get mkdir => '新建文件夹';
+  @override
+  String get download => '下载';
+  @override
+  String get rename => '重命名';
+  @override
+  String get delete => '删除';
+  @override
+  String get nameLabel => '名称';
+  @override
+  String get mkdirTitle => '新建文件夹';
+  @override
+  String get renameTitle => '重命名';
+  @override
+  String deleteTitle({required Object name}) => '删除「${name}」?';
+  @override
+  String get deleteBody => '将移入对方回收站(.anyshare_trash)。';
+  @override
+  String get readOnly => '只读';
+  @override
+  String truncated({required Object n}) => '仅显示前 ${n} 项。';
+  @override
+  String get empty => '该设备未共享任何目录';
+  @override
+  String get emptyFolder => '此目录为空';
+  @override
+  String downloadSaved({required Object path}) => '已保存到 ${path}';
+  @override
+  String uploadDone({required Object n}) => '已上传 ${n} 个文件';
+  @override
+  String uploadDonePartial({required Object n, required Object failed}) => '已上传 ${n} 个,失败 ${failed} 个';
+  @override
+  String get errUnknown => '无访问权限(对方未收藏本机,或已被拉黑)';
+  @override
+  String get errIpMismatch => '对方不再认可本机 IP 地址';
+  @override
+  String get errBlocked => '本机已被对方拉黑';
+  @override
+  String get errTemp => '临时设备无法访问共享目录';
+  @override
+  String get errReadOnly => '对方未开放写入';
+  @override
+  String get errNotFound => '不存在';
+  @override
+  String get errConflict => '名称冲突';
+  @override
+  String get errInvalidPath => '路径无效';
+  @override
+  String get errTooLarge => '文件过大';
+  @override
+  String get errRateLimited => '请求过于频繁,请稍后再试';
+  @override
+  String get errBadRequest => '请求无效';
+  @override
+  String get errProtocol => '对方响应异常';
+  @override
+  String get errSource => '源文件不可读';
+  @override
+  String get errInternal => '对方处理请求失败';
+  @override
+  String get errUnreachable => '无法连接到对方';
 }
 
 // Path: ui2.qrPairing

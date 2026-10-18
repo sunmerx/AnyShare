@@ -1056,6 +1056,7 @@ class Translations$ui2$en {
   late final Translations$ui2$card$en card = Translations$ui2$card$en.internal(_root);
   late final Translations$ui2$blocklist$en blocklist = Translations$ui2$blocklist$en.internal(_root);
   late final Translations$ui2$settings$en settings = Translations$ui2$settings$en.internal(_root);
+  late final Translations$ui2$dirBrowse$en dirBrowse = Translations$ui2$dirBrowse$en.internal(_root);
   late final Translations$ui2$qrPairing$en qrPairing = Translations$ui2$qrPairing$en.internal(_root);
   late final Translations$ui2$screen$en screen = Translations$ui2$screen$en.internal(_root);
   late final Translations$ui2$transfers$en transfers = Translations$ui2$transfers$en.internal(_root);
@@ -2262,6 +2263,126 @@ class Translations$ui2$settings$en {
 
   /// en: 'Other devices will no longer see this folder.'
   String get removeDirBody => 'Other devices will no longer see this folder.';
+}
+
+// Path: ui2.dirBrowse
+class Translations$ui2$dirBrowse$en {
+  Translations$ui2$dirBrowse$en.internal(this._root);
+
+  final Translations _root; // ignore: unused_field
+
+  // Translations
+
+  /// en: 'Shared folders'
+  String get title => 'Shared folders';
+
+  /// en: 'Actions'
+  String get actions => 'Actions';
+
+  /// en: 'Up'
+  String get up => 'Up';
+
+  /// en: 'Refresh'
+  String get refresh => 'Refresh';
+
+  /// en: 'Retry'
+  String get retry => 'Retry';
+
+  /// en: 'Upload files'
+  String get upload => 'Upload files';
+
+  /// en: 'New folder'
+  String get mkdir => 'New folder';
+
+  /// en: 'Download'
+  String get download => 'Download';
+
+  /// en: 'Rename'
+  String get rename => 'Rename';
+
+  /// en: 'Delete'
+  String get delete => 'Delete';
+
+  /// en: 'Name'
+  String get nameLabel => 'Name';
+
+  /// en: 'New folder'
+  String get mkdirTitle => 'New folder';
+
+  /// en: 'Rename'
+  String get renameTitle => 'Rename';
+
+  /// en: 'Delete "{name}"?'
+  String deleteTitle({required Object name}) => 'Delete "${name}"?';
+
+  /// en: 'It is moved to the host's recycle bin (.anyshare_trash).'
+  String get deleteBody => 'It is moved to the host\'s recycle bin (.anyshare_trash).';
+
+  /// en: 'Read-only'
+  String get readOnly => 'Read-only';
+
+  /// en: 'Only the first {n} entries are shown.'
+  String truncated({required Object n}) => 'Only the first ${n} entries are shown.';
+
+  /// en: 'This device does not share any folders'
+  String get empty => 'This device does not share any folders';
+
+  /// en: 'This folder is empty'
+  String get emptyFolder => 'This folder is empty';
+
+  /// en: 'Saved to {path}'
+  String downloadSaved({required Object path}) => 'Saved to ${path}';
+
+  /// en: 'Uploaded {n} file(s)'
+  String uploadDone({required Object n}) => 'Uploaded ${n} file(s)';
+
+  /// en: 'Uploaded {n}, failed {failed}'
+  String uploadDonePartial({required Object n, required Object failed}) => 'Uploaded ${n}, failed ${failed}';
+
+  /// en: 'No access (not favorited on the host, or blocked)'
+  String get errUnknown => 'No access (not favorited on the host, or blocked)';
+
+  /// en: 'The host no longer recognizes this IP address'
+  String get errIpMismatch => 'The host no longer recognizes this IP address';
+
+  /// en: 'This device is blocked on the host'
+  String get errBlocked => 'This device is blocked on the host';
+
+  /// en: 'Temporary devices cannot access shared folders'
+  String get errTemp => 'Temporary devices cannot access shared folders';
+
+  /// en: 'The host does not allow writing'
+  String get errReadOnly => 'The host does not allow writing';
+
+  /// en: 'Not found'
+  String get errNotFound => 'Not found';
+
+  /// en: 'Name conflict'
+  String get errConflict => 'Name conflict';
+
+  /// en: 'Invalid path'
+  String get errInvalidPath => 'Invalid path';
+
+  /// en: 'File too large'
+  String get errTooLarge => 'File too large';
+
+  /// en: 'Too many requests, try again shortly'
+  String get errRateLimited => 'Too many requests, try again shortly';
+
+  /// en: 'Invalid request'
+  String get errBadRequest => 'Invalid request';
+
+  /// en: 'Unexpected response from the host'
+  String get errProtocol => 'Unexpected response from the host';
+
+  /// en: 'Source file not readable'
+  String get errSource => 'Source file not readable';
+
+  /// en: 'The host failed to process the request'
+  String get errInternal => 'The host failed to process the request';
+
+  /// en: 'Cannot reach the host'
+  String get errUnreachable => 'Cannot reach the host';
 }
 
 // Path: ui2.qrPairing

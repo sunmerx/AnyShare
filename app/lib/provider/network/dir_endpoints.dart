@@ -29,7 +29,9 @@ const _uuid = Uuid();
 
 const _trashDirName = '.anyshare_trash';
 const _tmpPrefix = '.anyshare_tmp_';
-const _maxListEntries = 5000;
+
+/// Listing cap shared with the browse UI (truncation hint).
+const kDirMaxListEntries = 5000;
 
 /// Upload cap (v1): larger files are rejected up front (507 would need a
 /// cross-platform free-space probe; documented limitation).
@@ -291,7 +293,7 @@ extension DirEndpoints on ExtensionServerService {
       if (name.startsWith('.anyshare_')) {
         continue;
       }
-      if (entries.length >= _maxListEntries) {
+      if (entries.length >= kDirMaxListEntries) {
         truncated = true;
         break;
       }

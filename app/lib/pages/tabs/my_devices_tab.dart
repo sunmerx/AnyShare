@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:localsend_app/gen/strings.g.dart';
 import 'package:localsend_app/model/persistence/favorite_device.dart';
 import 'package:localsend_app/pages/device_details_page.dart';
+import 'package:localsend_app/pages/dir_browse_page.dart';
 import 'package:localsend_app/provider/favorites_provider.dart';
 import 'package:localsend_app/provider/network/nearby_devices_provider.dart';
 import 'package:localsend_app/provider/network/server/server_provider.dart';
@@ -125,9 +126,11 @@ class MyDevicesTab extends StatelessWidget {
             // Same-owner devices may share even at temp trust (D2 same-owner
             // rule takes precedence in evaluateScreenOffer).
             onTap: (device != null && device.ip?.isNotEmpty == true && canSendScreenShare())
-                ? () => ref.redux(screenProvider).dispatchAsync(
-                      StartScreenShareAction(peerIp: device.ip!, peerAlias: device.alias),
-                    )
+                ? () => ref
+                      .redux(screenProvider)
+                      .dispatchAsync(
+                        StartScreenShareAction(peerIp: device.ip!, peerAlias: device.alias),
+                      )
                 : null,
             disabledTooltip: !canSendScreenShare() ? t.ui2.screen.unsupportedSend : t.ui2.deviceList.offlineHint,
           ),
@@ -139,7 +142,10 @@ class MyDevicesTab extends StatelessWidget {
           DeviceActionButton(
             icon: Icons.folder_open,
             label: t.ui2.card.browseDir,
-            disabledTooltip: t.ui2.card.comingSoon,
+            onTap: (device != null && device.ip?.isNotEmpty == true)
+                ? () async => await context.push(() => DirBrowsePage(fingerprint: entry.fingerprint, host: device.ip!, title: entry.alias))
+                : null,
+            disabledTooltip: t.ui2.deviceList.offlineHint,
           ),
         ],
       );

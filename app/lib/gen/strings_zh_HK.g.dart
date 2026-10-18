@@ -810,6 +810,8 @@ class Translations$ui2$zh_HK extends Translations$ui2$en {
   @override
   late final Translations$ui2$settings$zh_HK settings = Translations$ui2$settings$zh_HK.internal(_root);
   @override
+  late final Translations$ui2$dirBrowse$zh_HK dirBrowse = Translations$ui2$dirBrowse$zh_HK.internal(_root);
+  @override
   late final Translations$ui2$qrPairing$zh_HK qrPairing = Translations$ui2$qrPairing$zh_HK.internal(_root);
   @override
   late final Translations$ui2$screen$zh_HK screen = Translations$ui2$screen$zh_HK.internal(_root);
@@ -1698,6 +1700,89 @@ class Translations$ui2$settings$zh_HK extends Translations$ui2$settings$en {
   String removeDirTitle({required Object name}) => '停止共享「${name}」?';
   @override
   String get removeDirBody => '其他裝置將不再看到此目錄。';
+}
+
+// Path: ui2.dirBrowse
+class Translations$ui2$dirBrowse$zh_HK extends Translations$ui2$dirBrowse$en {
+  Translations$ui2$dirBrowse$zh_HK.internal(TranslationsZhHk root) : this._root = root, super.internal(root);
+
+  final TranslationsZhHk _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get title => '共享目錄';
+  @override
+  String get actions => '操作';
+  @override
+  String get up => '上一層';
+  @override
+  String get refresh => '重新整理';
+  @override
+  String get retry => '重試';
+  @override
+  String get upload => '上傳檔案';
+  @override
+  String get mkdir => '新增資料夾';
+  @override
+  String get download => '下載';
+  @override
+  String get rename => '重新命名';
+  @override
+  String get delete => '刪除';
+  @override
+  String get nameLabel => '名稱';
+  @override
+  String get mkdirTitle => '新增資料夾';
+  @override
+  String get renameTitle => '重新命名';
+  @override
+  String deleteTitle({required Object name}) => '刪除「${name}」?';
+  @override
+  String get deleteBody => '將移入對方回收筒(.anyshare_trash)。';
+  @override
+  String get readOnly => '唯讀';
+  @override
+  String truncated({required Object n}) => '僅顯示前 ${n} 項。';
+  @override
+  String get empty => '該裝置未共享任何目錄';
+  @override
+  String get emptyFolder => '此目錄為空';
+  @override
+  String downloadSaved({required Object path}) => '已儲存至 ${path}';
+  @override
+  String uploadDone({required Object n}) => '已上傳 ${n} 個檔案';
+  @override
+  String uploadDonePartial({required Object n, required Object failed}) => '已上傳 ${n} 個,失敗 ${failed} 個';
+  @override
+  String get errUnknown => '無存取權限(對方未收藏本機,或已被封鎖)';
+  @override
+  String get errIpMismatch => '對方不再認可本機 IP 位址';
+  @override
+  String get errBlocked => '本機已被對方封鎖';
+  @override
+  String get errTemp => '臨時裝置無法存取共享目錄';
+  @override
+  String get errReadOnly => '對方未開放寫入';
+  @override
+  String get errNotFound => '不存在';
+  @override
+  String get errConflict => '名稱衝突';
+  @override
+  String get errInvalidPath => '路徑無效';
+  @override
+  String get errTooLarge => '檔案過大';
+  @override
+  String get errRateLimited => '請求過於頻繁,請稍後再試';
+  @override
+  String get errBadRequest => '請求無效';
+  @override
+  String get errProtocol => '對方回應異常';
+  @override
+  String get errSource => '來源檔案無法讀取';
+  @override
+  String get errInternal => '對方處理請求失敗';
+  @override
+  String get errUnreachable => '無法連線到對方';
 }
 
 // Path: ui2.qrPairing

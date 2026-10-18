@@ -3,6 +3,7 @@ import 'package:localsend_app/gen/strings.g.dart';
 import 'package:localsend_app/model/persistence/favorite_device.dart';
 import 'package:localsend_app/model/send_mode.dart';
 import 'package:localsend_app/pages/device_details_page.dart';
+import 'package:localsend_app/pages/dir_browse_page.dart';
 import 'package:localsend_app/pages/qr_scan_page.dart';
 import 'package:localsend_app/provider/animation_provider.dart';
 import 'package:localsend_app/provider/favorites_provider.dart';
@@ -196,13 +197,13 @@ class _DeviceListTabState extends State<DeviceListTab> with Refena {
             icon: Icons.screen_share,
             label: t.ui2.card.shareScreen,
             onTap: (device != null && device.ip?.isNotEmpty == true && !isTemp && canSendScreenShare())
-                ? () => ref.redux(screenProvider).dispatchAsync(
-                      StartScreenShareAction(peerIp: device.ip!, peerAlias: device.alias),
-                    )
+                ? () => ref
+                      .redux(screenProvider)
+                      .dispatchAsync(
+                        StartScreenShareAction(peerIp: device.ip!, peerAlias: device.alias),
+                      )
                 : null,
-            disabledTooltip: isTemp
-                ? t.ui2.card.tempNoScreen
-                : (!canSendScreenShare() ? t.ui2.screen.unsupportedSend : t.ui2.deviceList.offlineHint),
+            disabledTooltip: isTemp ? t.ui2.card.tempNoScreen : (!canSendScreenShare() ? t.ui2.screen.unsupportedSend : t.ui2.deviceList.offlineHint),
           ),
           DeviceActionButton(
             icon: Icons.mouse,
@@ -212,7 +213,10 @@ class _DeviceListTabState extends State<DeviceListTab> with Refena {
           DeviceActionButton(
             icon: Icons.folder_open,
             label: t.ui2.card.browseDir,
-            disabledTooltip: t.ui2.card.comingSoon,
+            onTap: (device != null && device.ip?.isNotEmpty == true)
+                ? () async => await context.push(() => DirBrowsePage(fingerprint: entry.fingerprint, host: device.ip!, title: entry.alias))
+                : null,
+            disabledTooltip: t.ui2.deviceList.offlineHint,
           ),
         ],
       );
@@ -256,10 +260,7 @@ class _DeviceListTabState extends State<DeviceListTab> with Refena {
   Future<void> _pair(BuildContext context, Device device) async {
     // Prefer an IPv4 channel when pairing (IPv6 link-local needs matching
     // scopes and is more fragile on LANs).
-    final pairHost = device.channels
-        .whereType<HttpChannel>()
-        .map((c) => c.host)
-        .firstWhere((h) => !h.contains(':'), orElse: () => device.ip ?? '');
+    final pairHost = device.channels.whereType<HttpChannel>().map((c) => c.host).firstWhere((h) => !h.contains(':'), orElse: () => device.ip ?? '');
     if (pairHost.isEmpty) {
       return;
     }
