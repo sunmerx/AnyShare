@@ -53,6 +53,17 @@
 - `pubspec.lock`:8 个 build 工具链传递依赖小版本再解析(archive/build_config/build_daemon 等,仅 codegen 使用;官方源解析,运行时依赖零漂移)
 - `app/pubspec.yaml`:description 重写、homepage → github.com/sunmerx/AnyShare
 
+### E-3 共享目录 UI 批次四b:多设备树与冲突询问(2026-10-18,E3-4b)
+
+- `app/lib/pages/dir_browse_page.dart`:多设备树(收藏设备+在线状态+懒探测 roots;树内根节点点击自动切 active;离线提示)、active 设备切换(host 优先会话快照)、进程级全局请求序号、dispose 关闭全部本页会话、粘贴冲突询问(F-DIR-14:保留两者/覆盖/取消;目录恒保留两者)、同目录粘贴拒绝、预检并入 busy
+- `app/lib/provider/network/dir_client.dart`:downloadToFile/uploadFile 增加字节进度回调
+- `app/lib/util/dir_transfer.dart`:relayDirEntries 增加 onConflict 透传与 onFileProgress(下载 0-0.5+上传 0.5-1 合成);同目录粘贴守卫
+- `app/lib/provider/dir_browse_provider.dart`:会话代际计数(Close 后在途 action 不得复活会话)
+- i18n:ui2.dirBrowse 新增 5 键(现 69 键,en/zh-CN/zh-TW/zh-HK)
+- 独立审查 9 项修复(blocker:同目录剪切+覆盖静默丢文件;major:树内根节点串设备、目录"覆盖"被忽略、幽灵会话吞导航)
+- 已知遗留(记账):上传/拖放冲突询问仍为服务端默认 rename;多设备树 widget 测试暂缺
+- 验证:analyze 0、219 测试全绿、Windows debug 构建
+
 ### E-3 共享目录 UI 批次四a:跨设备中转与剪贴板(2026-10-18,E3-4a)
 
 - `app/lib/util/dir_transfer.dart`(新增):relayDirEntries 跨设备中转(临时文件中转、move 上传后删源、目录递归、mkdir 冲突改名、逐项错误收集、自嵌套守卫、目录列举截断守卫、maxEntries=2000/maxDepth=32、删源失败单独计数、陈旧 staging 清扫)
