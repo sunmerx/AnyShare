@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:localsend_app/config/theme.dart';
 import 'package:localsend_app/gen/strings.g.dart';
 import 'package:localsend_app/model/persistence/color_mode.dart';
+import 'package:localsend_app/model/persistence/shared_dir_config.dart';
 import 'package:localsend_app/pages/about/about_page.dart';
 import 'package:localsend_app/pages/changelog_page.dart';
 import 'package:localsend_app/pages/donation/donation_page.dart';
@@ -15,6 +16,7 @@ import 'package:localsend_app/pages/web_share_page.dart';
 import 'package:localsend_app/provider/network/server/server_provider.dart';
 import 'package:localsend_app/provider/owner_provider.dart';
 import 'package:localsend_app/provider/settings_provider.dart';
+import 'package:localsend_app/provider/shared_dirs_provider.dart';
 import 'package:localsend_app/provider/version_provider.dart';
 import 'package:localsend_app/util/alias_generator.dart';
 import 'package:localsend_app/util/device_type_ext.dart';
@@ -35,9 +37,113 @@ import 'package:localsend_app/widget/local_send_logo.dart';
 import 'package:localsend_app/widget/responsive_list_view.dart';
 import 'package:localsend_isolates/constants.dart';
 import 'package:localsend_isolates/model/device.dart';
+import 'package:path/path.dart' as p;
 import 'package:refena_flutter/refena_flutter.dart';
 import 'package:routerino/routerino.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:uuid/uuid.dart';
+
+/// AnyShare modification (2026-10-18): E-3 add a shared folder (F-DIR-01).
+Future<void> _addSharedDir(BuildContext context, Ref ref) async {
+  final path = await pickDirectoryPath();
+  if (path == null || path.isEmpty) {
+    return;
+  }
+  await ref.redux(sharedDirsProvider).dispatchAsync(
+        AddSharedDirAction(SharedDirConfig(id: const Uuid().v4(), path: path, name: p.basename(path))),
+      );
+}
+
+class _SharedDirRow extends StatefulWidget {
+  final SharedDirConfig dir;
+
+  const _SharedDirRow({required this.dir});
+
+  @override
+  State<_SharedDirRow> createState() => _SharedDirRowState();
+}
+
+class _SharedDirRowState extends State<_SharedDirRow> {
+  bool _busy = false;
+
+  Future<void> _run(Future<void> Function() action) async {
+    if (_busy) {
+      return;
+    }
+    setState(() => _busy = true);
+    try {
+      await action();
+    } finally {
+      if (mounted) {
+        setState(() => _busy = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ref = context.ref;
+    final dir = widget.dir;
+    final displayName = dir.name.isEmpty ? p.basename(dir.path) : dir.name;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(displayName, style: Theme.of(context).textTheme.titleSmall),
+                Text(
+                  dir.path,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          Tooltip(
+            message: t.ui2.settings.writable,
+            child: Switch(
+              value: dir.writable,
+              onChanged: _busy
+                  ? null
+                  : (value) {
+                      // ignore: discarded_futures
+                      _run(() => ref.redux(sharedDirsProvider).dispatchAsync(UpdateSharedDirAction(dir.copyWith(writable: value))));
+                    },
+            ),
+          ),
+          IconButton(
+            tooltip: t.ui2.settings.removeDir,
+            icon: const Icon(Icons.delete_outline),
+            onPressed: _busy
+                ? null
+                : () {
+                    // ignore: discarded_futures
+                    _run(() async {
+                      final confirmed = await showDialog<bool>(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: Text(t.ui2.settings.removeDirTitle(name: displayName)),
+                          content: Text(t.ui2.settings.removeDirBody),
+                          actions: [
+                            TextButton(onPressed: () => Navigator.of(context).pop(false), child: Text(t.ui2.cancel)),
+                            FilledButton(onPressed: () => Navigator.of(context).pop(true), child: Text(t.ui2.settings.removeDir)),
+                          ],
+                        ),
+                      );
+                      if (confirmed == true) {
+                        await ref.redux(sharedDirsProvider).dispatchAsync(RemoveSharedDirAction(dir.id));
+                      }
+                    });
+                  },
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 /// AnyShare modification (2026-10-18): edit the local owner name (UI-1).
 Future<void> _editOwnerName(BuildContext context, Ref ref) async {
@@ -95,13 +201,25 @@ class SettingsTab extends StatelessWidget {
                 ),
               ],
             ),
+            // AnyShare modification (2026-10-18): E-3 host-side shared
+            // folders configuration (F-DIR-01). Android API 27+ cannot serve
+            // shared folders yet (SAF URI roots are unsupported by /dir/*).
             _SettingsSection(
-              title: '${t.ui2.settings.sharedDir} · ${t.ui2.card.comingSoon}',
+              title: t.ui2.settings.sharedDir,
               children: [
+                for (final dir in ref.watch(sharedDirsProvider)) _SharedDirRow(dir: dir),
+                if (ref.watch(sharedDirsProvider).isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
+                    child: Text(
+                      t.ui2.settings.noDirs,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                    ),
+                  ),
                 _ButtonEntry(
-                  label: t.ui2.settings.sharedDir,
-                  buttonLabel: t.ui2.card.comingSoon,
-                  onTap: null,
+                  label: t.ui2.settings.addDir,
+                  buttonLabel: canPickRawDirectoryPath() ? '+ ${t.ui2.settings.addDir}' : t.ui2.card.comingSoon,
+                  onTap: canPickRawDirectoryPath() ? () async => await _addSharedDir(context, ref) : null,
                 ),
               ],
             ),

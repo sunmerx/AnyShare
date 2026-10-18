@@ -692,7 +692,13 @@
       "local": "This device",
       "ownerName": "Owner name",
       "sharedDir": "Shared folders",
-      "screenShare": "Screen sharing"
+      "screenShare": "Screen sharing",
+      "addDir": "Add folder",
+      "writable": "Allow writes",
+      "removeDir": "Remove",
+      "noDirs": "No folders are shared yet",
+      "removeDirTitle": "Stop sharing \"{name}\"?",
+      "removeDirBody": "Other devices will no longer see this folder."
     },
     "qrPairing": {
       "displayTitle": "Pair by QR code",

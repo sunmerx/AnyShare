@@ -572,7 +572,13 @@
       "local": "本機",
       "ownerName": "歸屬者名稱",
       "sharedDir": "共享目錄",
-      "screenShare": "螢幕分享"
+      "screenShare": "螢幕分享",
+      "addDir": "新增目錄",
+      "writable": "允許寫入",
+      "removeDir": "移除",
+      "noDirs": "尚未共享任何目錄",
+      "removeDirTitle": "停止共享「{name}」?",
+      "removeDirBody": "其他裝置將不再看到此目錄。"
     },
     "qrPairing": {
       "displayTitle": "掃碼配對",

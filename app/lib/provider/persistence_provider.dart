@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:localsend_app/gen/strings.g.dart';
 import 'package:localsend_app/model/persistence/color_mode.dart';
+import 'package:localsend_app/model/persistence/dir_annotation.dart';
 import 'package:localsend_app/model/persistence/favorite_device.dart';
 import 'package:localsend_app/model/persistence/quick_save_mode.dart';
 import 'package:localsend_app/model/persistence/receive_history_entry.dart';
@@ -63,6 +64,7 @@ const _ownerName = 'ls_owner_name'; // AnyShare modification
 // AnyShare modification (2026-10-18): E-3 shared directories (host config)
 // and per-device write grants (fingerprints allowed to write).
 const _sharedDirs = 'ls_shared_dirs';
+const _dirAnnotations = 'ls_dir_annotations'; // E-3 client tags/notes (local)
 const _dirWriteGrants = 'ls_dir_write_grants';
 
 // Favorites
@@ -355,6 +357,22 @@ class PersistenceService {
   Set<String> getDirWriteGrants() => _getStringListSafe(_dirWriteGrants).toSet();
 
   Future<void> setDirWriteGrants(Set<String> fingerprints) => _prefs.setStringList(_dirWriteGrants, fingerprints.toList());
+
+  // AnyShare modification (2026-10-18): E-3 client-side tags/notes (local only).
+  Map<String, DirAnnotation> getDirAnnotations() {
+    final raw = _prefs.getString(_dirAnnotations);
+    if (raw == null || raw.isEmpty) {
+      return {};
+    }
+    try {
+      return DirAnnotation.decodeMap(raw);
+    } catch (_) {
+      return {};
+    }
+  }
+
+  Future<void> setDirAnnotations(Map<String, DirAnnotation> annotations) =>
+      _prefs.setString(_dirAnnotations, DirAnnotation.encodeMap(annotations));
 
   String getShowToken() {
     return _prefs.getString(_showToken)!;

@@ -6,6 +6,18 @@ import 'package:localsend_app/util/native/channel/android_channel.dart' as andro
 import 'package:localsend_app/util/native/platform_check.dart';
 import 'package:refena_flutter/refena_flutter.dart';
 
+/// AnyShare modification (2026-10-18): whether [pickDirectoryPath] returns a
+/// raw filesystem path usable by dart:io (E-3 shared folders). Android API 27+
+/// returns a SAF `content://` URI instead, which the directory endpoints
+/// cannot serve.
+bool canPickRawDirectoryPath() {
+  if (defaultTargetPlatform == TargetPlatform.android &&
+      (RefenaScope.defaultRef.read(deviceRawInfoProvider).androidSdkInt ?? 0) >= android_channel.contentUriMinSdk) {
+    return false;
+  }
+  return true;
+}
+
 /// Opens a file picker to select a directory.
 /// Returns null if the user cancels the selection.
 Future<String?> pickDirectoryPath() async {

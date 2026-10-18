@@ -1896,6 +1896,18 @@ class Translations$ui2$settings$zh_CN extends Translations$ui2$settings$en {
   String get sharedDir => '共享目录';
   @override
   String get screenShare => '屏幕共享';
+  @override
+  String get addDir => '添加目录';
+  @override
+  String get writable => '允许写入';
+  @override
+  String get removeDir => '移除';
+  @override
+  String get noDirs => '尚未共享任何目录';
+  @override
+  String removeDirTitle({required Object name}) => '停止共享「${name}」?';
+  @override
+  String get removeDirBody => '其他设备将不再看到此目录。';
 }
 
 // Path: ui2.qrPairing

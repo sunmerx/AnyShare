@@ -2244,6 +2244,24 @@ class Translations$ui2$settings$en {
 
   /// en: 'Screen sharing'
   String get screenShare => 'Screen sharing';
+
+  /// en: 'Add folder'
+  String get addDir => 'Add folder';
+
+  /// en: 'Allow writes'
+  String get writable => 'Allow writes';
+
+  /// en: 'Remove'
+  String get removeDir => 'Remove';
+
+  /// en: 'No folders are shared yet'
+  String get noDirs => 'No folders are shared yet';
+
+  /// en: 'Stop sharing "{name}"?'
+  String removeDirTitle({required Object name}) => 'Stop sharing "${name}"?';
+
+  /// en: 'Other devices will no longer see this folder.'
+  String get removeDirBody => 'Other devices will no longer see this folder.';
 }
 
 // Path: ui2.qrPairing
