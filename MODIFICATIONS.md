@@ -53,6 +53,19 @@
 - `pubspec.lock`:8 个 build 工具链传递依赖小版本再解析(archive/build_config/build_daemon 等,仅 codegen 使用;官方源解析,运行时依赖零漂移)
 - `app/pubspec.yaml`:description 重写、homepage → github.com/sunmerx/AnyShare
 
+### E-3 共享目录 UI 批次一:客户端与本地标注(2026-10-18,E3-3a)
+
+- `app/lib/provider/network/dir_client.dart`(新增):`/dir/*` 端点 Dart 客户端(roots/list/downloadToFile/downloadBytes/uploadFile/mkdir/rename/delete);服务端错误码透传;超时/畸形 JSON/源文件缺失分别映射 unreachable/protocol/source_error;下载经 `.part` 原子落盘(失败清理);上传 30 分钟窗口(服务端接收完成才响应)
+- `app/lib/model/persistence/dir_annotation.dart`(新增):本地标签/备注模型(条目级容错 JSON 编解码,键=`指纹:根:路径`)
+- `app/lib/provider/dir_annotations_provider.dart`(新增)+ `persistence_provider.dart`(`ls_dir_annotations`):标注存取(空标注即删除)
+- `app/lib/pages/tabs/settings_tab.dart`:共享目录配置区块替换占位(添加/逐目录可写开关/删除确认/行级 busy 防重入)
+- `app/lib/util/native/pick_directory_path.dart`:新增 `canPickRawDirectoryPath()` 能力判定(Android API 27+ SAF `content://` 根无法被 `/dir/*` 服务,入口门控)
+- i18n:ui2.settings 新增 addDir/writable/removeDir/noDirs/removeDirTitle/removeDirBody(en/zh-CN/zh-HK/zh-TW)
+- `pubspec.lock`:补 `mobile_scanner` 条目(PAIR-1 批次遗漏,HEAD 锁文件与 app/pubspec.yaml 不一致)
+- 独立审查 10 项修复(高危:上传/下载漏传指纹查询参数、下载 IOSink 泄漏与半成品残留;中危:TypeError 误映射 unreachable、上传超时窗口、Android SAF 门控;低危:decodeMap 条目级容错、Switch/删除竞态、错误路径测试补齐)
+- 已知遗留(记账):macOS 沙箱 security-scoped bookmark 未持久化(共享目录重启后不可达,macOS 非当前构建目标);Refena AsyncReduxAction 无串行队列(深层并发写保护待后续批次)
+- 验证:analyze 0、193 测试全绿
+
 ### E-3 共享目录后端批次(2026-10-18,E3-2)
 
 - `app/lib/provider/network/dir_endpoints.dart`(新增):53318 `/dir/*` 端点(roots/list/meta/download/upload/mkdir/rename/delete);访问门(指纹自述 + 存储 IP 严格匹配、重复收藏取最严格条目);写门(可写目录 × 同归属者或 full+设备授权);路径穿越/符号链接/`.anyshare_*` 防护;上传 `.tmp`+原子改名+长度校验+全路径清理+背压;删除默认应用级回收站(`.anyshare_trash` + 原子 meta);根目录身份保护(`.`/`sub/..` 均拒)
