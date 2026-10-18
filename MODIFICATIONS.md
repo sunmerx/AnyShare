@@ -53,6 +53,17 @@
 - `pubspec.lock`:8 个 build 工具链传递依赖小版本再解析(archive/build_config/build_daemon 等,仅 codegen 使用;官方源解析,运行时依赖零漂移)
 - `app/pubspec.yaml`:description 重写、homepage → github.com/sunmerx/AnyShare
 
+### E-3 共享目录 UI 批次四a:跨设备中转与剪贴板(2026-10-18,E3-4a)
+
+- `app/lib/util/dir_transfer.dart`(新增):relayDirEntries 跨设备中转(临时文件中转、move 上传后删源、目录递归、mkdir 冲突改名、逐项错误收集、自嵌套守卫、目录列举截断守卫、maxEntries=2000/maxDepth=32、删源失败单独计数、陈旧 staging 清扫)
+- `app/lib/provider/dir_clipboard_provider.dart`(新增):全局剪贴板(E3-4b 多设备页面复用)
+- `app/lib/pages/dir_browse_page.dart`:复制/剪切菜单、粘贴按钮、中转进度横幅、结果提示;**指纹方向修复**(客户端自述本机 securityProvider.certificateHash,此前误传被浏览设备指纹——真实双机必 403);网格溢出修复(mainAxisExtent 随字号缩放)
+- `app/lib/provider/dir_browse_provider.dart`:两处 DirClient 指纹同修(自述本机身份)
+- i18n:ui2.dirBrowse 新增 8 键(现 64 键,en/zh-CN/zh-TW/zh-HK)
+- 独立审查 10 项修复(blocker:剪贴板页面私有致跨设备 UI 不可达——已上提 provider;major:指纹方向、自嵌套粘贴、删源失败语义)
+- 已知遗留(记账):字节级进度合成(E3-1 §5)与粘贴冲突询问(F-DIR-14)随 E3-4b;真实双机跨设备验收待 E3-4b 多设备树页面
+- 验证:analyze 0、215 测试全绿(中转双设备端到端 10 项)、Windows debug 构建
+
 ### E-3 共享目录 UI 批次三:浏览页交互增强(2026-10-18,E3-3d)
 
 - `app/lib/util/dir_browse.dart`:sortDirEntriesBy(名称/大小/修改时间,升降序,目录恒在前)、filterDirEntries(名称搜索+标签筛选)、dirPreviewKindOf/dirPreviewCapOf(预览分类与上限:图片 10MB/MD 2MB/文本 1MB)
