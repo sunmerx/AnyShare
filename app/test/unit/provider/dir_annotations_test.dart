@@ -34,20 +34,32 @@ void main() {
 
   test('set and remove persist through the provider', () async {
     final key = DirAnnotation.key(fingerprint: 'FP1', rootId: 'root1', path: 'x.txt');
-    await container.redux(dirAnnotationsProvider).dispatchAsync(
-          SetDirAnnotationAction(key: key, annotation: const DirAnnotation(tags: ['t'], note: 'n')),
+    await container
+        .redux(dirAnnotationsProvider)
+        .dispatchAsync(
+          SetDirAnnotationAction(
+            key: key,
+            annotation: const DirAnnotation(tags: ['t'], note: 'n'),
+          ),
         );
     expect(container.read(dirAnnotationsProvider)[key]!.note, 'n');
 
     // An empty annotation removes the entry.
-    await container.redux(dirAnnotationsProvider).dispatchAsync(
+    await container
+        .redux(dirAnnotationsProvider)
+        .dispatchAsync(
           SetDirAnnotationAction(key: key, annotation: const DirAnnotation()),
         );
     expect(container.read(dirAnnotationsProvider).containsKey(key), isFalse);
 
     // Persisted form survives a fresh service instance.
-    await container.redux(dirAnnotationsProvider).dispatchAsync(
-          SetDirAnnotationAction(key: key, annotation: const DirAnnotation(note: 'kept')),
+    await container
+        .redux(dirAnnotationsProvider)
+        .dispatchAsync(
+          SetDirAnnotationAction(
+            key: key,
+            annotation: const DirAnnotation(note: 'kept'),
+          ),
         );
     final prefs = await SharedPreferences.getInstance();
     final reloaded = PersistenceService.test(prefs).getDirAnnotations();

@@ -62,7 +62,13 @@ void main() {
   });
 
   test('same-owner temp is allowed (owner rule precedes temp)', () {
-    expect(eval(entry: fav(trust: TrustLevel.temp, ownerId: 'me'), writable: false).access, DirAccess.readOnly);
+    expect(
+      eval(
+        entry: fav(trust: TrustLevel.temp, ownerId: 'me'),
+        writable: false,
+      ).access,
+      DirAccess.readOnly,
+    );
   });
 
   test('read-only directories never grant write', () {

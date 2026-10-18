@@ -371,8 +371,7 @@ class PersistenceService {
     }
   }
 
-  Future<void> setDirAnnotations(Map<String, DirAnnotation> annotations) =>
-      _prefs.setString(_dirAnnotations, DirAnnotation.encodeMap(annotations));
+  Future<void> setDirAnnotations(Map<String, DirAnnotation> annotations) => _prefs.setString(_dirAnnotations, DirAnnotation.encodeMap(annotations));
 
   String getShowToken() {
     return _prefs.getString(_showToken)!;

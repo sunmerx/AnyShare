@@ -417,8 +417,7 @@ class StartScreenShareAction extends AsyncReduxAction<ScreenService, ScreenState
       if (status == 200 && body?['ok'] == true) {
         final port = (body?['port'] as num?)?.toInt() ?? kScreenDataPort;
         final sessionId = body?['session'] as String?;
-        return await notifier.startSenderSession(peerIp, peerAlias, port, state.copyWith(clearError: true), sessionId: sessionId) ??
-            state;
+        return await notifier.startSenderSession(peerIp, peerAlias, port, state.copyWith(clearError: true), sessionId: sessionId) ?? state;
       }
       if (status == 409 && body?['pending'] == true) {
         final sessionId = (body?['session'] as String?) ?? const Uuid().v4();
@@ -431,14 +430,14 @@ class StartScreenShareAction extends AsyncReduxAction<ScreenService, ScreenState
           clearError: true,
         );
       }
-    final error = switch (body?['error']) {
-      'blocked' => t.ui2.screen.errBlocked,
-      'temp_not_allowed' => t.ui2.screen.errTempNotAllowed,
-      'busy' => t.ui2.screen.errBusy,
-      'rate_limited' => t.ui2.screen.errBusy,
-      'receive_unsupported' => t.ui2.screen.errReceiveUnsupported,
-      _ => status == null ? t.ui2.screen.errOffline : t.ui2.screen.errRejected(code: '$status'),
-    };
+      final error = switch (body?['error']) {
+        'blocked' => t.ui2.screen.errBlocked,
+        'temp_not_allowed' => t.ui2.screen.errTempNotAllowed,
+        'busy' => t.ui2.screen.errBusy,
+        'rate_limited' => t.ui2.screen.errBusy,
+        'receive_unsupported' => t.ui2.screen.errReceiveUnsupported,
+        _ => status == null ? t.ui2.screen.errOffline : t.ui2.screen.errRejected(code: '$status'),
+      };
       return state.copyWith(lastError: error);
     } finally {
       notifier.startingShare = false;
@@ -582,10 +581,12 @@ class AbortPendingScreenOfferAction extends AsyncReduxAction<ScreenService, Scre
     }
     notifier.cancelTimer();
     // Fire-and-forget: clearing the pending state must not wait on the peer.
-    unawaited(postScreenControl(pending.peerIp, notifier.controlPort, 'screen/stop', {
-      'session': pending.sessionId,
-      'reason': reason,
-    }));
+    unawaited(
+      postScreenControl(pending.peerIp, notifier.controlPort, 'screen/stop', {
+        'session': pending.sessionId,
+        'reason': reason,
+      }),
+    );
     return state.copyWith(clearPendingOffer: true);
   }
 }
@@ -603,19 +604,23 @@ class StopScreenShareAction extends AsyncReduxAction<ScreenService, ScreenState>
       }
       notifier.cancelTimer();
       // Fire-and-forget: the receiver will time the offer out otherwise.
-      unawaited(postScreenControl(waiting.peerIp, notifier.controlPort, 'screen/stop', {
-        'session': waiting.sessionId,
-        'reason': 'user_stop',
-      }));
+      unawaited(
+        postScreenControl(waiting.peerIp, notifier.controlPort, 'screen/stop', {
+          'session': waiting.sessionId,
+          'reason': 'user_stop',
+        }),
+      );
       return state.copyWith(clearWaiting: true);
     }
     notifier.cancelTimer();
     await notifier.stopEngine();
     // Fire-and-forget: local teardown is already done.
-    unawaited(postScreenControl(active.peerIp, notifier.controlPort, 'screen/stop', {
-      'session': active.sessionId,
-      'reason': 'user_stop',
-    }));
+    unawaited(
+      postScreenControl(active.peerIp, notifier.controlPort, 'screen/stop', {
+        'session': active.sessionId,
+        'reason': 'user_stop',
+      }),
+    );
     return state.copyWith(clearActive: true);
   }
 }
@@ -708,10 +713,12 @@ class _ScreenWaitingTimeoutAction extends AsyncReduxAction<ScreenService, Screen
     }
     notifier.cancelTimer();
     // The receiver may still be listening (e.g. its accept was lost).
-    unawaited(postScreenControl(waiting.peerIp, notifier.controlPort, 'screen/stop', {
-      'session': sessionId,
-      'reason': 'timeout',
-    }));
+    unawaited(
+      postScreenControl(waiting.peerIp, notifier.controlPort, 'screen/stop', {
+        'session': sessionId,
+        'reason': 'timeout',
+      }),
+    );
     return state.copyWith(clearWaiting: true, lastError: t.ui2.screen.errNoResponse);
   }
 }
@@ -754,10 +761,12 @@ class _ReceiverNoStreamWatchdogAction extends AsyncReduxAction<ScreenService, Sc
       return state;
     }
     await notifier.stopEngine();
-    unawaited(postScreenControl(active.peerIp, notifier.controlPort, 'screen/stop', {
-      'session': sessionId,
-      'reason': 'no_stream',
-    }));
+    unawaited(
+      postScreenControl(active.peerIp, notifier.controlPort, 'screen/stop', {
+        'session': sessionId,
+        'reason': 'no_stream',
+      }),
+    );
     return state.copyWith(clearActive: true, lastError: t.ui2.screen.errNoStream);
   }
 }
@@ -791,10 +800,12 @@ class _ScreenSessionEventAction extends AsyncReduxAction<ScreenService, ScreenSt
         // Tell the peer (e.g. receiver window closed -> sender must stop).
         // Fire-and-forget: the local state must clear immediately.
         if (reason == 'windowclosed' || reason == 'error') {
-          unawaited(postScreenControl(active.peerIp, notifier.controlPort, 'screen/stop', {
-            'session': active.sessionId,
-            'reason': reason,
-          }));
+          unawaited(
+            postScreenControl(active.peerIp, notifier.controlPort, 'screen/stop', {
+              'session': active.sessionId,
+              'reason': reason,
+            }),
+          );
         }
         return state.copyWith(clearActive: true);
     }

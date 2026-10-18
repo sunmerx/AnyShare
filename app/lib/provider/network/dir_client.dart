@@ -243,14 +243,16 @@ class DirClient {
       } catch (_) {
         throw const DirClientException('source_error');
       }
-      final request = await client.postUrl(_uri('upload', {
-        'root': root,
-        'fingerprint': fingerprint,
-        'path': path,
-        'name': name,
-        'onConflict': onConflict,
-        'size': '$length',
-      }));
+      final request = await client.postUrl(
+        _uri('upload', {
+          'root': root,
+          'fingerprint': fingerprint,
+          'path': path,
+          'name': name,
+          'onConflict': onConflict,
+          'size': '$length',
+        }),
+      );
       request.contentLength = length;
       await request.addStream(source.openRead());
       final response = await request.close().timeout(uploadTimeout ?? const Duration(minutes: 30));

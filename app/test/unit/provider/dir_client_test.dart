@@ -36,13 +36,19 @@ void main() {
     container = RefenaContainer();
     final prefs = await SharedPreferences.getInstance();
     await container.set(persistenceProvider.overrideWithValue(PersistenceService.test(prefs)));
-    await container.redux(sharedDirsProvider).dispatchAsync(
+    await container
+        .redux(sharedDirsProvider)
+        .dispatchAsync(
           AddSharedDirAction(SharedDirConfig(id: 'root1', path: root.path, name: 'Root', writable: true)),
         );
-    await container.redux(sharedDirsProvider).dispatchAsync(
+    await container
+        .redux(sharedDirsProvider)
+        .dispatchAsync(
           AddSharedDirAction(SharedDirConfig(id: 'ro', path: root.path, name: 'ReadOnly', writable: false)),
         );
-    await container.redux(favoritesProvider).dispatchAsync(
+    await container
+        .redux(favoritesProvider)
+        .dispatchAsync(
           AddFavoriteAction(
             FavoriteDevice.fromValues(fingerprint: 'FPPEER', ip: '127.0.0.1', port: 53317, alias: 'Peer').copyWith(trustLevel: TrustLevel.full),
           ),

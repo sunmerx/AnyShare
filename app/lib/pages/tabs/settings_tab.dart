@@ -49,7 +49,9 @@ Future<void> _addSharedDir(BuildContext context, Ref ref) async {
   if (path == null || path.isEmpty) {
     return;
   }
-  await ref.redux(sharedDirsProvider).dispatchAsync(
+  await ref
+      .redux(sharedDirsProvider)
+      .dispatchAsync(
         AddSharedDirAction(SharedDirConfig(id: const Uuid().v4(), path: path, name: p.basename(path))),
       );
 }

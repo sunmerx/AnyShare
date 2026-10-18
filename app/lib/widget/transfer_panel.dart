@@ -25,7 +25,8 @@ List<ActiveTransferView> _active(WatchableRef ref) {
   // Progress notifications arrive per chunk: only subscribe while something
   // is actually active (the rail section lives for the whole app lifetime).
   final receiveStatus = server?.session?.status;
-  final hasActive = sessions.values.any((s) => s.status == SessionStatus.waiting || s.status == SessionStatus.sending) ||
+  final hasActive =
+      sessions.values.any((s) => s.status == SessionStatus.waiting || s.status == SessionStatus.sending) ||
       receiveStatus == SessionStatus.waiting ||
       receiveStatus == SessionStatus.sending;
   if (!hasActive) {
@@ -159,9 +160,7 @@ class _ActiveTransferRow extends StatelessWidget {
     final ref = context.ref;
     final theme = Theme.of(context);
     final title = view.fileCount > 1 ? t.sendTab.selection.files(files: view.fileCount) : view.firstName;
-    final subtitle = view.outgoing
-        ? t.ui2.transfers.toPeer(alias: view.peerAlias)
-        : t.ui2.transfers.fromPeer(alias: view.peerAlias);
+    final subtitle = view.outgoing ? t.ui2.transfers.toPeer(alias: view.peerAlias) : t.ui2.transfers.fromPeer(alias: view.peerAlias);
     final status = view.status.humanString;
 
     return Padding(

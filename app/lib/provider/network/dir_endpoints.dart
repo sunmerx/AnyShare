@@ -253,7 +253,8 @@ extension DirEndpoints on ExtensionServerService {
           {
             'id': root.id,
             'name': root.name.isEmpty ? p.basename(root.path) : root.name,
-            'writable': evaluateDirAccess(
+            'writable':
+                evaluateDirAccess(
                   entry: entry,
                   requesterIp: ip,
                   myOwnerId: myOwnerId,
@@ -614,10 +615,12 @@ extension DirEndpoints on ExtensionServerService {
       }
       // Meta written atomically next to the trashed item.
       final metaTmp = File('$target.meta.json.tmp');
-      await metaTmp.writeAsString(jsonEncode({
-        'originalPath': relative,
-        'deletedAt': stamp,
-      }));
+      await metaTmp.writeAsString(
+        jsonEncode({
+          'originalPath': relative,
+          'deletedAt': stamp,
+        }),
+      );
       await metaTmp.rename('$target.meta.json');
       await writeJson(request, {'ok': true});
       return;

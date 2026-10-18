@@ -85,9 +85,7 @@ class BlocklistTab extends StatelessWidget {
       ),
     );
     if (confirmed == true) {
-      await ref
-          .redux(favoritesProvider)
-          .dispatchAsync(UpdateFavoriteAction(entry.copyWith(blocked: false, trustLevel: TrustLevel.limited)));
+      await ref.redux(favoritesProvider).dispatchAsync(UpdateFavoriteAction(entry.copyWith(blocked: false, trustLevel: TrustLevel.limited)));
     }
   }
 

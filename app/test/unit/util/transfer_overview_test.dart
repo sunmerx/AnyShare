@@ -114,7 +114,10 @@ void main() {
   test('recipientBusy sessions are not active', () {
     final views = activeTransfers(
       sendSessions: {
-        'S1': sendSession(status: SessionStatus.recipientBusy, files: {'a': sending('a', token: 't')}),
+        'S1': sendSession(
+          status: SessionStatus.recipientBusy,
+          files: {'a': sending('a', token: 't')},
+        ),
       },
       server: null,
       progressOf: (_, _) => 0,

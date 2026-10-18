@@ -127,14 +127,16 @@ void main() {
       final client = HttpClient()..connectionTimeout = const Duration(seconds: 5);
       final request = await client.postUrl(Uri.parse('http://127.0.0.1:$port/api/anyshare/v1/pair/register'));
       request.headers.contentType = ContentType.json;
-      request.write(jsonEncode({
-        'alias': 'Peer',
-        'fingerprint': 'FPPEER',
-        'eph': base64Encode(List<int>.filled(32, 7)),
-        'port': 53317,
-        'https': false,
-        'qrToken': ?qrToken,
-      }));
+      request.write(
+        jsonEncode({
+          'alias': 'Peer',
+          'fingerprint': 'FPPEER',
+          'eph': base64Encode(List<int>.filled(32, 7)),
+          'port': 53317,
+          'https': false,
+          'qrToken': ?qrToken,
+        }),
+      );
       final response = await request.close().timeout(const Duration(seconds: 5));
       final text = await response.transform(utf8.decoder).join();
       return (response.statusCode, text.isEmpty ? <String, dynamic>{} : jsonDecode(text) as Map<String, dynamic>);

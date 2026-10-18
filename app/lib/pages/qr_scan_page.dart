@@ -142,7 +142,9 @@ class _QrScanPageState extends State<QrScanPage> with Refena, WidgetsBindingObse
 
     // F-PAIR-13: commit the owner change only after a successful pairing.
     if (join) {
-      ref.redux(ownerProvider).dispatch(
+      ref
+          .redux(ownerProvider)
+          .dispatch(
             SetOwnerIdentityAction(
               id: payload.ownerId,
               name: payload.ownerName.isEmpty ? payload.alias : payload.ownerName,

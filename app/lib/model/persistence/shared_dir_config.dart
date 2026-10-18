@@ -24,11 +24,11 @@ class SharedDirConfig {
   });
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'path': path,
-        'name': name,
-        'writable': writable,
-      };
+    'id': id,
+    'path': path,
+    'name': name,
+    'writable': writable,
+  };
 
   factory SharedDirConfig.fromJson(Map<String, dynamic> json) {
     return SharedDirConfig(

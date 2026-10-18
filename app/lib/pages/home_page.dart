@@ -22,7 +22,8 @@ enum HomeTab {
   myDevices(Icons.devices),
   deviceList(Icons.grid_view),
   blocklist(Icons.block),
-  settings(Icons.settings);
+  settings(Icons.settings)
+  ;
 
   const HomeTab(this.icon);
 

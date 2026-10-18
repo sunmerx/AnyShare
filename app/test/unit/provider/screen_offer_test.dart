@@ -124,7 +124,9 @@ void main() {
     String ownerId = '',
     String ip = '127.0.0.1',
   }) async {
-    await container.redux(favoritesProvider).dispatchAsync(
+    await container
+        .redux(favoritesProvider)
+        .dispatchAsync(
           AddFavoriteAction(
             FavoriteDevice.fromValues(
               fingerprint: fingerprint,
@@ -265,9 +267,7 @@ void main() {
     final sessionId = body['session'] as String;
     expect(container.read(screenProvider).active, isNotNull);
 
-    await container
-        .redux(screenProvider)
-        .dispatchAsync(IncomingScreenStopAction(reason: 'user_stop', session: sessionId));
+    await container.redux(screenProvider).dispatchAsync(IncomingScreenStopAction(reason: 'user_stop', session: sessionId));
 
     expect(container.read(screenProvider).active, isNull);
     expect(engine.sessions.single.stopped, true);
@@ -278,9 +278,7 @@ void main() {
     final (status, _) = await offer();
     expect(status, 200);
 
-    await container
-        .redux(screenProvider)
-        .dispatchAsync(IncomingScreenStopAction(reason: 'user_stop', session: 'stale-session'));
+    await container.redux(screenProvider).dispatchAsync(IncomingScreenStopAction(reason: 'user_stop', session: 'stale-session'));
 
     expect(container.read(screenProvider).active, isNotNull);
   });
@@ -310,7 +308,9 @@ void main() {
   });
 
   test('start share to a reachable peer starts a sender session', () async {
-    await container.redux(screenProvider).dispatchAsync(
+    await container
+        .redux(screenProvider)
+        .dispatchAsync(
           StartScreenShareAction(peerIp: '127.0.0.1', peerAlias: 'Peer'),
         );
 
@@ -330,7 +330,9 @@ void main() {
   });
 
   test('clear error action resets the banner error', () async {
-    await container.redux(screenProvider).dispatchAsync(
+    await container
+        .redux(screenProvider)
+        .dispatchAsync(
           StartScreenShareAction(peerIp: 'fe80::1', peerAlias: 'Peer'),
         );
     expect(container.read(screenProvider).lastError, isNotNull);

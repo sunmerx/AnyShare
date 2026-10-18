@@ -26,14 +26,21 @@ void main() {
     String ownerId = '',
     bool blocked = false,
   }) {
-    return FavoriteDevice.fromValues(fingerprint: fingerprint, ip: '10.0.0.1', port: 53317, alias: 'F-$fingerprint')
-        .copyWith(ownerId: ownerId, blocked: blocked);
+    return FavoriteDevice.fromValues(
+      fingerprint: fingerprint,
+      ip: '10.0.0.1',
+      port: 53317,
+      alias: 'F-$fingerprint',
+    ).copyWith(ownerId: ownerId, blocked: blocked);
   }
 
   test('same-owner favorites go to myDevices', () {
     final groups = groupDevices(
       discovered: const [],
-      favorites: [fav(fingerprint: 'A', ownerId: 'me'), fav(fingerprint: 'B', ownerId: 'other')],
+      favorites: [
+        fav(fingerprint: 'A', ownerId: 'me'),
+        fav(fingerprint: 'B', ownerId: 'other'),
+      ],
       myOwnerId: 'me',
     );
     expect(groups.myDevices.map((f) => f.fingerprint), ['A']);
@@ -54,7 +61,10 @@ void main() {
 
   test('unpaired discovered devices are nearby, paired ones are not', () {
     final groups = groupDevices(
-      discovered: [dev(fingerprint: 'A'), dev(fingerprint: 'B')],
+      discovered: [
+        dev(fingerprint: 'A'),
+        dev(fingerprint: 'B'),
+      ],
       favorites: [fav(fingerprint: 'B')],
       myOwnerId: 'me',
     );

@@ -70,7 +70,9 @@ class _ScreenOfferDialogState extends State<ScreenOfferDialog> with Refena {
               ? null
               : () async {
                   setState(() => _busy = true);
-                  await ref.redux(screenProvider).dispatchAsync(
+                  await ref
+                      .redux(screenProvider)
+                      .dispatchAsync(
                         AbortPendingScreenOfferAction(sessionId: widget.pending.sessionId),
                       );
                   if (context.mounted) {
@@ -84,7 +86,9 @@ class _ScreenOfferDialogState extends State<ScreenOfferDialog> with Refena {
               ? null
               : () async {
                   setState(() => _busy = true);
-                  await ref.redux(screenProvider).dispatchAsync(
+                  await ref
+                      .redux(screenProvider)
+                      .dispatchAsync(
                         AcceptPendingScreenOfferAction(sessionId: widget.pending.sessionId),
                       );
                   if (context.mounted) {

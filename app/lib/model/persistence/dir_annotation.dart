@@ -15,7 +15,10 @@ class DirAnnotation {
 
   factory DirAnnotation.fromJson(Map<String, dynamic> json) {
     return DirAnnotation(
-      tags: [for (final tag in (json['tags'] as List? ?? [])) if (tag is String) tag],
+      tags: [
+        for (final tag in (json['tags'] as List? ?? []))
+          if (tag is String) tag,
+      ],
       note: json['note'] as String? ?? '',
     );
   }

@@ -27,11 +27,15 @@ class ScreenSessionBanner extends StatelessWidget {
           icon: Icons.screen_share,
           text: t.ui2.screen.requestBody(alias: pending.peerAlias),
           actionLabel: t.ui2.screen.accept,
-          onAction: () => ref.redux(screenProvider).dispatchAsync(
+          onAction: () => ref
+              .redux(screenProvider)
+              .dispatchAsync(
                 AcceptPendingScreenOfferAction(sessionId: pending.sessionId),
               ),
           secondaryLabel: t.ui2.screen.reject,
-          onSecondary: () => ref.redux(screenProvider).dispatchAsync(
+          onSecondary: () => ref
+              .redux(screenProvider)
+              .dispatchAsync(
                 AbortPendingScreenOfferAction(sessionId: pending.sessionId),
               ),
           background: theme.colorScheme.tertiaryContainer,
@@ -60,8 +64,8 @@ class ScreenSessionBanner extends StatelessWidget {
       final statsLabel = stats == null
           ? ''
           : active.role == ScreenRole.sender
-              ? ' · ${stats.fps.toStringAsFixed(0)} fps · ${stats.mbps.toStringAsFixed(1)} Mbps'
-              : ' · ${stats.fps.toStringAsFixed(0)} fps';
+          ? ' · ${stats.fps.toStringAsFixed(0)} fps · ${stats.mbps.toStringAsFixed(1)} Mbps'
+          : ' · ${stats.fps.toStringAsFixed(0)} fps';
       banners.add(
         _banner(
           context,
@@ -133,8 +137,7 @@ class ScreenSessionBanner extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-            if (secondaryLabel != null && onSecondary != null)
-              TextButton(onPressed: onSecondary, child: Text(secondaryLabel)),
+            if (secondaryLabel != null && onSecondary != null) TextButton(onPressed: onSecondary, child: Text(secondaryLabel)),
             TextButton(onPressed: onAction, child: Text(actionLabel)),
           ],
         ),

@@ -38,11 +38,15 @@ void main() {
     container = RefenaContainer();
     final prefs = await SharedPreferences.getInstance();
     await container.set(persistenceProvider.overrideWithValue(PersistenceService.test(prefs)));
-    await container.redux(sharedDirsProvider).dispatchAsync(AddSharedDirAction(SharedDirConfig(id: 'root1', path: root.path, name: 'Root', writable: true)));
+    await container
+        .redux(sharedDirsProvider)
+        .dispatchAsync(AddSharedDirAction(SharedDirConfig(id: 'root1', path: root.path, name: 'Root', writable: true)));
     await container
         .redux(sharedDirsProvider)
         .dispatchAsync(AddSharedDirAction(SharedDirConfig(id: 'ro1', path: readOnlyRoot.path, name: 'ReadOnly', writable: false)));
-    await container.redux(favoritesProvider).dispatchAsync(
+    await container
+        .redux(favoritesProvider)
+        .dispatchAsync(
           AddFavoriteAction(
             FavoriteDevice.fromValues(fingerprint: 'FPPEER', ip: '127.0.0.1', port: 53317, alias: 'Peer').copyWith(trustLevel: TrustLevel.full),
           ),
@@ -104,7 +108,9 @@ void main() {
     expect(s1, 403);
     expect(b1['error'], 'unknown');
 
-    await container.redux(favoritesProvider).dispatchAsync(
+    await container
+        .redux(favoritesProvider)
+        .dispatchAsync(
           AddFavoriteAction(
             FavoriteDevice.fromValues(fingerprint: 'FPELSEWHERE', ip: '10.0.0.9', port: 53317, alias: 'Far').copyWith(trustLevel: TrustLevel.full),
           ),
@@ -113,7 +119,9 @@ void main() {
     expect(s2, 403);
     expect(b2['error'], 'ip_mismatch');
 
-    await container.redux(favoritesProvider).dispatchAsync(
+    await container
+        .redux(favoritesProvider)
+        .dispatchAsync(
           AddFavoriteAction(
             FavoriteDevice.fromValues(fingerprint: 'FPTEMP', ip: '127.0.0.1', port: 53317, alias: 'Temp').copyWith(trustLevel: TrustLevel.temp),
           ),
@@ -256,7 +264,9 @@ void main() {
   });
 
   test('limited devices are read-only through the endpoints', () async {
-    await container.redux(favoritesProvider).dispatchAsync(
+    await container
+        .redux(favoritesProvider)
+        .dispatchAsync(
           AddFavoriteAction(
             FavoriteDevice.fromValues(fingerprint: 'FPLIM', ip: '127.0.0.1', port: 53317, alias: 'Lim').copyWith(trustLevel: TrustLevel.limited),
           ),

@@ -227,7 +227,9 @@ extension ExtensionServerHandler on ExtensionServerService {
           await writeJson(request, {'error': 'bad_request'}, status: 400);
           return;
         }
-        await ref.redux(screenProvider).dispatchAsync(
+        await ref
+            .redux(screenProvider)
+            .dispatchAsync(
               IncomingScreenAcceptAction(
                 sessionId: body['session'] as String,
                 port: (body['port'] as num?)?.toInt() ?? kScreenDataPort,
@@ -246,7 +248,9 @@ extension ExtensionServerHandler on ExtensionServerService {
       // Also exempt from the rate limiter (see accept).
       try {
         final body = await readJsonBody(request);
-        await ref.redux(screenProvider).dispatchAsync(
+        await ref
+            .redux(screenProvider)
+            .dispatchAsync(
               IncomingScreenStopAction(
                 reason: (body?['reason'] as String?) ?? 'remote_stop',
                 session: body?['session'] as String?,
