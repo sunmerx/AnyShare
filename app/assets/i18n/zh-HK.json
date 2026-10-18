@@ -636,7 +636,15 @@
       "previewUnsupported": "暫不支援預覽此類型",
       "previewError": "預覽載入失敗",
       "dropHint": "放開即上傳到此目錄",
-      "busyHint": "有操作正在進行中,請稍候"
+      "busyHint": "有操作正在進行中,請稍候",
+      "copy": "複製",
+      "cut": "剪下",
+      "paste": "貼到此處",
+      "cutToClipboard": "已剪下至剪貼簿",
+      "pasteDone": "已貼上 {n} 項",
+      "pastePartial": "已貼上 {n} 項,失敗 {failed} 項",
+      "pasteLimit": "超出項目上限,已貼上 {n} 項",
+      "pasteMoveDeleteFailed": "已複製 {n} 項,但來源端刪除失敗"
     },
     "qrPairing": {
       "displayTitle": "掃碼配對",

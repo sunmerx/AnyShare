@@ -756,7 +756,15 @@
       "previewUnsupported": "No preview for this file type",
       "previewError": "Preview failed to load",
       "dropHint": "Drop to upload into this folder",
-      "busyHint": "Another operation is in progress"
+      "busyHint": "Another operation is in progress",
+      "copy": "Copy",
+      "cut": "Cut",
+      "paste": "Paste here",
+      "cutToClipboard": "Cut to clipboard",
+      "pasteDone": "Pasted {n} item(s)",
+      "pastePartial": "Pasted {n}, failed {failed}",
+      "pasteLimit": "Item limit reached; pasted {n} item(s)",
+      "pasteMoveDeleteFailed": "Copied {n} item(s), but the source could not be removed"
     },
     "qrPairing": {
       "displayTitle": "Pair by QR code",

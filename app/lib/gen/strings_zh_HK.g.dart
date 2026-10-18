@@ -1821,6 +1821,22 @@ class Translations$ui2$dirBrowse$zh_HK extends Translations$ui2$dirBrowse$en {
   String get dropHint => '放開即上傳到此目錄';
   @override
   String get busyHint => '有操作正在進行中,請稍候';
+  @override
+  String get copy => '複製';
+  @override
+  String get cut => '剪下';
+  @override
+  String get paste => '貼到此處';
+  @override
+  String get cutToClipboard => '已剪下至剪貼簿';
+  @override
+  String pasteDone({required Object n}) => '已貼上 ${n} 項';
+  @override
+  String pastePartial({required Object n, required Object failed}) => '已貼上 ${n} 項,失敗 ${failed} 項';
+  @override
+  String pasteLimit({required Object n}) => '超出項目上限,已貼上 ${n} 項';
+  @override
+  String pasteMoveDeleteFailed({required Object n}) => '已複製 ${n} 項,但來源端刪除失敗';
 }
 
 // Path: ui2.qrPairing

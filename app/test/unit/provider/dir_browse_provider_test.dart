@@ -45,10 +45,10 @@ void main() {
         .redux(favoritesProvider)
         .dispatchAsync(
           AddFavoriteAction(
-            FavoriteDevice.fromValues(fingerprint: 'FPPEER', ip: '127.0.0.1', port: 53317, alias: 'Peer').copyWith(trustLevel: TrustLevel.full),
+            FavoriteDevice.fromValues(fingerprint: 'TESTHASH123', ip: '127.0.0.1', port: 53317, alias: 'Peer').copyWith(trustLevel: TrustLevel.full),
           ),
         );
-    await container.redux(dirWriteGrantsProvider).dispatchAsync(SetDirWriteGrantAction(fingerprint: 'FPPEER', granted: true));
+    await container.redux(dirWriteGrantsProvider).dispatchAsync(SetDirWriteGrantAction(fingerprint: 'TESTHASH123', granted: true));
     await container.redux(extensionServerProvider).dispatchAsync(StartExtensionServerAction(port: 0));
     await container.set(dirBrowsePortProvider.overrideWithValue(container.read(extensionServerProvider).port ?? 0));
   });
@@ -107,8 +107,9 @@ void main() {
   });
 
   test('permission and transport errors are stored in the session', () async {
-    await container.redux(dirBrowseProvider).dispatchAsync(OpenDirBrowseAction(fingerprint: 'STRANGER', host: '127.0.0.1', requestId: 1));
-    final denied = container.read(dirBrowseProvider)['STRANGER']!;
+    await container.redux(favoritesProvider).dispatchAsync(RemoveFavoriteAction(deviceFingerprint: 'TESTHASH123'));
+    await container.redux(dirBrowseProvider).dispatchAsync(OpenDirBrowseAction(fingerprint: 'FPPEER', host: '127.0.0.1', requestId: 1));
+    final denied = container.read(dirBrowseProvider)['FPPEER']!;
     expect(denied.error, 'unknown');
     expect(denied.roots, isEmpty);
 

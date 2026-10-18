@@ -8,9 +8,12 @@ import 'package:localsend_app/gen/strings.g.dart';
 import 'package:localsend_app/model/persistence/dir_annotation.dart';
 import 'package:localsend_app/provider/dir_annotations_provider.dart';
 import 'package:localsend_app/provider/dir_browse_provider.dart';
+import 'package:localsend_app/provider/dir_clipboard_provider.dart';
 import 'package:localsend_app/provider/network/dir_client.dart';
 import 'package:localsend_app/provider/network/dir_endpoints.dart' show kDirMaxListEntries;
+import 'package:localsend_app/provider/security_provider.dart';
 import 'package:localsend_app/util/dir_browse.dart';
+import 'package:localsend_app/util/dir_transfer.dart';
 import 'package:localsend_app/widget/dialogs/dir_annotation_dialog.dart';
 import 'package:localsend_app/widget/dir_preview_panel.dart';
 import 'package:path/path.dart' as p;
@@ -52,6 +55,9 @@ class _DirBrowsePageState extends State<DirBrowsePage> {
   /// Selected file name in the current directory (drives the preview panel).
   String? _selectedName;
 
+  /// (done, total, currentName) while a cross-device paste runs.
+  (int, int, String)? _relayProgress;
+
   bool _dragActive = false;
 
   late final Ref _ref;
@@ -80,7 +86,11 @@ class _DirBrowsePageState extends State<DirBrowsePage> {
     super.dispose();
   }
 
-  DirClient get _client => DirClient(host: widget.host, extPort: context.ref.read(dirBrowsePortProvider), fingerprint: widget.fingerprint);
+  DirClient get _client => DirClient(
+    host: widget.host,
+    extPort: context.ref.read(dirBrowsePortProvider),
+    fingerprint: context.ref.read(securityProvider).certificateHash,
+  );
 
   Future<void> _run(Future<void> Function() action) async {
     if (_busy) {
@@ -320,6 +330,8 @@ class _DirBrowsePageState extends State<DirBrowsePage> {
       items: [
         if (!entry.isDir) PopupMenuItem(value: 'preview', child: Text(t.ui2.dirBrowse.preview)),
         if (!entry.isDir) PopupMenuItem(value: 'download', child: Text(t.ui2.dirBrowse.download)),
+        PopupMenuItem(value: 'copy', child: Text(t.ui2.dirBrowse.copy)),
+        if (session.writable) PopupMenuItem(value: 'cut', child: Text(t.ui2.dirBrowse.cut)),
         PopupMenuItem(value: 'annotation', child: Text(t.ui2.dirBrowse.annotation)),
         if (session.writable) ...[
           PopupMenuItem(value: 'rename', child: Text(t.ui2.dirBrowse.rename)),
@@ -339,6 +351,10 @@ class _DirBrowsePageState extends State<DirBrowsePage> {
         setState(() => _selectedName = entry.name);
       case 'download':
         await _download(session, entry);
+      case 'copy':
+        _setClipboard(session, entry, move: false);
+      case 'cut':
+        _setClipboard(session, entry, move: true);
       case 'annotation':
         await _editAnnotation(session, entry);
       case 'rename':
@@ -348,10 +364,79 @@ class _DirBrowsePageState extends State<DirBrowsePage> {
     }
   }
 
+  void _setClipboard(DirBrowseSession session, DirEntry entry, {required bool move}) {
+    _ref
+        .redux(dirClipboardProvider)
+        .dispatch(
+          SetDirClipboardAction(
+            clipboard: DirClipboard(
+              sourceFingerprint: session.fingerprint,
+              sourceHost: session.host,
+              sourceRootId: session.rootId,
+              sourcePath: session.path,
+              entry: entry,
+              move: move,
+            ),
+          ),
+        );
+    _showMessage(move ? t.ui2.dirBrowse.cutToClipboard : t.general.copiedToClipboard);
+  }
+
+  Future<void> _paste(DirBrowseSession session) async {
+    final clipboard = _ref.read(dirClipboardProvider);
+    if (clipboard == null) {
+      return;
+    }
+    await _run(() async {
+      final sourceClient = DirClient(
+        host: clipboard.sourceHost,
+        extPort: _ref.read(dirBrowsePortProvider),
+        fingerprint: _ref.read(securityProvider).certificateHash,
+      );
+      setState(() => _relayProgress = (0, 1, clipboard.entry.name));
+      DirRelayResult result;
+      try {
+        result = await relayDirEntries(
+          source: sourceClient,
+          sourceRoot: clipboard.sourceRootId,
+          sourcePath: clipboard.sourcePath,
+          target: _client,
+          targetRoot: session.rootId,
+          targetPath: session.path,
+          entries: [clipboard.entry],
+          move: clipboard.move,
+          onProgress: (done, total, current) {
+            if (mounted) {
+              setState(() => _relayProgress = (done, total, current));
+            }
+          },
+        );
+      } finally {
+        if (mounted) {
+          setState(() => _relayProgress = null);
+        }
+      }
+      await _reloadLatest();
+      if (result.truncated) {
+        _showMessage(t.ui2.dirBrowse.pasteLimit(n: result.copied));
+      } else if (result.deleteFailed > 0) {
+        _showMessage(t.ui2.dirBrowse.pasteMoveDeleteFailed(n: result.copied));
+      } else if (result.failed == 0) {
+        _showMessage(t.ui2.dirBrowse.pasteDone(n: result.copied));
+      } else {
+        _showMessage(t.ui2.dirBrowse.pastePartial(n: result.copied, failed: result.failed));
+      }
+      if (clipboard.move && result.ok) {
+        _ref.redux(dirClipboardProvider).dispatch(ClearDirClipboardAction());
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final ref = context.ref;
     final session = ref.watch(dirBrowseProvider)[widget.fingerprint];
+    final hasClipboard = ref.watch(dirClipboardProvider) != null;
     final width = MediaQuery.sizeOf(context).width;
     final narrow = width < 700;
     final wide = width >= 1000;
@@ -360,6 +445,12 @@ class _DirBrowsePageState extends State<DirBrowsePage> {
       appBar: AppBar(
         title: Text(widget.title),
         actions: [
+          if (hasClipboard && session != null && session.rootId.isNotEmpty && session.writable)
+            IconButton(
+              tooltip: t.ui2.dirBrowse.paste,
+              icon: const Icon(Icons.content_paste),
+              onPressed: _busy ? null : () => _paste(session),
+            ),
           if (session != null && session.rootId.isNotEmpty && session.writable) ...[
             IconButton(
               tooltip: t.ui2.dirBrowse.upload,
@@ -380,7 +471,37 @@ class _DirBrowsePageState extends State<DirBrowsePage> {
             ),
         ],
       ),
-      body: _buildBody(context, ref, session, narrow, wide),
+      body: Column(
+        children: [
+          if (_relayProgress != null)
+            Material(
+              color: Theme.of(context).colorScheme.secondaryContainer,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '${_relayProgress!.$1}/${_relayProgress!.$2}  ${_relayProgress!.$3}',
+                        style: Theme.of(context).textTheme.bodySmall,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    SizedBox(
+                      width: 120,
+                      child: LinearProgressIndicator(
+                        value: _relayProgress!.$2 == 0 ? null : _relayProgress!.$1 / _relayProgress!.$2,
+                        minHeight: 4,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          Expanded(child: _buildBody(context, ref, session, narrow, wide)),
+        ],
+      ),
     );
   }
 
@@ -454,6 +575,8 @@ class _DirBrowsePageState extends State<DirBrowsePage> {
       onRename: (entry) => _rename(session, entry),
       onDelete: (entry) => _delete(session, entry),
       onAnnotate: (entry) => _editAnnotation(session, entry),
+      onCopy: (entry) => _setClipboard(session, entry, move: false),
+      onCut: (entry) => _setClipboard(session, entry, move: true),
       errorText: _errorText,
     );
 
@@ -642,6 +765,8 @@ class _DirPane extends StatelessWidget {
   final ValueChanged<DirEntry> onRename;
   final ValueChanged<DirEntry> onDelete;
   final ValueChanged<DirEntry> onAnnotate;
+  final ValueChanged<DirEntry> onCopy;
+  final ValueChanged<DirEntry> onCut;
   final String Function(String code) errorText;
 
   const _DirPane({
@@ -669,6 +794,8 @@ class _DirPane extends StatelessWidget {
     required this.onRename,
     required this.onDelete,
     required this.onAnnotate,
+    required this.onCopy,
+    required this.onCut,
     required this.errorText,
   });
 
@@ -869,6 +996,8 @@ class _DirPane extends StatelessWidget {
           onRename: () => onRename(entry),
           onDelete: () => onDelete(entry),
           onAnnotate: () => onAnnotate(entry),
+          onCopy: () => onCopy(entry),
+          onCut: () => onCut(entry),
         );
       },
     );
@@ -876,13 +1005,18 @@ class _DirPane extends StatelessWidget {
 
   Widget _buildGrid(BuildContext context) {
     final theme = Theme.of(context);
+    // Cell height must follow the accessibility text scale: a fixed
+    // childAspectRatio would clip the icon+name+size column at large font
+    // scales (Android "largest", Windows text scaling 200%+).
+    final textScale = MediaQuery.textScalerOf(context).scale(1.0).clamp(1.0, 3.0);
+    final cellHeight = 118 + 48 * (textScale - 1);
     return GridView.builder(
       padding: const EdgeInsets.all(12),
-      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+      gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
         maxCrossAxisExtent: 150,
         mainAxisSpacing: 8,
         crossAxisSpacing: 8,
-        childAspectRatio: 0.95,
+        mainAxisExtent: cellHeight,
       ),
       itemCount: visible.length,
       itemBuilder: (context, index) {
@@ -952,6 +1086,8 @@ class _DirEntryTile extends StatelessWidget {
   final VoidCallback onRename;
   final VoidCallback onDelete;
   final VoidCallback onAnnotate;
+  final VoidCallback onCopy;
+  final VoidCallback onCut;
 
   const _DirEntryTile({
     required this.entry,
@@ -966,6 +1102,8 @@ class _DirEntryTile extends StatelessWidget {
     required this.onRename,
     required this.onDelete,
     required this.onAnnotate,
+    required this.onCopy,
+    required this.onCut,
   });
 
   @override
@@ -1036,6 +1174,10 @@ class _DirEntryTile extends StatelessWidget {
                 onDownload?.call();
               case 'annotation':
                 onAnnotate();
+              case 'copy':
+                onCopy();
+              case 'cut':
+                onCut();
               case 'rename':
                 onRename();
               case 'delete':
@@ -1045,6 +1187,8 @@ class _DirEntryTile extends StatelessWidget {
           itemBuilder: (context) => [
             if (onPreview != null) PopupMenuItem(value: 'preview', child: Text(t.ui2.dirBrowse.preview)),
             if (onDownload != null) PopupMenuItem(value: 'download', child: Text(t.ui2.dirBrowse.download)),
+            PopupMenuItem(value: 'copy', child: Text(t.ui2.dirBrowse.copy)),
+            if (writable) PopupMenuItem(value: 'cut', child: Text(t.ui2.dirBrowse.cut)),
             PopupMenuItem(value: 'annotation', child: Text(t.ui2.dirBrowse.annotation)),
             if (writable) ...[
               PopupMenuItem(value: 'rename', child: Text(t.ui2.dirBrowse.rename)),

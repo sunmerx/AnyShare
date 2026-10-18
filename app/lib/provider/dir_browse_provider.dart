@@ -1,5 +1,6 @@
 import 'package:localsend_app/provider/network/dir_client.dart';
 import 'package:localsend_app/provider/network/extension_server_provider.dart' show kExtensionPort;
+import 'package:localsend_app/provider/security_provider.dart';
 import 'package:localsend_app/util/dir_browse.dart';
 import 'package:refena_flutter/refena_flutter.dart';
 
@@ -90,6 +91,11 @@ class DirBrowseService extends ReduxNotifier<Map<String, DirBrowseSession>> {
   Map<String, DirBrowseSession> init() => {};
 
   int get port => ref.read(dirBrowsePortProvider);
+
+  /// The /dir/* access gate identifies the requester by its self-reported
+  /// fingerprint: always present the LOCAL device identity, never the browsed
+  /// device's (the host's favorites contain the requester, not itself).
+  String get localFingerprint => ref.read(securityProvider).certificateHash;
 }
 
 /// Probes the device roots and loads the first root's listing. Errors are
@@ -110,7 +116,7 @@ class OpenDirBrowseAction extends AsyncReduxAction<DirBrowseService, Map<String,
   Future<Map<String, DirBrowseSession>> reduce() async {
     var session = DirBrowseSession(fingerprint: fingerprint, host: host);
     if (host.isNotEmpty) {
-      final client = DirClient(host: host, extPort: notifier.port, fingerprint: fingerprint);
+      final client = DirClient(host: host, extPort: notifier.port, fingerprint: notifier.localFingerprint);
       try {
         final roots = await client.roots();
         session = session.copyWith(roots: roots);
@@ -154,7 +160,7 @@ class LoadDirListingAction extends AsyncReduxAction<DirBrowseService, Map<String
       return state;
     }
     var session = current.copyWith(rootId: rootId, path: path, error: null);
-    final client = DirClient(host: current.host, extPort: notifier.port, fingerprint: current.fingerprint);
+    final client = DirClient(host: current.host, extPort: notifier.port, fingerprint: notifier.localFingerprint);
     try {
       final listing = await client.list(root: rootId, path: path);
       session = session.copyWith(

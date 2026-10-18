@@ -753,7 +753,15 @@
       "previewUnsupported": "暂不支持预览此类型",
       "previewError": "预览加载失败",
       "dropHint": "松开即上传到此目录",
-      "busyHint": "有操作正在进行中,请稍候"
+      "busyHint": "有操作正在进行中,请稍候",
+      "copy": "复制",
+      "cut": "剪切",
+      "paste": "粘贴到此处",
+      "cutToClipboard": "已剪切到剪贴板",
+      "pasteDone": "已粘贴 {n} 项",
+      "pastePartial": "已粘贴 {n} 项,失败 {failed} 项",
+      "pasteLimit": "超出条目上限,已粘贴 {n} 项",
+      "pasteMoveDeleteFailed": "已复制 {n} 项,但源端删除失败"
     },
     "qrPairing": {
       "displayTitle": "扫码配对",

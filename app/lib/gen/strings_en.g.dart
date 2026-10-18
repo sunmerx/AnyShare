@@ -2440,6 +2440,30 @@ class Translations$ui2$dirBrowse$en {
 
   /// en: 'Another operation is in progress'
   String get busyHint => 'Another operation is in progress';
+
+  /// en: 'Copy'
+  String get copy => 'Copy';
+
+  /// en: 'Cut'
+  String get cut => 'Cut';
+
+  /// en: 'Paste here'
+  String get paste => 'Paste here';
+
+  /// en: 'Cut to clipboard'
+  String get cutToClipboard => 'Cut to clipboard';
+
+  /// en: 'Pasted {n} item(s)'
+  String pasteDone({required Object n}) => 'Pasted ${n} item(s)';
+
+  /// en: 'Pasted {n}, failed {failed}'
+  String pastePartial({required Object n, required Object failed}) => 'Pasted ${n}, failed ${failed}';
+
+  /// en: 'Item limit reached; pasted {n} item(s)'
+  String pasteLimit({required Object n}) => 'Item limit reached; pasted ${n} item(s)';
+
+  /// en: 'Copied {n} item(s), but the source could not be removed'
+  String pasteMoveDeleteFailed({required Object n}) => 'Copied ${n} item(s), but the source could not be removed';
 }
 
 // Path: ui2.qrPairing
