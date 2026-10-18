@@ -6,16 +6,21 @@ import 'package:file_selector/file_selector.dart' as file_selector;
 import 'package:flutter/material.dart';
 import 'package:localsend_app/gen/strings.g.dart';
 import 'package:localsend_app/model/persistence/dir_annotation.dart';
+import 'package:localsend_app/model/persistence/favorite_device.dart';
 import 'package:localsend_app/provider/dir_annotations_provider.dart';
 import 'package:localsend_app/provider/dir_browse_provider.dart';
 import 'package:localsend_app/provider/dir_clipboard_provider.dart';
+import 'package:localsend_app/provider/favorites_provider.dart';
 import 'package:localsend_app/provider/network/dir_client.dart';
 import 'package:localsend_app/provider/network/dir_endpoints.dart' show kDirMaxListEntries;
+import 'package:localsend_app/provider/network/nearby_devices_provider.dart';
 import 'package:localsend_app/provider/security_provider.dart';
 import 'package:localsend_app/util/dir_browse.dart';
 import 'package:localsend_app/util/dir_transfer.dart';
+import 'package:localsend_app/util/send_flow.dart';
 import 'package:localsend_app/widget/dialogs/dir_annotation_dialog.dart';
 import 'package:localsend_app/widget/dir_preview_panel.dart';
+import 'package:localsend_isolates/model/device.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:refena_flutter/refena_flutter.dart';
@@ -43,7 +48,9 @@ class _DirBrowsePageState extends State<DirBrowsePage> {
 
   /// Monotonic request id for listing loads: a slow response never overwrites
   /// a directory the user navigated to later (see the provider actions).
-  int _requestSeq = 0;
+  /// Process-global so ids stay comparable across page instances (an old
+  /// page's in-flight request must not outrank a new page's requests).
+  static int _globalRequestSeq = 0;
 
   DirViewMode _viewMode = DirViewMode.list;
   DirSortBy _sortBy = DirSortBy.name;
@@ -55,8 +62,16 @@ class _DirBrowsePageState extends State<DirBrowsePage> {
   /// Selected file name in the current directory (drives the preview panel).
   String? _selectedName;
 
-  /// (done, total, currentName) while a cross-device paste runs.
-  (int, int, String)? _relayProgress;
+  /// (done, total, currentName, currentFileFraction?) while a cross-device
+  /// paste runs. The fraction is 0..1 of the current file (download 0-0.5,
+  /// upload 0.5-1); null for directories (indeterminate).
+  (int, int, String, double?)? _relayProgress;
+
+  /// Active device in the tree (defaults to the page's initial device).
+  late String _activeFingerprint;
+
+  /// Sessions this page opened; all are closed on dispose.
+  final Set<String> _openedSessions = {};
 
   bool _dragActive = false;
 
@@ -65,6 +80,7 @@ class _DirBrowsePageState extends State<DirBrowsePage> {
   @override
   void initState() {
     super.initState();
+    _activeFingerprint = widget.fingerprint;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         // ignore: discarded_futures
@@ -82,15 +98,19 @@ class _DirBrowsePageState extends State<DirBrowsePage> {
   @override
   void dispose() {
     _searchController.dispose();
-    _ref.redux(dirBrowseProvider).dispatch(CloseDirBrowseAction(fingerprint: widget.fingerprint));
+    for (final fingerprint in _openedSessions) {
+      _ref.redux(dirBrowseProvider).dispatch(CloseDirBrowseAction(fingerprint: fingerprint));
+    }
     super.dispose();
   }
 
-  DirClient get _client => DirClient(
-    host: widget.host,
+  DirClient _clientFor(String host) => DirClient(
+    host: host,
     extPort: context.ref.read(dirBrowsePortProvider),
     fingerprint: context.ref.read(securityProvider).certificateHash,
   );
+
+  DirClient get _client => _clientFor(_activeHost);
 
   Future<void> _run(Future<void> Function() action) async {
     if (_busy) {
@@ -140,36 +160,42 @@ class _DirBrowsePageState extends State<DirBrowsePage> {
   }
 
   Future<void> _openFresh() async {
-    final id = ++_requestSeq;
+    final id = ++_globalRequestSeq;
     setState(() {
       _loading = true;
       _selectedName = null;
     });
-    await _ref.redux(dirBrowseProvider).dispatchAsync(OpenDirBrowseAction(fingerprint: widget.fingerprint, host: widget.host, requestId: id));
-    if (mounted && id == _requestSeq) {
+    _openedSessions.add(_activeFingerprint);
+    await _ref
+        .redux(dirBrowseProvider)
+        .dispatchAsync(
+          OpenDirBrowseAction(fingerprint: _activeFingerprint, host: _activeHost, requestId: id),
+        );
+    if (mounted && id == _globalRequestSeq) {
       setState(() => _loading = false);
     }
   }
 
   Future<void> _open({required String rootId, required String path}) async {
-    final id = ++_requestSeq;
+    final id = ++_globalRequestSeq;
     setState(() {
       _loading = true;
       _selectedName = null;
     });
+    _openedSessions.add(_activeFingerprint);
     await _ref
         .redux(dirBrowseProvider)
         .dispatchAsync(
-          LoadDirListingAction(fingerprint: widget.fingerprint, rootId: rootId, path: path, requestId: id),
+          LoadDirListingAction(fingerprint: _activeFingerprint, rootId: rootId, path: path, requestId: id),
         );
-    if (mounted && id == _requestSeq) {
+    if (mounted && id == _globalRequestSeq) {
       setState(() => _loading = false);
     }
   }
 
   /// Re-fetches whatever the session currently shows (after a mutation).
   Future<void> _reloadLatest() async {
-    final latest = _ref.read(dirBrowseProvider)[widget.fingerprint];
+    final latest = _ref.read(dirBrowseProvider)[_activeFingerprint];
     if (latest == null) {
       return;
     }
@@ -177,6 +203,41 @@ class _DirBrowsePageState extends State<DirBrowsePage> {
       await _openFresh();
     } else {
       await _open(rootId: latest.rootId, path: latest.path);
+    }
+  }
+
+  /// Tree entries: all favorites with their online device (if discovered) and
+  /// the host to dial. Updated during build; used by [_activeHost].
+  List<({FavoriteDevice entry, Device? device, String host})> _treeDevices = [];
+
+  String get _activeHost {
+    // Prefer the host the session was opened with (keeps loads and direct
+    // client calls on the same address after an IP change).
+    final session = _ref.read(dirBrowseProvider)[_activeFingerprint];
+    if (session != null && session.host.isNotEmpty) {
+      return session.host;
+    }
+    if (_activeFingerprint == widget.fingerprint) {
+      return widget.host;
+    }
+    for (final device in _treeDevices) {
+      if (device.entry.fingerprint == _activeFingerprint) {
+        return device.host;
+      }
+    }
+    return '';
+  }
+
+  void _selectDevice(({FavoriteDevice entry, Device? device, String host}) target) {
+    setState(() {
+      _activeFingerprint = target.entry.fingerprint;
+      _selectedName = null;
+      _search = '';
+      _searchController.clear();
+    });
+    if (_ref.read(dirBrowseProvider)[target.entry.fingerprint] == null) {
+      // ignore: discarded_futures
+      _openFresh();
     }
   }
 
@@ -387,27 +448,80 @@ class _DirBrowsePageState extends State<DirBrowsePage> {
     if (clipboard == null) {
       return;
     }
+    // Same directory: nothing to do (a move would delete what it just wrote).
+    if (clipboard.sourceFingerprint == _activeFingerprint && clipboard.sourceRootId == session.rootId && clipboard.sourcePath == session.path) {
+      _showMessage(t.ui2.dirBrowse.pasteSameDir);
+      return;
+    }
+    // Capture the target device up front: the conflict dialog below may stay
+    // open while the user switches devices in the tree.
+    final targetFingerprint = _activeFingerprint;
+    final targetClient = _client;
     await _run(() async {
+      // Conflict pre-check (F-DIR-14): ask when the target already has a file
+      // with the same name. Directories always keep both (rename); only files
+      // can be overwritten, so the dialog is file-only.
+      var onConflict = 'rename';
+      if (!clipboard.entry.isDir) {
+        try {
+          final listing = await targetClient.list(root: session.rootId, path: session.path);
+          if (listing.entries.any((e) => e.name == clipboard.entry.name)) {
+            if (!mounted) {
+              return;
+            }
+            final choice = await showDialog<String>(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: Text(t.ui2.dirBrowse.conflictTitle(name: clipboard.entry.name)),
+                content: Text(t.ui2.dirBrowse.conflictBody),
+                actions: [
+                  TextButton(onPressed: () => Navigator.of(context).pop('rename'), child: Text(t.ui2.dirBrowse.conflictKeepBoth)),
+                  TextButton(onPressed: () => Navigator.of(context).pop('overwrite'), child: Text(t.ui2.dirBrowse.conflictOverwrite)),
+                  FilledButton(onPressed: () => Navigator.of(context).pop(), child: Text(t.ui2.cancel)),
+                ],
+              ),
+            );
+            if (choice == null || _activeFingerprint != targetFingerprint) {
+              return;
+            }
+            onConflict = choice;
+          }
+        } on DirClientException {
+          // Listing failed: fall through, the server will apply its own policy.
+        }
+      }
       final sourceClient = DirClient(
         host: clipboard.sourceHost,
         extPort: _ref.read(dirBrowsePortProvider),
         fingerprint: _ref.read(securityProvider).certificateHash,
       );
-      setState(() => _relayProgress = (0, 1, clipboard.entry.name));
+      var done = 0;
+      var total = 1;
+      var currentName = clipboard.entry.name;
+      setState(() => _relayProgress = (0, 1, currentName, null));
       DirRelayResult result;
       try {
         result = await relayDirEntries(
           source: sourceClient,
           sourceRoot: clipboard.sourceRootId,
           sourcePath: clipboard.sourcePath,
-          target: _client,
+          target: targetClient,
           targetRoot: session.rootId,
           targetPath: session.path,
           entries: [clipboard.entry],
           move: clipboard.move,
-          onProgress: (done, total, current) {
+          onConflict: onConflict,
+          onProgress: (d, t, current) {
+            done = d;
+            total = t;
+            currentName = current;
             if (mounted) {
-              setState(() => _relayProgress = (done, total, current));
+              setState(() => _relayProgress = (d, t, current, null));
+            }
+          },
+          onFileProgress: (fraction) {
+            if (mounted) {
+              setState(() => _relayProgress = (done, total, currentName, fraction));
             }
           },
         );
@@ -435,15 +549,35 @@ class _DirBrowsePageState extends State<DirBrowsePage> {
   @override
   Widget build(BuildContext context) {
     final ref = context.ref;
-    final session = ref.watch(dirBrowseProvider)[widget.fingerprint];
+    final sessions = ref.watch(dirBrowseProvider);
+    final session = sessions[_activeFingerprint];
     final hasClipboard = ref.watch(dirClipboardProvider) != null;
     final width = MediaQuery.sizeOf(context).width;
     final narrow = width < 700;
     final wide = width >= 1000;
 
+    // Multi-device tree data (E3-4b): all favorites with their online state.
+    final favorites = ref.watch(favoritesProvider);
+    final discovered = ref.watch(nearbyDevicesProvider).allDevices.values.toList();
+    _treeDevices = [
+      for (final entry in favorites)
+        () {
+          final device = findDiscovered(discovered, entry);
+          final host = (device?.ip?.isNotEmpty == true) ? device!.ip! : entry.ip;
+          return (entry: entry, device: device, host: host);
+        }(),
+    ];
+
+    String activeAlias = widget.title;
+    for (final device in _treeDevices) {
+      if (device.entry.fingerprint == _activeFingerprint) {
+        activeAlias = device.entry.alias;
+      }
+    }
+
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.title),
+        title: Text(activeAlias),
         actions: [
           if (hasClipboard && session != null && session.rootId.isNotEmpty && session.writable)
             IconButton(
@@ -482,7 +616,9 @@ class _DirBrowsePageState extends State<DirBrowsePage> {
                   children: [
                     Expanded(
                       child: Text(
-                        '${_relayProgress!.$1}/${_relayProgress!.$2}  ${_relayProgress!.$3}',
+                        _relayProgress!.$4 == null
+                            ? '${_relayProgress!.$1}/${_relayProgress!.$2}  ${_relayProgress!.$3}'
+                            : '${_relayProgress!.$1}/${_relayProgress!.$2}  ${_relayProgress!.$3}  ${(_relayProgress!.$4! * 100).round()}%',
                         style: Theme.of(context).textTheme.bodySmall,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -491,7 +627,7 @@ class _DirBrowsePageState extends State<DirBrowsePage> {
                     SizedBox(
                       width: 120,
                       child: LinearProgressIndicator(
-                        value: _relayProgress!.$2 == 0 ? null : _relayProgress!.$1 / _relayProgress!.$2,
+                        value: _relayProgress!.$2 == 0 ? null : (_relayProgress!.$1 + (_relayProgress!.$4 ?? 0)) / _relayProgress!.$2,
                         minHeight: 4,
                       ),
                     ),
@@ -517,13 +653,20 @@ class _DirBrowsePageState extends State<DirBrowsePage> {
     }
 
     final annotations = ref.watch(dirAnnotationsProvider);
-    final rootsPanel = _RootsPanel(
-      session: session,
-      onSelect: (rootId) {
+    final rootsPanel = _DeviceTreePanel(
+      devices: _treeDevices,
+      sessions: ref.watch(dirBrowseProvider),
+      activeFingerprint: _activeFingerprint,
+      compact: narrow,
+      onSelectDevice: _selectDevice,
+      onSelectRoot: (target, rootId) {
+        setState(() {
+          _activeFingerprint = target.entry.fingerprint;
+          _selectedName = null;
+        });
         // ignore: discarded_futures
         _open(rootId: rootId, path: '');
       },
-      compact: narrow,
     );
 
     final tagsByName = <String, List<String>>{
@@ -706,37 +849,92 @@ class _ErrorView extends StatelessWidget {
   }
 }
 
-class _RootsPanel extends StatelessWidget {
-  final DirBrowseSession session;
-  final ValueChanged<String> onSelect;
+class _DeviceTreePanel extends StatelessWidget {
+  final List<({FavoriteDevice entry, Device? device, String host})> devices;
+  final Map<String, DirBrowseSession> sessions;
+  final String activeFingerprint;
   final bool compact;
+  final void Function(({FavoriteDevice entry, Device? device, String host}) target) onSelectDevice;
+  final void Function(({FavoriteDevice entry, Device? device, String host}) target, String rootId) onSelectRoot;
 
-  const _RootsPanel({required this.session, required this.onSelect, required this.compact});
+  const _DeviceTreePanel({
+    required this.devices,
+    required this.sessions,
+    required this.activeFingerprint,
+    required this.compact,
+    required this.onSelectDevice,
+    required this.onSelectRoot,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final tiles = [
-      for (final root in session.roots)
+    final theme = Theme.of(context);
+    final children = <Widget>[];
+    for (final target in devices) {
+      final session = sessions[target.entry.fingerprint];
+      final online = target.device != null;
+      children.add(
         SizedBox(
           width: compact ? 200 : null,
           child: ListTile(
-            dense: compact,
-            leading: const Icon(Icons.folder_outlined, size: 20),
-            title: Text(root.name.isEmpty ? root.id : root.name, overflow: TextOverflow.ellipsis),
-            trailing: root.writable ? null : Tooltip(message: t.ui2.settings.writable, child: const Icon(Icons.lock_outline, size: 16)),
-            selected: root.id == session.rootId,
-            onTap: () => onSelect(root.id),
+            dense: true,
+            leading: Icon(
+              Icons.devices,
+              size: 20,
+              color: target.entry.fingerprint == activeFingerprint ? theme.colorScheme.primary : null,
+            ),
+            title: Text(target.entry.alias, overflow: TextOverflow.ellipsis),
+            subtitle: Text(
+              online ? target.host : t.ui2.deviceList.offlineHint,
+              style: TextStyle(fontSize: 10.5, color: theme.colorScheme.onSurfaceVariant),
+              overflow: TextOverflow.ellipsis,
+            ),
+            selected: target.entry.fingerprint == activeFingerprint,
+            onTap: () => onSelectDevice(target),
           ),
         ),
-    ];
+      );
+      if (session != null) {
+        for (final root in session.roots) {
+          children.add(
+            SizedBox(
+              width: compact ? 200 : null,
+              child: ListTile(
+                dense: true,
+                contentPadding: const EdgeInsets.only(left: 36, right: 12),
+                leading: const Icon(Icons.folder_outlined, size: 18),
+                title: Text(root.name.isEmpty ? root.id : root.name, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13)),
+                trailing: root.writable ? null : Tooltip(message: t.ui2.settings.writable, child: const Icon(Icons.lock_outline, size: 14)),
+                selected: target.entry.fingerprint == activeFingerprint && session.rootId == root.id,
+                onTap: () => onSelectRoot(target, root.id),
+              ),
+            ),
+          );
+        }
+        if (session.roots.isEmpty && session.error == null) {
+          children.add(
+            SizedBox(
+              width: compact ? 200 : null,
+              child: Padding(
+                padding: const EdgeInsets.only(left: 36, right: 12, top: 2, bottom: 6),
+                child: Text(
+                  t.ui2.dirBrowse.empty,
+                  style: theme.textTheme.bodySmall?.copyWith(fontSize: 11, color: theme.colorScheme.onSurfaceVariant),
+                ),
+              ),
+            ),
+          );
+        }
+      }
+    }
     if (compact) {
       return SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        child: Row(children: tiles),
+        child: Row(children: children),
       );
     }
-    return ListView(padding: const EdgeInsets.symmetric(vertical: 8), children: tiles);
+    return ListView(padding: const EdgeInsets.symmetric(vertical: 8), children: children);
   }
 }
 

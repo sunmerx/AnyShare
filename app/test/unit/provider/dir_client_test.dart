@@ -147,6 +147,50 @@ void main() {
     expect(File('${target.path}.part').existsSync(), isFalse);
   });
 
+  test('download and upload report byte progress', () async {
+    final received = <int>[];
+    final target = File(p.join(root.path, '..', 'progress.txt'));
+    try {
+      await client.downloadToFile(
+        root: 'root1',
+        path: 'a.txt',
+        target: target,
+        onProgress: (r, total) {
+          received.add(r);
+          expect(total, 5);
+        },
+      );
+      expect(received, isNotEmpty);
+      expect(received.last, 5);
+      final sorted = [...received]..sort();
+      expect(received, orderedEquals(sorted));
+    } finally {
+      if (target.existsSync()) {
+        target.deleteSync();
+      }
+    }
+
+    final sent = <int>[];
+    final source = File(p.join(root.path, '..', 'progress_src.txt'));
+    source.writeAsStringSync('bravo');
+    try {
+      await client.uploadFile(
+        root: 'root1',
+        path: '',
+        source: source,
+        name: 'progress_src.txt',
+        onProgress: (s, total) {
+          sent.add(s);
+          expect(total, 5);
+        },
+      );
+      expect(sent, isNotEmpty);
+      expect(sent.last, 5);
+    } finally {
+      source.deleteSync();
+    }
+  });
+
   test('read-only root rejects writes', () async {
     final listing = await client.list(root: 'ro', path: '');
     expect(listing.writable, isFalse);

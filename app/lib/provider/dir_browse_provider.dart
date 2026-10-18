@@ -96,6 +96,10 @@ class DirBrowseService extends ReduxNotifier<Map<String, DirBrowseSession>> {
   /// fingerprint: always present the LOCAL device identity, never the browsed
   /// device's (the host's favorites contain the requester, not itself).
   String get localFingerprint => ref.read(securityProvider).certificateHash;
+
+  /// Per-fingerprint generation, bumped on close: in-flight actions that were
+  /// dispatched by a now-closed page must not resurrect the session.
+  final Map<String, int> generations = {};
 }
 
 /// Probes the device roots and loads the first root's listing. Errors are
@@ -114,6 +118,7 @@ class OpenDirBrowseAction extends AsyncReduxAction<DirBrowseService, Map<String,
 
   @override
   Future<Map<String, DirBrowseSession>> reduce() async {
+    final generation = notifier.generations[fingerprint] ?? 0;
     var session = DirBrowseSession(fingerprint: fingerprint, host: host);
     if (host.isNotEmpty) {
       final client = DirClient(host: host, extPort: notifier.port, fingerprint: notifier.localFingerprint);
@@ -137,6 +142,10 @@ class OpenDirBrowseAction extends AsyncReduxAction<DirBrowseService, Map<String,
     } else {
       session = session.copyWith(error: 'unreachable');
     }
+    if ((notifier.generations[fingerprint] ?? 0) != generation) {
+      // The page that started this request is gone.
+      return state;
+    }
     final current = state[fingerprint];
     if (current != null && current.requestId > requestId) {
       return state;
@@ -155,6 +164,7 @@ class LoadDirListingAction extends AsyncReduxAction<DirBrowseService, Map<String
 
   @override
   Future<Map<String, DirBrowseSession>> reduce() async {
+    final generation = notifier.generations[fingerprint] ?? 0;
     final current = state[fingerprint];
     if (current == null) {
       return state;
@@ -173,6 +183,9 @@ class LoadDirListingAction extends AsyncReduxAction<DirBrowseService, Map<String
       // instead of leaving stale writable/truncated values from the old one.
       session = session.copyWith(entries: const [], writable: false, truncated: false, error: e.code);
     }
+    if ((notifier.generations[fingerprint] ?? 0) != generation) {
+      return state;
+    }
     if (state[fingerprint] != null && state[fingerprint]!.requestId > requestId) {
       return state;
     }
@@ -187,6 +200,7 @@ class CloseDirBrowseAction extends ReduxAction<DirBrowseService, Map<String, Dir
 
   @override
   Map<String, DirBrowseSession> reduce() {
+    notifier.generations[fingerprint] = (notifier.generations[fingerprint] ?? 0) + 1;
     final updated = {...state}..remove(fingerprint);
     return updated;
   }

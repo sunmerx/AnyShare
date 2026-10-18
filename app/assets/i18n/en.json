@@ -764,7 +764,12 @@
       "pasteDone": "Pasted {n} item(s)",
       "pastePartial": "Pasted {n}, failed {failed}",
       "pasteLimit": "Item limit reached; pasted {n} item(s)",
-      "pasteMoveDeleteFailed": "Copied {n} item(s), but the source could not be removed"
+      "pasteMoveDeleteFailed": "Copied {n} item(s), but the source could not be removed",
+      "conflictTitle": "\"{name}\" already exists",
+      "conflictBody": "Choose how to proceed.",
+      "conflictKeepBoth": "Keep both",
+      "conflictOverwrite": "Overwrite",
+      "pasteSameDir": "Already in this folder"
     },
     "qrPairing": {
       "displayTitle": "Pair by QR code",

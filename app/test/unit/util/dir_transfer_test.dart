@@ -220,6 +220,7 @@ void main() {
     Directory(p.join(rootB.path, 'sub')).createSync();
     final entries = await listA();
     final sub = entries.firstWhere((e) => e.name == 'sub');
+    // Directories always keep both; `overwrite` only applies to files.
     final result = await relayDirEntries(
       source: clientToA,
       sourceRoot: 'root1',
@@ -229,9 +230,30 @@ void main() {
       targetPath: '',
       entries: [sub],
       move: false,
+      onConflict: 'overwrite',
     );
     expect(result.ok, isTrue);
     expect(File(p.join(rootB.path, 'sub(1)', 'f2.txt')).readAsStringSync(), 'two');
+    expect(Directory(p.join(rootB.path, 'sub')).existsSync(), isTrue);
+  });
+
+  test('pasting a file into its own directory is refused', () async {
+    final entries = await listA();
+    final f1 = entries.firstWhere((e) => e.name == 'f1.txt');
+    final result = await relayDirEntries(
+      source: clientToA,
+      sourceRoot: 'root1',
+      sourcePath: '',
+      target: clientToA,
+      targetRoot: 'root1',
+      targetPath: '',
+      entries: [f1],
+      move: true,
+      onConflict: 'overwrite',
+    );
+    expect(result.failed, 1);
+    expect(result.errors, contains('conflict'));
+    expect(File(p.join(rootA.path, 'f1.txt')).readAsStringSync(), 'one');
   });
 
   test('move reports a failed source deletion separately and keeps the copy', () async {
@@ -280,5 +302,47 @@ void main() {
     // The directory itself was created; the child beyond the depth cap was not.
     expect(Directory(p.join(rootB.path, 'sub')).existsSync(), isTrue);
     expect(File(p.join(rootB.path, 'sub', 'f2.txt')).existsSync(), isFalse);
+  });
+
+  test('overwrite policy replaces the target file', () async {
+    File(p.join(rootB.path, 'f1.txt')).writeAsStringSync('existing');
+    final entries = await listA();
+    final f1 = entries.firstWhere((e) => e.name == 'f1.txt');
+    final result = await relayDirEntries(
+      source: clientToA,
+      sourceRoot: 'root1',
+      sourcePath: '',
+      target: clientToB,
+      targetRoot: 'root1',
+      targetPath: '',
+      entries: [f1],
+      move: false,
+      onConflict: 'overwrite',
+    );
+    expect(result.ok, isTrue);
+    expect(File(p.join(rootB.path, 'f1.txt')).readAsStringSync(), 'one');
+    expect(File(p.join(rootB.path, 'f1(1).txt')).existsSync(), isFalse);
+  });
+
+  test('byte progress is reported monotonically for files', () async {
+    final entries = await listA();
+    final f1 = entries.firstWhere((e) => e.name == 'f1.txt');
+    final fractions = <double>[];
+    final result = await relayDirEntries(
+      source: clientToA,
+      sourceRoot: 'root1',
+      sourcePath: '',
+      target: clientToB,
+      targetRoot: 'root1',
+      targetPath: '',
+      entries: [f1],
+      move: false,
+      onFileProgress: fractions.add,
+    );
+    expect(result.ok, isTrue);
+    expect(fractions, isNotEmpty);
+    final sorted = [...fractions]..sort();
+    expect(fractions, orderedEquals(sorted));
+    expect(fractions.last, closeTo(1.0, 0.001));
   });
 }

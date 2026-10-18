@@ -2464,6 +2464,21 @@ class Translations$ui2$dirBrowse$en {
 
   /// en: 'Copied {n} item(s), but the source could not be removed'
   String pasteMoveDeleteFailed({required Object n}) => 'Copied ${n} item(s), but the source could not be removed';
+
+  /// en: '"{name}" already exists'
+  String conflictTitle({required Object name}) => '"${name}" already exists';
+
+  /// en: 'Choose how to proceed.'
+  String get conflictBody => 'Choose how to proceed.';
+
+  /// en: 'Keep both'
+  String get conflictKeepBoth => 'Keep both';
+
+  /// en: 'Overwrite'
+  String get conflictOverwrite => 'Overwrite';
+
+  /// en: 'Already in this folder'
+  String get pasteSameDir => 'Already in this folder';
 }
 
 // Path: ui2.qrPairing

@@ -54,6 +54,8 @@ Future<DirRelayResult> relayDirEntries({
   required List<DirEntry> entries,
   required bool move,
   void Function(int done, int total, String current)? onProgress,
+  void Function(double fraction)? onFileProgress,
+  String onConflict = 'rename',
   int maxEntries = kDirRelayMaxEntries,
   int maxDepth = kDirRelayMaxDepth,
 }) async {
@@ -125,10 +127,39 @@ Future<DirRelayResult> relayDirEntries({
         await deleteSource(srcRel);
       }
     } else {
+      // Same directory: a move would download, overwrite (or rename) and then
+      // delete the source — net data loss. Refuse; the page also blocks this.
+      if (sameDevice && joinDirPath(tgtDir, entry.name) == srcRel) {
+        throw const DirClientException('conflict');
+      }
       final temp = File(p.join(staging.path, 'stage_$visited'));
       try {
-        await source.downloadToFile(root: sourceRoot, path: srcRel, target: temp);
-        await target.uploadFile(root: targetRoot, path: tgtDir, source: temp, name: entry.name, onConflict: 'rename');
+        await source.downloadToFile(
+          root: sourceRoot,
+          path: srcRel,
+          target: temp,
+          onProgress: onFileProgress == null
+              ? null
+              : (received, total) {
+                  if (total != null && total > 0) {
+                    onFileProgress(received / total * 0.5);
+                  }
+                },
+        );
+        await target.uploadFile(
+          root: targetRoot,
+          path: tgtDir,
+          source: temp,
+          name: entry.name,
+          onConflict: onConflict,
+          onProgress: onFileProgress == null
+              ? null
+              : (sent, total) {
+                  if (total != null && total > 0) {
+                    onFileProgress(0.5 + sent / total * 0.5);
+                  }
+                },
+        );
       } finally {
         try {
           if (temp.existsSync()) {

@@ -761,7 +761,12 @@
       "pasteDone": "已粘贴 {n} 项",
       "pastePartial": "已粘贴 {n} 项,失败 {failed} 项",
       "pasteLimit": "超出条目上限,已粘贴 {n} 项",
-      "pasteMoveDeleteFailed": "已复制 {n} 项,但源端删除失败"
+      "pasteMoveDeleteFailed": "已复制 {n} 项,但源端删除失败",
+      "conflictTitle": "「{name}」已存在",
+      "conflictBody": "请选择处理方式。",
+      "conflictKeepBoth": "保留两者",
+      "conflictOverwrite": "覆盖",
+      "pasteSameDir": "已在此目录中,无需粘贴"
     },
     "qrPairing": {
       "displayTitle": "扫码配对",

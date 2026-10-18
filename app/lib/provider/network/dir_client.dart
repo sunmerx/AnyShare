@@ -157,7 +157,13 @@ class DirClient {
   /// Downloads [path] into [target]. The transfer is written to a `.part`
   /// sibling first and atomically renamed on success; on any failure the
   /// partial file is removed and [target] is left untouched.
-  Future<void> downloadToFile({required String root, required String path, required File target}) async {
+  /// [onProgress] receives (receivedBytes, totalBytes?).
+  Future<void> downloadToFile({
+    required String root,
+    required String path,
+    required File target,
+    void Function(int received, int? total)? onProgress,
+  }) async {
     final part = File('${target.path}.part');
     final client = await _open();
     try {
@@ -170,9 +176,17 @@ class DirClient {
         }
         _throwFromBody(response.statusCode, bytes);
       }
+      final total = response.contentLength > 0 ? response.contentLength : null;
+      var received = 0;
       final sink = part.openWrite();
       try {
-        await sink.addStream(response);
+        await sink.addStream(
+          response.map((chunk) {
+            received += chunk.length;
+            onProgress?.call(received, total);
+            return chunk;
+          }),
+        );
       } finally {
         try {
           await sink.close();
@@ -244,6 +258,7 @@ class DirClient {
     required String name,
     String onConflict = 'rename',
     Duration? uploadTimeout,
+    void Function(int sent, int? total)? onProgress,
   }) async {
     final client = await _open();
     try {
@@ -264,7 +279,14 @@ class DirClient {
         }),
       );
       request.contentLength = length;
-      await request.addStream(source.openRead());
+      var sent = 0;
+      await request.addStream(
+        source.openRead().map((chunk) {
+          sent += chunk.length;
+          onProgress?.call(sent, length);
+          return chunk;
+        }),
+      );
       final response = await request.close().timeout(uploadTimeout ?? const Duration(minutes: 30));
       final bytes = <int>[];
       await for (final chunk in response) {

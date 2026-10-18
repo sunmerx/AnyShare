@@ -644,7 +644,12 @@
       "pasteDone": "已貼上 {n} 項",
       "pastePartial": "已貼上 {n} 項,失敗 {failed} 項",
       "pasteLimit": "超出項目上限,已貼上 {n} 項",
-      "pasteMoveDeleteFailed": "已複製 {n} 項,但來源端刪除失敗"
+      "pasteMoveDeleteFailed": "已複製 {n} 項,但來源端刪除失敗",
+      "conflictTitle": "「{name}」已存在",
+      "conflictBody": "請選擇處理方式。",
+      "conflictKeepBoth": "保留兩者",
+      "conflictOverwrite": "覆蓋",
+      "pasteSameDir": "已在此目錄中,無需貼上"
     },
     "qrPairing": {
       "displayTitle": "掃碼配對",

@@ -2047,6 +2047,16 @@ class Translations$ui2$dirBrowse$zh_CN extends Translations$ui2$dirBrowse$en {
   String pasteLimit({required Object n}) => '超出条目上限,已粘贴 ${n} 项';
   @override
   String pasteMoveDeleteFailed({required Object n}) => '已复制 ${n} 项,但源端删除失败';
+  @override
+  String conflictTitle({required Object name}) => '「${name}」已存在';
+  @override
+  String get conflictBody => '请选择处理方式。';
+  @override
+  String get conflictKeepBoth => '保留两者';
+  @override
+  String get conflictOverwrite => '覆盖';
+  @override
+  String get pasteSameDir => '已在此目录中,无需粘贴';
 }
 
 // Path: ui2.qrPairing
