@@ -2383,6 +2383,63 @@ class Translations$ui2$dirBrowse$en {
 
   /// en: 'Cannot reach the host'
   String get errUnreachable => 'Cannot reach the host';
+
+  /// en: 'Preview'
+  String get preview => 'Preview';
+
+  /// en: 'Tags & note'
+  String get annotation => 'Tags & note';
+
+  /// en: 'Tags & note'
+  String get tagsTitle => 'Tags & note';
+
+  /// en: 'Note'
+  String get noteLabel => 'Note';
+
+  /// en: 'Add tag'
+  String get addTag => 'Add tag';
+
+  /// en: 'List view'
+  String get viewList => 'List view';
+
+  /// en: 'Grid view'
+  String get viewGrid => 'Grid view';
+
+  /// en: 'Sort'
+  String get sortBy => 'Sort';
+
+  /// en: 'Name'
+  String get sortName => 'Name';
+
+  /// en: 'Size'
+  String get sortSize => 'Size';
+
+  /// en: 'Modified'
+  String get sortModified => 'Modified';
+
+  /// en: 'Ascending'
+  String get sortAscending => 'Ascending';
+
+  /// en: 'Descending'
+  String get sortDescending => 'Descending';
+
+  /// en: 'Search this folder'
+  String get searchHint => 'Search this folder';
+
+  /// en: 'File too large to preview'
+  String get previewTooLarge => 'File too large to preview';
+
+  /// en: 'No preview for this file type'
+  String get previewUnsupported => 'No preview for this file type';
+
+  /// en: 'Preview failed to load'
+  String get previewError => 'Preview failed to load';
+
+  /// en: 'Drop to upload into this folder'
+  String get dropHint => 'Drop to upload into this folder';
+
+  /// en: 'Another operation is in progress'
+  String get busyHint => 'Another operation is in progress';
 }
 
 // Path: ui2.qrPairing

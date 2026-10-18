@@ -1783,6 +1783,44 @@ class Translations$ui2$dirBrowse$zh_HK extends Translations$ui2$dirBrowse$en {
   String get errInternal => '對方處理請求失敗';
   @override
   String get errUnreachable => '無法連線到對方';
+  @override
+  String get preview => '預覽';
+  @override
+  String get annotation => '標籤與備註';
+  @override
+  String get tagsTitle => '標籤與備註';
+  @override
+  String get noteLabel => '備註';
+  @override
+  String get addTag => '新增標籤';
+  @override
+  String get viewList => '清單檢視';
+  @override
+  String get viewGrid => '網格檢視';
+  @override
+  String get sortBy => '排序';
+  @override
+  String get sortName => '名稱';
+  @override
+  String get sortSize => '大小';
+  @override
+  String get sortModified => '修改時間';
+  @override
+  String get sortAscending => '升冪';
+  @override
+  String get sortDescending => '降冪';
+  @override
+  String get searchHint => '搜尋此目錄';
+  @override
+  String get previewTooLarge => '檔案過大,無法預覽';
+  @override
+  String get previewUnsupported => '暫不支援預覽此類型';
+  @override
+  String get previewError => '預覽載入失敗';
+  @override
+  String get dropHint => '放開即上傳到此目錄';
+  @override
+  String get busyHint => '有操作正在進行中,請稍候';
 }
 
 // Path: ui2.qrPairing

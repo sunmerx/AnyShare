@@ -200,14 +200,24 @@ class DirClient {
     } catch (_) {}
   }
 
-  Future<Uint8List> downloadBytes({required String root, required String path}) async {
+  /// Downloads [path] fully into memory. [maxBytes] aborts the transfer with a
+  /// `too_large` error once exceeded (used by previews with size caps).
+  Future<Uint8List> downloadBytes({required String root, required String path, int? maxBytes}) async {
     final client = await _open();
     try {
       final request = await client.postUrl(_uri('download', {'root': root, 'path': path, 'fingerprint': fingerprint}));
       final response = await request.close().timeout(timeout);
       final bytes = <int>[];
+      var exceeded = false;
       await for (final chunk in response) {
         bytes.addAll(chunk);
+        if (maxBytes != null && bytes.length > maxBytes) {
+          exceeded = true;
+          break;
+        }
+      }
+      if (exceeded) {
+        throw const DirClientException('too_large');
       }
       if (response.statusCode != 200) {
         _throwFromBody(response.statusCode, bytes);

@@ -1993,6 +1993,44 @@ class Translations$ui2$dirBrowse$zh_CN extends Translations$ui2$dirBrowse$en {
   String get errInternal => '对方处理请求失败';
   @override
   String get errUnreachable => '无法连接到对方';
+  @override
+  String get preview => '预览';
+  @override
+  String get annotation => '标签与备注';
+  @override
+  String get tagsTitle => '标签与备注';
+  @override
+  String get noteLabel => '备注';
+  @override
+  String get addTag => '添加标签';
+  @override
+  String get viewList => '列表视图';
+  @override
+  String get viewGrid => '网格视图';
+  @override
+  String get sortBy => '排序';
+  @override
+  String get sortName => '名称';
+  @override
+  String get sortSize => '大小';
+  @override
+  String get sortModified => '修改时间';
+  @override
+  String get sortAscending => '升序';
+  @override
+  String get sortDescending => '降序';
+  @override
+  String get searchHint => '搜索此目录';
+  @override
+  String get previewTooLarge => '文件过大,无法预览';
+  @override
+  String get previewUnsupported => '暂不支持预览此类型';
+  @override
+  String get previewError => '预览加载失败';
+  @override
+  String get dropHint => '松开即上传到此目录';
+  @override
+  String get busyHint => '有操作正在进行中,请稍候';
 }
 
 // Path: ui2.qrPairing
