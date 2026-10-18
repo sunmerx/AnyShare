@@ -574,6 +574,23 @@
       "sharedDir": "共享目錄",
       "screenShare": "螢幕分享"
     },
+    "qrPairing": {
+      "displayTitle": "掃碼配對",
+      "displayHint": "用手機上的 AnyShare 掃描此 QR 碼",
+      "expiresIn": "{n} 秒後自動更新",
+      "noAddress": "無可用網絡位址",
+      "scanTitle": "掃描 QR 碼",
+      "scanHint": "對準對方裝置上的 QR 碼",
+      "invalidCode": "無法辨識的 QR 碼",
+      "permissionDenied": "掃描需要相機權限",
+      "openSettings": "開啟系統設定",
+      "joinOwnerTitle": "加入歸屬者?",
+      "joinOwnerBody": "這是「{name}」的配對碼。加入其歸屬者後,本機將出現在對方的「我的裝置」中。",
+      "join": "加入歸屬者",
+      "justPair": "僅配對",
+      "joinedOwner": "已加入歸屬者「{name}」",
+      "paired": "配對成功"
+    },
     "screen": {
       "requestTitle": "投放螢幕請求",
       "requestBody": "「{alias}」請求分享螢幕到本機。",

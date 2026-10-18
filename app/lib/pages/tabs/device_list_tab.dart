@@ -3,21 +3,25 @@ import 'package:localsend_app/gen/strings.g.dart';
 import 'package:localsend_app/model/persistence/favorite_device.dart';
 import 'package:localsend_app/model/send_mode.dart';
 import 'package:localsend_app/pages/device_details_page.dart';
+import 'package:localsend_app/pages/qr_scan_page.dart';
 import 'package:localsend_app/provider/animation_provider.dart';
 import 'package:localsend_app/provider/favorites_provider.dart';
 import 'package:localsend_app/provider/local_ip_provider.dart';
+import 'package:localsend_app/provider/network/extension_server_provider.dart';
 import 'package:localsend_app/provider/network/nearby_devices_provider.dart';
 import 'package:localsend_app/provider/network/scan_facade.dart';
 import 'package:localsend_app/provider/owner_provider.dart';
 import 'package:localsend_app/provider/screen/screen_provider.dart';
 import 'package:localsend_app/provider/settings_provider.dart';
 import 'package:localsend_app/util/device_groups.dart';
+import 'package:localsend_app/util/native/platform_check.dart';
 import 'package:localsend_app/util/screen_capabilities.dart';
 import 'package:localsend_app/util/send_flow.dart';
 import 'package:localsend_app/widget/circular_popup_button.dart';
 import 'package:localsend_app/widget/custom_icon_button.dart';
 import 'package:localsend_app/widget/device_card.dart';
 import 'package:localsend_app/widget/dialogs/pairing_dialog.dart';
+import 'package:localsend_app/widget/dialogs/qr_pairing_dialog.dart';
 import 'package:localsend_app/widget/dialogs/send_mode_help_dialog.dart';
 import 'package:localsend_app/widget/multi_send_info.dart';
 import 'package:localsend_app/widget/responsive_list_view.dart';
@@ -83,10 +87,16 @@ class _DeviceListTabState extends State<DeviceListTab> with Refena {
             ),
             const _SendModeButton(),
             Tooltip(
-              message: '${t.ui2.deviceList.qrPairing} · ${t.ui2.card.comingSoon}',
+              message: t.ui2.deviceList.qrPairing,
               child: CustomIconButton(
-                onPressed: null,
-                child: Icon(Icons.qr_code, color: Theme.of(context).disabledColor),
+                onPressed: () async {
+                  if (checkPlatform([TargetPlatform.android, TargetPlatform.iOS])) {
+                    await context.push(() => const QrScanPage());
+                  } else {
+                    await showQrPairingDialog(context);
+                  }
+                },
+                child: const Icon(Icons.qr_code),
               ),
             ),
           ],
@@ -256,7 +266,7 @@ class _DeviceListTabState extends State<DeviceListTab> with Refena {
     await showInitiatorPairingDialog(
       context,
       host: pairHost,
-      extPort: 53318,
+      extPort: kExtensionPort,
       onPaired: (_) {},
     );
   }

@@ -694,6 +694,23 @@
       "sharedDir": "Shared folders",
       "screenShare": "Screen sharing"
     },
+    "qrPairing": {
+      "displayTitle": "Pair by QR code",
+      "displayHint": "Scan this code with AnyShare on your phone",
+      "expiresIn": "Refreshes in {n}s",
+      "noAddress": "No usable network address",
+      "scanTitle": "Scan QR code",
+      "scanHint": "Point at the QR code on the other device",
+      "invalidCode": "Unrecognized QR code",
+      "permissionDenied": "Camera permission is required to scan",
+      "openSettings": "Open settings",
+      "joinOwnerTitle": "Join owner?",
+      "joinOwnerBody": "This is the pairing code of \"{name}\". Joining makes this device appear in the other device's \"My Devices\".",
+      "join": "Join owner",
+      "justPair": "Just pair",
+      "joinedOwner": "Joined owner \"{name}\"",
+      "paired": "Paired successfully"
+    },
     "screen": {
       "requestTitle": "Screen share request",
       "requestBody": "\"{alias}\" wants to share its screen to this device.",

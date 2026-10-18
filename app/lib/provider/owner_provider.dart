@@ -48,3 +48,22 @@ class SetOwnerNameAction extends ReduxAction<OwnerService, OwnerIdentity> {
     return updated;
   }
 }
+
+/// AnyShare modification (2026-10-18): adopts the owner identity from a
+/// scanned QR code (F-PAIR-13 "join my owner").
+class SetOwnerIdentityAction extends ReduxAction<OwnerService, OwnerIdentity> {
+  final String id;
+  final String name;
+
+  SetOwnerIdentityAction({required this.id, required this.name});
+
+  @override
+  OwnerIdentity reduce() {
+    final updated = OwnerIdentity(id: id, name: name);
+    // ignore: discarded_futures
+    notifier._persistence.setOwnerId(id);
+    // ignore: discarded_futures
+    notifier._persistence.setOwnerName(name);
+    return updated;
+  }
+}

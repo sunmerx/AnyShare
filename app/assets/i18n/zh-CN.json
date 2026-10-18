@@ -691,6 +691,23 @@
       "sharedDir": "共享目录",
       "screenShare": "屏幕共享"
     },
+    "qrPairing": {
+      "displayTitle": "扫码配对",
+      "displayHint": "用手机上的 AnyShare 扫描此二维码",
+      "expiresIn": "{n} 秒后自动刷新",
+      "noAddress": "无可用网络地址",
+      "scanTitle": "扫描二维码",
+      "scanHint": "对准对方设备上的二维码",
+      "invalidCode": "无法识别的二维码",
+      "permissionDenied": "扫描需要相机权限",
+      "openSettings": "打开系统设置",
+      "joinOwnerTitle": "加入归属者?",
+      "joinOwnerBody": "这是「{name}」的配对码。加入其归属者后,本机将出现在对方的「我的设备」中。",
+      "join": "加入归属者",
+      "justPair": "仅配对",
+      "joinedOwner": "已加入归属者「{name}」",
+      "paired": "配对成功"
+    },
     "screen": {
       "requestTitle": "投屏请求",
       "requestBody": "「{alias}」请求共享屏幕到本机。",

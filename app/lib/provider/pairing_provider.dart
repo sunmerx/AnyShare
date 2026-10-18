@@ -177,7 +177,14 @@ extension PairingClient on Ref {
   }
 
   /// Registers a pairing request; returns the session with the SAS code.
-  Future<PairingSession> pairRegister({required String host, required int extPort, required String peerFingerprint}) async {
+  /// [qrToken] comes from a scanned QR code (F-PAIR-08) and is validated by
+  /// the peer's extension server.
+  Future<PairingSession> pairRegister({
+    required String host,
+    required int extPort,
+    required String peerFingerprint,
+    String? qrToken,
+  }) async {
     final keyPair = await SasCrypto.generateKeyPair();
     final localPub = await keyPair.extractPublicKey();
     final server = read(serverProvider);
@@ -188,6 +195,7 @@ extension PairingClient on Ref {
               'eph': base64Encode(localPub.bytes),
               'port': server?.port ?? 53317,
               'https': server?.https ?? true,
+              'qrToken': ?qrToken,
             })
             as Map;
     if (response['session'] is! String || response['eph'] is! String || response['code'] is! String) {

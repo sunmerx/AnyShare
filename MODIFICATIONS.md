@@ -53,6 +53,21 @@
 - `pubspec.lock`:8 个 build 工具链传递依赖小版本再解析(archive/build_config/build_daemon 等,仅 codegen 使用;官方源解析,运行时依赖零漂移)
 - `app/pubspec.yaml`:description 重写、homepage → github.com/sunmerx/AnyShare
 
+### 扫码配对与归属者加入批次(2026-10-18,PAIR-1/F-PAIR-08/13)
+
+- `app/lib/util/qr_pairing.dart`(新增):二维码载荷编解码(版本化 JSON,严格类型校验,恶意载荷不抛异常)+ 单测
+- `app/lib/provider/qr_pairing_provider.dart`(新增):展示侧状态(一次性令牌 60s TTL、地址/指纹/归属者载荷;无网络地址或扩展服务未启动时明确报错)
+- `app/lib/widget/dialogs/qr_pairing_dialog.dart`(新增):展示二维码(pretty_qr_code)、倒计时自动刷新、关闭即失效
+- `app/lib/pages/qr_scan_page.dart`(新增):扫码页(mobile_scanner + 权限申请/设置跳转、仅 QR 码制式、生命周期暂停恢复、失败可重扫);扫码者=主动加入方(确认后加入归属者,**配对成功才提交身份**)
+- `app/lib/provider/network/extension_server_provider.dart`:pair/register 校验二维码一次性令牌(TTL + 用后立即轮换;注明为防重放而非鉴权门,手动配对不受影响)
+- `app/lib/provider/pairing_provider.dart`、`app/lib/widget/dialogs/pairing_dialog.dart`:注册携带 qrToken;**校验扫码指纹与注册响应指纹一致**(防中继冒充);对话框返回配对结果(失败可重扫)
+- `app/lib/provider/owner_provider.dart`:SetOwnerIdentityAction(加入归属者)
+- `app/lib/pages/tabs/{device_list_tab,my_devices_tab}.dart`:入口(移动端→扫码页,桌面→展示二维码;我的设备空状态→展示二维码)
+- `app/pubspec.yaml`:新增 `mobile_scanner 5.2.3`;AndroidManifest CAMERA 权限 + iOS Info.plist 相机用途说明
+- i18n:ui2.qrPairing 块(en/zh-CN/zh-HK/zh-TW)
+- 独立审查 16 项修复(中危:解码类型安全、令牌用后轮换、指纹校验、身份提交时机改为配对成功后、确认反馈改走全局 messenger)
+- 验证:analyze 0、154 测试全绿、Windows 构建 + Android debug APK 构建通过(含相机权限与插件集成)
+
 ### UI 重设计批次三:传输面板与发送到…(2026-10-18,UI-3/F-XFER-16)
 
 - `app/lib/util/transfer_overview.dart`(新增):传输聚合纯函数(活动传输:发送会话+接收会话,进度含校验和阶段;历史合并排序)+ 4 项单测

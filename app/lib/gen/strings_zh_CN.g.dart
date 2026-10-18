@@ -941,6 +941,8 @@ class Translations$ui2$zh_CN extends Translations$ui2$en {
   @override
   late final Translations$ui2$settings$zh_CN settings = Translations$ui2$settings$zh_CN.internal(_root);
   @override
+  late final Translations$ui2$qrPairing$zh_CN qrPairing = Translations$ui2$qrPairing$zh_CN.internal(_root);
+  @override
   late final Translations$ui2$screen$zh_CN screen = Translations$ui2$screen$zh_CN.internal(_root);
   @override
   late final Translations$ui2$transfers$zh_CN transfers = Translations$ui2$transfers$zh_CN.internal(_root);
@@ -1894,6 +1896,45 @@ class Translations$ui2$settings$zh_CN extends Translations$ui2$settings$en {
   String get sharedDir => '共享目录';
   @override
   String get screenShare => '屏幕共享';
+}
+
+// Path: ui2.qrPairing
+class Translations$ui2$qrPairing$zh_CN extends Translations$ui2$qrPairing$en {
+  Translations$ui2$qrPairing$zh_CN.internal(TranslationsZhCn root) : this._root = root, super.internal(root);
+
+  final TranslationsZhCn _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get displayTitle => '扫码配对';
+  @override
+  String get displayHint => '用手机上的 AnyShare 扫描此二维码';
+  @override
+  String expiresIn({required Object n}) => '${n} 秒后自动刷新';
+  @override
+  String get noAddress => '无可用网络地址';
+  @override
+  String get scanTitle => '扫描二维码';
+  @override
+  String get scanHint => '对准对方设备上的二维码';
+  @override
+  String get invalidCode => '无法识别的二维码';
+  @override
+  String get permissionDenied => '扫描需要相机权限';
+  @override
+  String get openSettings => '打开系统设置';
+  @override
+  String get joinOwnerTitle => '加入归属者?';
+  @override
+  String joinOwnerBody({required Object name}) => '这是「${name}」的配对码。加入其归属者后,本机将出现在对方的「我的设备」中。';
+  @override
+  String get join => '加入归属者';
+  @override
+  String get justPair => '仅配对';
+  @override
+  String joinedOwner({required Object name}) => '已加入归属者「${name}」';
+  @override
+  String get paired => '配对成功';
 }
 
 // Path: ui2.screen

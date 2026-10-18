@@ -12,6 +12,7 @@ import 'package:localsend_app/util/device_groups.dart';
 import 'package:localsend_app/util/screen_capabilities.dart';
 import 'package:localsend_app/util/send_flow.dart';
 import 'package:localsend_app/widget/device_card.dart';
+import 'package:localsend_app/widget/dialogs/qr_pairing_dialog.dart';
 import 'package:localsend_app/widget/multi_send_info.dart';
 import 'package:localsend_app/widget/responsive_list_view.dart';
 import 'package:localsend_app/widget/selection_banner.dart';
@@ -66,11 +67,22 @@ class MyDevicesTab extends StatelessWidget {
         }),
         if (groups.myDevices.isEmpty)
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
-            child: Text(
-              t.ui2.myDevices.empty(owner: owner.name.isEmpty ? '—' : owner.name),
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+            padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 20),
+            child: Column(
+              children: [
+                Text(
+                  t.ui2.myDevices.empty(owner: owner.name.isEmpty ? '—' : owner.name),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                ),
+                const SizedBox(height: 16),
+                // F-PAIR-08/13: show a QR for other devices to join this owner.
+                OutlinedButton.icon(
+                  onPressed: () => showQrPairingDialog(context),
+                  icon: const Icon(Icons.qr_code, size: 18),
+                  label: Text(t.ui2.qrPairing.displayTitle),
+                ),
+              ],
             ),
           ),
       ],

@@ -7,6 +7,7 @@ import 'package:localsend_app/model/persistence/favorite_device.dart';
 import 'package:localsend_app/provider/favorites_provider.dart';
 import 'package:localsend_app/provider/network/server/server_provider.dart';
 import 'package:localsend_app/provider/owner_provider.dart';
+import 'package:localsend_app/provider/qr_pairing_provider.dart';
 import 'package:localsend_app/provider/screen/screen_provider.dart';
 import 'package:localsend_app/provider/security_provider.dart';
 import 'package:localsend_app/util/sas.dart';
@@ -262,6 +263,20 @@ extension ExtensionServerHandler on ExtensionServerService {
       if (body == null || body['eph'] is! String) {
         await _json(request, {'error': 'bad_request'}, status: 400);
         return;
+      }
+      // F-PAIR-08: QR-originated registrations must carry the displayer's
+      // current one-time token. This is replay protection for honest scanners,
+      // not an auth gate — token-less manual pairing keeps working (SAS
+      // confirmation still gates every pairing).
+      final qrToken = body['qrToken'];
+      if (qrToken != null) {
+        final qrState = ref.read(qrPairingProvider);
+        if (qrToken is! String || !qrState.isValidToken(qrToken)) {
+          await _json(request, {'error': 'invalid_token'}, status: 403);
+          return;
+        }
+        // Rotate immediately: the used token must not be replayable.
+        ref.redux(qrPairingProvider).dispatch(StartQrPairingAction());
       }
       final pending = ref.read(extensionServerProvider).pending;
       if (pending != null && !pending.aborted && DateTime.now().difference(pending.createdAt) < kPendingTtl) {

@@ -810,6 +810,8 @@ class Translations$ui2$zh_HK extends Translations$ui2$en {
   @override
   late final Translations$ui2$settings$zh_HK settings = Translations$ui2$settings$zh_HK.internal(_root);
   @override
+  late final Translations$ui2$qrPairing$zh_HK qrPairing = Translations$ui2$qrPairing$zh_HK.internal(_root);
+  @override
   late final Translations$ui2$screen$zh_HK screen = Translations$ui2$screen$zh_HK.internal(_root);
   @override
   late final Translations$ui2$transfers$zh_HK transfers = Translations$ui2$transfers$zh_HK.internal(_root);
@@ -1684,6 +1686,45 @@ class Translations$ui2$settings$zh_HK extends Translations$ui2$settings$en {
   String get sharedDir => '共享目錄';
   @override
   String get screenShare => '螢幕分享';
+}
+
+// Path: ui2.qrPairing
+class Translations$ui2$qrPairing$zh_HK extends Translations$ui2$qrPairing$en {
+  Translations$ui2$qrPairing$zh_HK.internal(TranslationsZhHk root) : this._root = root, super.internal(root);
+
+  final TranslationsZhHk _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get displayTitle => '掃碼配對';
+  @override
+  String get displayHint => '用手機上的 AnyShare 掃描此 QR 碼';
+  @override
+  String expiresIn({required Object n}) => '${n} 秒後自動更新';
+  @override
+  String get noAddress => '無可用網絡位址';
+  @override
+  String get scanTitle => '掃描 QR 碼';
+  @override
+  String get scanHint => '對準對方裝置上的 QR 碼';
+  @override
+  String get invalidCode => '無法辨識的 QR 碼';
+  @override
+  String get permissionDenied => '掃描需要相機權限';
+  @override
+  String get openSettings => '開啟系統設定';
+  @override
+  String get joinOwnerTitle => '加入歸屬者?';
+  @override
+  String joinOwnerBody({required Object name}) => '這是「${name}」的配對碼。加入其歸屬者後,本機將出現在對方的「我的裝置」中。';
+  @override
+  String get join => '加入歸屬者';
+  @override
+  String get justPair => '僅配對';
+  @override
+  String joinedOwner({required Object name}) => '已加入歸屬者「${name}」';
+  @override
+  String get paired => '配對成功';
 }
 
 // Path: ui2.screen

@@ -10,15 +10,23 @@ import 'package:refena_flutter/refena_flutter.dart';
 ///
 /// [onPaired] is called with the finished favorite entry so the details page
 /// can refresh.
-Future<void> showInitiatorPairingDialog(
+Future<FavoriteDevice?> showInitiatorPairingDialog(
   BuildContext context, {
   required String host,
   required int extPort,
   required void Function(FavoriteDevice) onPaired,
+  String? qrToken,
+  String? expectedFingerprint,
 }) async {
-  await showDialog(
+  return showDialog<FavoriteDevice>(
     context: context,
-    builder: (_) => _InitiatorPairingDialog(host: host, extPort: extPort, onPaired: onPaired),
+    builder: (_) => _InitiatorPairingDialog(
+      host: host,
+      extPort: extPort,
+      onPaired: onPaired,
+      qrToken: qrToken,
+      expectedFingerprint: expectedFingerprint,
+    ),
   );
 }
 
@@ -27,7 +35,20 @@ class _InitiatorPairingDialog extends StatefulWidget {
   final int extPort;
   final void Function(FavoriteDevice) onPaired;
 
-  const _InitiatorPairingDialog({required this.host, required this.extPort, required this.onPaired});
+  /// F-PAIR-08: one-time token from the scanned QR (null for manual pairing).
+  final String? qrToken;
+
+  /// F-PAIR-08: fingerprint claimed by the scanned QR; the register response
+  /// must match it (the QR's cryptographic anchor).
+  final String? expectedFingerprint;
+
+  const _InitiatorPairingDialog({
+    required this.host,
+    required this.extPort,
+    required this.onPaired,
+    this.qrToken,
+    this.expectedFingerprint,
+  });
 
   @override
   State<_InitiatorPairingDialog> createState() => _InitiatorPairingDialogState();
@@ -41,6 +62,9 @@ class _InitiatorPairingDialogState extends State<_InitiatorPairingDialog> with R
   PairingSession? _session;
   String? _error;
 
+  /// Set once the pairing completed; returned through the dialog's pop.
+  FavoriteDevice? _pairedDevice;
+
   @override
   void initState() {
     super.initState();
@@ -49,7 +73,18 @@ class _InitiatorPairingDialogState extends State<_InitiatorPairingDialog> with R
 
   Future<void> _run(Ref ref) async {
     try {
-      final session = await ref.pairRegister(host: widget.host, extPort: widget.extPort, peerFingerprint: '');
+      final session = await ref.pairRegister(
+        host: widget.host,
+        extPort: widget.extPort,
+        peerFingerprint: '',
+        qrToken: widget.qrToken,
+      );
+      // F-PAIR-08: a scanned QR is bound to a fingerprint — abort when the
+      // responding device is not the one that showed the code.
+      final expected = widget.expectedFingerprint;
+      if (expected != null && expected.isNotEmpty && session.peerFingerprint != expected) {
+        throw const PairingException(PairingError.rejected, 'fingerprint mismatch');
+      }
       final code = await ref.deriveLocalCode(session: session);
       if (!mounted) {
         return;
@@ -82,6 +117,7 @@ class _InitiatorPairingDialogState extends State<_InitiatorPairingDialog> with R
     try {
       final result = await ref.pairConfirm(host: widget.host, extPort: widget.extPort, session: session, peerIp: widget.host);
       await finishPairing(ref, result);
+      _pairedDevice = result.device;
       widget.onPaired(result.device);
       if (!mounted) {
         return;
@@ -139,7 +175,7 @@ class _InitiatorPairingDialogState extends State<_InitiatorPairingDialog> with R
           )
         else
           TextButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => Navigator.of(context).pop(_pairedDevice),
             child: Text(t.general.close),
           ),
       ],

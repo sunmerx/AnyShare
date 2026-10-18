@@ -1056,6 +1056,7 @@ class Translations$ui2$en {
   late final Translations$ui2$card$en card = Translations$ui2$card$en.internal(_root);
   late final Translations$ui2$blocklist$en blocklist = Translations$ui2$blocklist$en.internal(_root);
   late final Translations$ui2$settings$en settings = Translations$ui2$settings$en.internal(_root);
+  late final Translations$ui2$qrPairing$en qrPairing = Translations$ui2$qrPairing$en.internal(_root);
   late final Translations$ui2$screen$en screen = Translations$ui2$screen$en.internal(_root);
   late final Translations$ui2$transfers$en transfers = Translations$ui2$transfers$en.internal(_root);
   late final Translations$ui2$trust$en trust = Translations$ui2$trust$en.internal(_root);
@@ -2243,6 +2244,61 @@ class Translations$ui2$settings$en {
 
   /// en: 'Screen sharing'
   String get screenShare => 'Screen sharing';
+}
+
+// Path: ui2.qrPairing
+class Translations$ui2$qrPairing$en {
+  Translations$ui2$qrPairing$en.internal(this._root);
+
+  final Translations _root; // ignore: unused_field
+
+  // Translations
+
+  /// en: 'Pair by QR code'
+  String get displayTitle => 'Pair by QR code';
+
+  /// en: 'Scan this code with AnyShare on your phone'
+  String get displayHint => 'Scan this code with AnyShare on your phone';
+
+  /// en: 'Refreshes in {n}s'
+  String expiresIn({required Object n}) => 'Refreshes in ${n}s';
+
+  /// en: 'No usable network address'
+  String get noAddress => 'No usable network address';
+
+  /// en: 'Scan QR code'
+  String get scanTitle => 'Scan QR code';
+
+  /// en: 'Point at the QR code on the other device'
+  String get scanHint => 'Point at the QR code on the other device';
+
+  /// en: 'Unrecognized QR code'
+  String get invalidCode => 'Unrecognized QR code';
+
+  /// en: 'Camera permission is required to scan'
+  String get permissionDenied => 'Camera permission is required to scan';
+
+  /// en: 'Open settings'
+  String get openSettings => 'Open settings';
+
+  /// en: 'Join owner?'
+  String get joinOwnerTitle => 'Join owner?';
+
+  /// en: 'This is the pairing code of "{name}". Joining makes this device appear in the other device's "My Devices".'
+  String joinOwnerBody({required Object name}) =>
+      'This is the pairing code of "${name}". Joining makes this device appear in the other device\'s "My Devices".';
+
+  /// en: 'Join owner'
+  String get join => 'Join owner';
+
+  /// en: 'Just pair'
+  String get justPair => 'Just pair';
+
+  /// en: 'Joined owner "{name}"'
+  String joinedOwner({required Object name}) => 'Joined owner "${name}"';
+
+  /// en: 'Paired successfully'
+  String get paired => 'Paired successfully';
 }
 
 // Path: ui2.screen
