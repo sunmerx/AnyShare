@@ -53,6 +53,15 @@
 - `pubspec.lock`:8 个 build 工具链传递依赖小版本再解析(archive/build_config/build_daemon 等,仅 codegen 使用;官方源解析,运行时依赖零漂移)
 - `app/pubspec.yaml`:description 重写、homepage → github.com/sunmerx/AnyShare
 
+### 投屏 IPv4 拨号修复(2026-10-19,双机验收实测)
+
+- `app/lib/util/screen_capabilities.dart`:新增 `screenShareHostOf`(优先 IPv4 HTTP 通道,回退 IPv4 ip,全 IPv6 返回 null)
+- `app/lib/provider/screen/screen_provider.dart`:IPv6 守卫报错改 i18n(ui2.screen.errIpv6,原硬编码中文)
+- `app/lib/pages/tabs/{my_devices_tab,device_list_tab}.dart`、`app/lib/pages/device_details_page.dart`:「共享屏幕」入口改用 screenShareHostOf(门控与拨号地址一致;仅 IPv6 设备禁用并提示)
+- i18n:ui2.screen 新增 errIpv6(en/zh-CN/zh-TW/zh-HK)
+- `app/test/unit/util/screen_capabilities_test.dart`(新增,3 项)
+- 验证:analyze 0、222 测试全绿、Windows debug 构建
+
 ### E-3 共享目录 UI 批次四b:多设备树与冲突询问(2026-10-18,E3-4b)
 
 - `app/lib/pages/dir_browse_page.dart`:多设备树(收藏设备+在线状态+懒探测 roots;树内根节点点击自动切 active;离线提示)、active 设备切换(host 优先会话快照)、进程级全局请求序号、dispose 关闭全部本页会话、粘贴冲突询问(F-DIR-14:保留两者/覆盖/取消;目录恒保留两者)、同目录粘贴拒绝、预检并入 busy
