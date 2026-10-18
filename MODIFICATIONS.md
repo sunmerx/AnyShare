@@ -53,6 +53,17 @@
 - `pubspec.lock`:8 个 build 工具链传递依赖小版本再解析(archive/build_config/build_daemon 等,仅 codegen 使用;官方源解析,运行时依赖零漂移)
 - `app/pubspec.yaml`:description 重写、homepage → github.com/sunmerx/AnyShare
 
+### E-3 共享目录后端批次(2026-10-18,E3-2)
+
+- `app/lib/provider/network/dir_endpoints.dart`(新增):53318 `/dir/*` 端点(roots/list/meta/download/upload/mkdir/rename/delete);访问门(指纹自述 + 存储 IP 严格匹配、重复收藏取最严格条目);写门(可写目录 × 同归属者或 full+设备授权);路径穿越/符号链接/`.anyshare_*` 防护;上传 `.tmp`+原子改名+长度校验+全路径清理+背压;删除默认应用级回收站(`.anyshare_trash` + 原子 meta);根目录身份保护(`.`/`sub/..` 均拒)
+- `app/lib/util/dir_access.dart`(新增):权限判定纯函数(拒绝原因码:unknown/ip_mismatch/blocked/temp_not_allowed;limited 只读;同归属者免授权;full 需设备授权)+ 单测
+- `app/lib/util/dir_paths.dart`(新增):路径解析与防护(规范化/包含性/最深存在祖先 realpath 校验/内部目录拒绝/Windows 保留名与非法字符)+ 单测
+- `app/lib/provider/shared_dirs_provider.dart` + `app/lib/model/persistence/shared_dir_config.dart`(新增):共享目录配置(多目录/只读可写)与设备写授权持久化(`ls_shared_dirs` / `ls_dir_write_grants`)
+- `app/lib/provider/persistence_provider.dart`:新增共享目录/写授权存取;`app/lib/provider/network/extension_server_provider.dart`:JSON 辅助函数公开化(`readJsonBody`/`writeJson`,行为不变)+ dir 端点接入
+- `app/test/unit/provider/dir_endpoints_test.dart`(新增):13 项端点测试(权限拒绝/穿越/回收站/长度校验/tmp 清理/只读);util 单测 22 项
+- 独立审查 21 项修复(高危:`.`/`sub/..` 绕过根删除/重命名保护——改 realpath 身份比对;中危:上传 rename 竞态与 overwrite 误删、tmp 全路径清理、长度校验、背压、`.anyshare_trash` 协议不可达、空 IP 收紧、重复收藏取最严格、限速配额 600/分)
+- **双机验收通过**:Ubuntu curl → Windows 应用:roots/list/download/upload/mkdir/rename/delete-to-trash 全链路(上传落盘内容一致、穿越拒绝、无授权只读);analyze 0、182 测试全绿
+
 ### 扫码配对与归属者加入批次(2026-10-18,PAIR-1/F-PAIR-08/13)
 
 - `app/lib/util/qr_pairing.dart`(新增):二维码载荷编解码(版本化 JSON,严格类型校验,恶意载荷不抛异常)+ 单测

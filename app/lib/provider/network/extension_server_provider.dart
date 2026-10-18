@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:cryptography/cryptography.dart';
 import 'package:localsend_app/model/persistence/favorite_device.dart';
 import 'package:localsend_app/provider/favorites_provider.dart';
+import 'package:localsend_app/provider/network/dir_endpoints.dart';
 import 'package:localsend_app/provider/network/server/server_provider.dart';
 import 'package:localsend_app/provider/owner_provider.dart';
 import 'package:localsend_app/provider/qr_pairing_provider.dart';
@@ -200,7 +201,7 @@ extension ExtensionServerHandler on ExtensionServerService {
   Future<void> _handle(HttpRequest request) async {
     final path = request.uri.path;
     if (request.method == 'GET' && path == '/api/anyshare/v1/capabilities') {
-      await _json(request, {
+      await writeJson(request, {
         'ext': 1,
         'sas': true,
         'fingerprint': ref.read(securityProvider).certificateHash,
@@ -210,14 +211,20 @@ extension ExtensionServerHandler on ExtensionServerService {
       return;
     }
 
+    // AnyShare modification (2026-10-18): E-3 shared directory endpoints
+    // (own rate limiter; JSON and binary).
+    if (await handleDirRequest(request)) {
+      return;
+    }
+
     if (request.method == 'POST' && path == '/api/anyshare/v1/screen/accept') {
       // The receiver confirmed a pending offer and is listening now.
       // Exempt from the shared rate limiter: session callbacks are bursty and
       // a 429 here would silently break an accepted session.
       try {
-        final body = await _readJson(request);
+        final body = await readJsonBody(request);
         if (body == null || body['session'] is! String) {
-          await _json(request, {'error': 'bad_request'}, status: 400);
+          await writeJson(request, {'error': 'bad_request'}, status: 400);
           return;
         }
         await ref.redux(screenProvider).dispatchAsync(
@@ -226,10 +233,10 @@ extension ExtensionServerHandler on ExtensionServerService {
                 port: (body['port'] as num?)?.toInt() ?? kScreenDataPort,
               ),
             );
-        await _json(request, {'ok': true});
+        await writeJson(request, {'ok': true});
       } catch (e, st) {
         _logger.warning('screen/accept failed: $e\n$st');
-        await _json(request, {'error': 'internal'}, status: 500);
+        await writeJson(request, {'error': 'internal'}, status: 500);
       }
       return;
     }
@@ -238,30 +245,30 @@ extension ExtensionServerHandler on ExtensionServerService {
       // Either side ends the session (user stop, denial, window closed, ...).
       // Also exempt from the rate limiter (see accept).
       try {
-        final body = await _readJson(request);
+        final body = await readJsonBody(request);
         await ref.redux(screenProvider).dispatchAsync(
               IncomingScreenStopAction(
                 reason: (body?['reason'] as String?) ?? 'remote_stop',
                 session: body?['session'] as String?,
               ),
             );
-        await _json(request, {'ok': true});
+        await writeJson(request, {'ok': true});
       } catch (e, st) {
         _logger.warning('screen/stop failed: $e\n$st');
-        await _json(request, {'error': 'internal'}, status: 500);
+        await writeJson(request, {'error': 'internal'}, status: 500);
       }
       return;
     }
 
     if (_rateLimited(request)) {
-      await _json(request, {'error': 'rate_limited'}, status: 429);
+      await writeJson(request, {'error': 'rate_limited'}, status: 429);
       return;
     }
 
     if (request.method == 'POST' && path == '/api/anyshare/v1/pair/register') {
-      final body = await _readJson(request);
+      final body = await readJsonBody(request);
       if (body == null || body['eph'] is! String) {
-        await _json(request, {'error': 'bad_request'}, status: 400);
+        await writeJson(request, {'error': 'bad_request'}, status: 400);
         return;
       }
       // F-PAIR-08: QR-originated registrations must carry the displayer's
@@ -272,7 +279,7 @@ extension ExtensionServerHandler on ExtensionServerService {
       if (qrToken != null) {
         final qrState = ref.read(qrPairingProvider);
         if (qrToken is! String || !qrState.isValidToken(qrToken)) {
-          await _json(request, {'error': 'invalid_token'}, status: 403);
+          await writeJson(request, {'error': 'invalid_token'}, status: 403);
           return;
         }
         // Rotate immediately: the used token must not be replayable.
@@ -280,7 +287,7 @@ extension ExtensionServerHandler on ExtensionServerService {
       }
       final pending = ref.read(extensionServerProvider).pending;
       if (pending != null && !pending.aborted && DateTime.now().difference(pending.createdAt) < kPendingTtl) {
-        await _json(request, {'error': 'busy'}, status: 409);
+        await writeJson(request, {'error': 'busy'}, status: 409);
         return;
       }
 
@@ -309,7 +316,7 @@ extension ExtensionServerHandler on ExtensionServerService {
       );
       ref.redux(extensionServerProvider).dispatch(_SetPendingAction(newPending));
 
-      await _json(request, {
+      await writeJson(request, {
         'session': sessionId,
         'eph': base64Encode(localPub.bytes),
         'code': code,
@@ -329,9 +336,9 @@ extension ExtensionServerHandler on ExtensionServerService {
       // Lets the SENDER check how the receiver would treat them before a
       // transfer (auto-accept / limited / blocked). Reveals only the policy
       // toward the queried fingerprint — never ownerId/ownerName.
-      final body = await _readJson(request);
+      final body = await readJsonBody(request);
       if (body == null || body['fingerprint'] is! String) {
-        await _json(request, {'error': 'bad_request'}, status: 400);
+        await writeJson(request, {'error': 'bad_request'}, status: 400);
         return;
       }
       FavoriteDevice? entry;
@@ -342,10 +349,10 @@ extension ExtensionServerHandler on ExtensionServerService {
         }
       }
       if (entry == null) {
-        await _json(request, {'known': false});
+        await writeJson(request, {'known': false});
         return;
       }
-      await _json(request, {
+      await writeJson(request, {
         'known': true,
         'trustLevel': entry.trustLevel.name,
         'blocked': entry.blocked,
@@ -360,9 +367,9 @@ extension ExtensionServerHandler on ExtensionServerService {
       // E-2 screen share: the sender offers to stream its screen to us.
       // The trust chain (D2) decides; the response is immediate (auto-accept)
       // or `pending` while the local user is asked (W3 dialog).
-      final body = await _readJson(request);
+      final body = await readJsonBody(request);
       if (body == null || body['fingerprint'] is! String) {
-        await _json(request, {'error': 'bad_request'}, status: 400);
+        await writeJson(request, {'error': 'bad_request'}, status: 400);
         return;
       }
       final action = HandleScreenOfferAction(
@@ -372,7 +379,7 @@ extension ExtensionServerHandler on ExtensionServerService {
       );
       try {
         final (_, result) = await ref.redux(screenProvider).dispatchAsyncWithResult(action);
-        await _json(request, result.body, status: result.status);
+        await writeJson(request, result.body, status: result.status);
         // Pending offers ask the local user (UI-2/W3): show the dialog like
         // the pairing responder flow does.
         if (result.status == 409 && result.body['pending'] == true) {
@@ -384,23 +391,23 @@ extension ExtensionServerHandler on ExtensionServerService {
         }
       } catch (e, st) {
         _logger.warning('screen/offer failed: $e\n$st');
-        await _json(request, {'error': 'internal'}, status: 500);
+        await writeJson(request, {'error': 'internal'}, status: 500);
       }
       return;
     }
 
     if (request.method == 'POST' && path == '/api/anyshare/v1/pair/confirm') {
-      final body = await _readJson(request);
+      final body = await readJsonBody(request);
       final pending = ref.read(extensionServerProvider).pending;
       // Note: pending.aborted is NOT rejected here — the gate below resolves
       // to false in that case, yielding a distinct `not_confirmed` error.
       if (body == null || pending == null || body['session'] != pending.sessionId) {
-        await _json(request, {'error': 'no_pending'}, status: 409);
+        await writeJson(request, {'error': 'no_pending'}, status: 409);
         return;
       }
       if (DateTime.now().difference(pending.createdAt) > kPendingTtl) {
         ref.redux(extensionServerProvider).dispatch(_ClearPendingAction());
-        await _json(request, {'error': 'no_pending'}, status: 409);
+        await writeJson(request, {'error': 'no_pending'}, status: 409);
         return;
       }
 
@@ -411,16 +418,16 @@ extension ExtensionServerHandler on ExtensionServerService {
       try {
         accepted = await pending.userGate.future.timeout(const Duration(seconds: 60));
       } on TimeoutException {
-        await _json(request, {'error': 'not_confirmed'}, status: 409);
+        await writeJson(request, {'error': 'not_confirmed'}, status: 409);
         return;
       }
       if (!accepted || pending.aborted) {
-        await _json(request, {'error': 'not_confirmed'}, status: 409);
+        await writeJson(request, {'error': 'not_confirmed'}, status: 409);
         return;
       }
 
       final localOwner = ref.read(ownerProvider);
-      await _json(request, {
+      await writeJson(request, {
         'ok': true,
         'ownerId': localOwner.id,
         'ownerName': localOwner.name,
@@ -451,7 +458,7 @@ extension ExtensionServerHandler on ExtensionServerService {
       return;
     }
 
-    await _json(request, {'error': 'not_found'}, status: 404);
+    await writeJson(request, {'error': 'not_found'}, status: 404);
   }
 
   bool _rateLimited(HttpRequest request) {
@@ -470,7 +477,7 @@ extension ExtensionServerHandler on ExtensionServerService {
     return false;
   }
 
-  Future<Map<String, dynamic>?> _readJson(HttpRequest request) async {
+  Future<Map<String, dynamic>?> readJsonBody(HttpRequest request) async {
     try {
       final body = await request.fold<List<int>>(<int>[], (acc, chunk) {
         acc.addAll(chunk);
@@ -486,7 +493,7 @@ extension ExtensionServerHandler on ExtensionServerService {
     }
   }
 
-  Future<void> _json(HttpRequest request, Map<String, dynamic> data, {int status = 200}) async {
+  Future<void> writeJson(HttpRequest request, Map<String, dynamic> data, {int status = 200}) async {
     request.response.statusCode = status;
     request.response.headers.contentType = ContentType.json;
     request.response.write(jsonEncode(data));

@@ -10,6 +10,7 @@ import 'package:localsend_app/model/persistence/favorite_device.dart';
 import 'package:localsend_app/model/persistence/quick_save_mode.dart';
 import 'package:localsend_app/model/persistence/receive_history_entry.dart';
 import 'package:localsend_app/model/persistence/send_history_entry.dart';
+import 'package:localsend_app/model/persistence/shared_dir_config.dart';
 import 'package:localsend_app/model/send_mode.dart';
 import 'package:localsend_app/provider/window_dimensions_provider.dart';
 import 'package:localsend_app/util/alias_generator.dart';
@@ -59,6 +60,10 @@ const _trustUsage = 'ls_trust_usage'; // AnyShare modification
 const _sendHistory = 'ls_send_history'; // AnyShare modification
 const _ownerId = 'ls_owner_id'; // AnyShare modification
 const _ownerName = 'ls_owner_name'; // AnyShare modification
+// AnyShare modification (2026-10-18): E-3 shared directories (host config)
+// and per-device write grants (fingerprints allowed to write).
+const _sharedDirs = 'ls_shared_dirs';
+const _dirWriteGrants = 'ls_dir_write_grants';
 
 // Favorites
 const _favorites = 'ls_favorites';
@@ -335,6 +340,21 @@ class PersistenceService {
     final favoritesRaw = entries.map((entry) => jsonEncode(entry.toJson())).toList();
     await _prefs.setStringList(_favorites, favoritesRaw);
   }
+
+  // AnyShare modification (2026-10-18): E-3 shared directories.
+  List<SharedDirConfig> getSharedDirs() {
+    final raw = _getStringListSafe(_sharedDirs);
+    return raw.map((entry) => SharedDirConfig.fromJson(jsonDecode(entry))).toList();
+  }
+
+  Future<void> setSharedDirs(List<SharedDirConfig> entries) async {
+    final raw = entries.map((entry) => jsonEncode(entry.toJson())).toList();
+    await _prefs.setStringList(_sharedDirs, raw);
+  }
+
+  Set<String> getDirWriteGrants() => _getStringListSafe(_dirWriteGrants).toSet();
+
+  Future<void> setDirWriteGrants(Set<String> fingerprints) => _prefs.setStringList(_dirWriteGrants, fingerprints.toList());
 
   String getShowToken() {
     return _prefs.getString(_showToken)!;
