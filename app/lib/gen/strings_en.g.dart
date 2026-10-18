@@ -1056,6 +1056,7 @@ class Translations$ui2$en {
   late final Translations$ui2$card$en card = Translations$ui2$card$en.internal(_root);
   late final Translations$ui2$blocklist$en blocklist = Translations$ui2$blocklist$en.internal(_root);
   late final Translations$ui2$settings$en settings = Translations$ui2$settings$en.internal(_root);
+  late final Translations$ui2$screen$en screen = Translations$ui2$screen$en.internal(_root);
   late final Translations$ui2$trust$en trust = Translations$ui2$trust$en.internal(_root);
 }
 
@@ -2241,6 +2242,84 @@ class Translations$ui2$settings$en {
 
   /// en: 'Screen sharing'
   String get screenShare => 'Screen sharing';
+}
+
+// Path: ui2.screen
+class Translations$ui2$screen$en {
+  Translations$ui2$screen$en.internal(this._root);
+
+  final Translations _root; // ignore: unused_field
+
+  // Translations
+
+  /// en: 'Screen share request'
+  String get requestTitle => 'Screen share request';
+
+  /// en: '"{alias}" wants to share its screen to this device.'
+  String requestBody({required Object alias}) => '"${alias}" wants to share its screen to this device.';
+
+  /// en: 'Accept'
+  String get accept => 'Accept';
+
+  /// en: 'Reject'
+  String get reject => 'Reject';
+
+  /// en: 'Sharing screen to "{alias}"'
+  String sending({required Object alias}) => 'Sharing screen to "${alias}"';
+
+  /// en: 'Waiting for "{alias}" to confirm…'
+  String waiting({required Object alias}) => 'Waiting for "${alias}" to confirm…';
+
+  /// en: 'Receiving screen from "{alias}"'
+  String receiving({required Object alias}) => 'Receiving screen from "${alias}"';
+
+  /// en: 'Stop'
+  String get stop => 'Stop';
+
+  /// en: 'Screen sharing cannot be started from this platform yet'
+  String get unsupportedSend => 'Screen sharing cannot be started from this platform yet';
+
+  /// en: 'Screen sharing cannot be received on this platform yet'
+  String get unsupportedReceive => 'Screen sharing cannot be received on this platform yet';
+
+  /// en: 'The peer has blocked this device'
+  String get errBlocked => 'The peer has blocked this device';
+
+  /// en: 'The peer does not allow temporary devices to share screens'
+  String get errTempNotAllowed => 'The peer does not allow temporary devices to share screens';
+
+  /// en: 'The peer is busy'
+  String get errBusy => 'The peer is busy';
+
+  /// en: 'Cannot reach the peer (offline?)'
+  String get errOffline => 'Cannot reach the peer (offline?)';
+
+  /// en: 'The peer rejected the screen share ({code})'
+  String errRejected({required Object code}) => 'The peer rejected the screen share (${code})';
+
+  /// en: 'No response from the peer'
+  String get errNoResponse => 'No response from the peer';
+
+  /// en: 'Failed to start screen sharing'
+  String get errStartSenderFailed => 'Failed to start screen sharing';
+
+  /// en: 'Failed to start receiving'
+  String get errStartReceiverFailed => 'Failed to start receiving';
+
+  /// en: 'Could not notify the peer to start'
+  String get errNotifyFailed => 'Could not notify the peer to start';
+
+  /// en: 'The screen session ended unexpectedly'
+  String get errStreamEnded => 'The screen session ended unexpectedly';
+
+  /// en: 'The peer did not start streaming'
+  String get errNoStream => 'The peer did not start streaming';
+
+  /// en: 'The peer's platform cannot receive screen shares yet'
+  String get errReceiveUnsupported => 'The peer\'s platform cannot receive screen shares yet';
+
+  /// en: 'The peer cancelled the screen share'
+  String get errCancelledByPeer => 'The peer cancelled the screen share';
 }
 
 // Path: ui2.trust

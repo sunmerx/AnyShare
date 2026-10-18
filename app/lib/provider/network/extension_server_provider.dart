@@ -11,6 +11,7 @@ import 'package:localsend_app/provider/screen/screen_provider.dart';
 import 'package:localsend_app/provider/security_provider.dart';
 import 'package:localsend_app/util/sas.dart';
 import 'package:localsend_app/widget/dialogs/pairing_dialog.dart';
+import 'package:localsend_app/widget/dialogs/screen_offer_dialog.dart';
 import 'package:logging/logging.dart';
 import 'package:refena_flutter/refena_flutter.dart';
 import 'package:routerino/routerino.dart';
@@ -357,6 +358,15 @@ extension ExtensionServerHandler on ExtensionServerService {
       try {
         final (_, result) = await ref.redux(screenProvider).dispatchAsyncWithResult(action);
         await _json(request, result.body, status: result.status);
+        // Pending offers ask the local user (UI-2/W3): show the dialog like
+        // the pairing responder flow does.
+        if (result.status == 409 && result.body['pending'] == true) {
+          final pending = ref.read(screenProvider).pendingOffer;
+          if (pending != null) {
+            // ignore: use_build_context_synchronously, unawaited_futures
+            Routerino.context.pushImmediately(() => ScreenOfferDialog(pending: pending));
+          }
+        }
       } catch (e, st) {
         _logger.warning('screen/offer failed: $e\n$st');
         await _json(request, {'error': 'internal'}, status: 500);

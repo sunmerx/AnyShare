@@ -2,11 +2,13 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:localsend_app/gen/strings.g.dart';
 import 'package:localsend_app/model/persistence/favorite_device.dart';
 import 'package:localsend_app/provider/favorites_provider.dart';
 import 'package:localsend_app/provider/network/server/server_provider.dart';
 import 'package:localsend_app/provider/owner_provider.dart';
 import 'package:localsend_app/provider/security_provider.dart';
+import 'package:localsend_app/util/screen_capabilities.dart';
 import 'package:localsend_app/util/screen_trust.dart';
 import 'package:localsend_isolates/isolate.dart';
 import 'package:logging/logging.dart';
@@ -96,6 +98,10 @@ class _ReceiverAdapter implements ScreenEngineSession {
 }
 
 final screenEngineProvider = Provider<ScreenEngine>((ref) => const FrbScreenEngine());
+
+/// E2.0 platform capabilities as providers so tests can override them.
+final screenSendSupportedProvider = Provider<bool>((ref) => canSendScreenShare());
+final screenReceiveSupportedProvider = Provider<bool>((ref) => canReceiveScreenShare());
 
 enum ScreenRole { sender, receiver }
 
@@ -210,6 +216,12 @@ class ScreenService extends ReduxNotifier<ScreenState> {
   /// Guards against double-tap starting two offers in flight.
   bool startingShare = false;
 
+  /// Guards against overlapping offer handling (auto-accept engine start).
+  bool startingOffer = false;
+
+  /// Guards against double-accepting a pending offer (dialog re-entry).
+  bool acceptingOffer = false;
+
   @override
   ScreenState init() => const ScreenState();
 
@@ -232,8 +244,13 @@ class ScreenService extends ReduxNotifier<ScreenState> {
     return null;
   }
 
-  /// Attaches an engine session: replaces any previous subscription.
-  void attach(String sessionId, ScreenEngineSession session) {
+  /// Attaches an engine session. Stops any previous engine session first so
+  /// overlapping paths can never leak a live Rust session, then replaces the
+  /// event subscription.
+  Future<void> attach(String sessionId, ScreenEngineSession session) async {
+    if (_engineSession != null) {
+      await stopEngine();
+    }
     unawaited(_subscription?.cancel());
     _engineSession = session;
     _subscription = session.events.listen(
@@ -296,7 +313,7 @@ class ScreenService extends ReduxNotifier<ScreenState> {
       final session = await ref.read(screenEngineProvider).startSender(host: peerIp, port: port);
       final id = sessionId ?? const Uuid().v4();
       cancelTimer();
-      attach(id, session);
+      await attach(id, session);
       return current.copyWith(
         active: ActiveScreenSession(
           role: ScreenRole.sender,
@@ -310,7 +327,7 @@ class ScreenService extends ReduxNotifier<ScreenState> {
       );
     } catch (e) {
       _logger.warning('failed to start screen sender: $e');
-      return current.copyWith(clearWaiting: true, lastError: '启动屏幕共享失败:$e');
+      return current.copyWith(clearWaiting: true, lastError: '${t.ui2.screen.errStartSenderFailed}:$e');
     }
   }
 
@@ -321,7 +338,7 @@ class ScreenService extends ReduxNotifier<ScreenState> {
     try {
       final session = await ref.read(screenEngineProvider).startReceiver(port: kScreenDataPort);
       cancelTimer();
-      attach(sessionId, session);
+      await attach(sessionId, session);
       startTimer(const Duration(seconds: 15), () {
         // ignore: discarded_futures
         ref.redux(screenProvider).dispatchAsync(_ReceiverNoStreamWatchdogAction(sessionId));
@@ -382,7 +399,7 @@ class StartScreenShareAction extends AsyncReduxAction<ScreenService, ScreenState
   @override
   Future<ScreenState> reduce() async {
     if (state.active != null || state.waiting != null || notifier.startingShare) {
-      return state.copyWith(lastError: 'busy');
+      return state.copyWith(lastError: t.ui2.screen.errBusy);
     }
     if (peerIp.contains(':')) {
       // The engine's data plane is IPv4-only in E2.0.
@@ -414,13 +431,14 @@ class StartScreenShareAction extends AsyncReduxAction<ScreenService, ScreenState
           clearError: true,
         );
       }
-      final error = switch (body?['error']) {
-        'blocked' => '对方已拉黑本设备',
-        'temp_not_allowed' => '对方不允许临时设备共享屏幕',
-        'busy' => '对方正忙',
-        'rate_limited' => '对方请求过于频繁,稍后再试',
-        _ => status == null ? '无法连接对方(离线或未开启)' : '对方拒绝了屏幕共享($status)',
-      };
+    final error = switch (body?['error']) {
+      'blocked' => t.ui2.screen.errBlocked,
+      'temp_not_allowed' => t.ui2.screen.errTempNotAllowed,
+      'busy' => t.ui2.screen.errBusy,
+      'rate_limited' => t.ui2.screen.errBusy,
+      'receive_unsupported' => t.ui2.screen.errReceiveUnsupported,
+      _ => status == null ? t.ui2.screen.errOffline : t.ui2.screen.errRejected(code: '$status'),
+    };
       return state.copyWith(lastError: error);
     } finally {
       notifier.startingShare = false;
@@ -443,7 +461,12 @@ class HandleScreenOfferAction extends AsyncReduxActionWithResult<ScreenService, 
 
   @override
   Future<(ScreenState, ScreenOfferResult)> reduce() async {
-    if (state.active != null || state.pendingOffer != null) {
+    // This platform cannot show a screen share (E2.0: Linux only): reject
+    // early with a dedicated error instead of failing at engine start.
+    if (!notifier.ref.read(screenReceiveSupportedProvider)) {
+      return (state, const ScreenOfferResult(403, {'error': 'receive_unsupported'}));
+    }
+    if (state.active != null || state.pendingOffer != null || state.waiting != null || notifier.startingOffer) {
       return (state, const ScreenOfferResult(409, {'error': 'busy'}));
     }
     final entry = notifier.lookupFavorite(peerFingerprint);
@@ -458,7 +481,7 @@ class HandleScreenOfferAction extends AsyncReduxActionWithResult<ScreenService, 
         final sessionId = const Uuid().v4();
         notifier.startTimer(kScreenOfferTtl, () {
           // ignore: discarded_futures
-          notifier.ref.redux(screenProvider).dispatchAsync(AbortPendingScreenOfferAction(reason: 'timeout'));
+          notifier.ref.redux(screenProvider).dispatchAsync(AbortPendingScreenOfferAction(reason: 'timeout', sessionId: sessionId));
         });
         final next = state.copyWith(
           pendingOffer: PendingScreenOffer(
@@ -473,10 +496,15 @@ class HandleScreenOfferAction extends AsyncReduxActionWithResult<ScreenService, 
         return (next, ScreenOfferResult(409, {'pending': true, 'session': sessionId}));
       case ScreenOfferDecision.autoAccept:
         final sessionId = const Uuid().v4();
-        final started = await notifier.startReceiverSession(peerIp, peerAlias, sessionId);
-        return started != null
-            ? (started, ScreenOfferResult(200, {'ok': true, 'port': kScreenDataPort, 'session': sessionId}))
-            : (state, const ScreenOfferResult(500, {'error': 'engine_failed'}));
+        notifier.startingOffer = true;
+        try {
+          final started = await notifier.startReceiverSession(peerIp, peerAlias, sessionId);
+          return started != null
+              ? (started, ScreenOfferResult(200, {'ok': true, 'port': kScreenDataPort, 'session': sessionId}))
+              : (state, const ScreenOfferResult(500, {'error': 'engine_failed'}));
+        } finally {
+          notifier.startingOffer = false;
+        }
     }
   }
 }
@@ -484,44 +512,55 @@ class HandleScreenOfferAction extends AsyncReduxActionWithResult<ScreenService, 
 /// Local user (or W3 dialog) accepted a pending offer: start the receiver and
 /// tell the sender to begin.
 class AcceptPendingScreenOfferAction extends AsyncReduxAction<ScreenService, ScreenState> {
+  /// The offer session id the dialog was opened for; null accepts whatever is
+  /// pending. A mismatch is a stale dialog and does nothing.
+  final String? sessionId;
+
+  AcceptPendingScreenOfferAction({this.sessionId});
+
   @override
   Future<ScreenState> reduce() async {
     final pending = state.pendingOffer;
-    if (pending == null) {
+    if (pending == null || (sessionId != null && pending.sessionId != sessionId) || notifier.acceptingOffer) {
       return state;
     }
-    final started = await notifier.startReceiverSession(pending.peerIp, pending.peerAlias, pending.sessionId);
-    if (started == null) {
-      return state.copyWith(clearPendingOffer: true, lastError: '启动接收失败');
-    }
-    // A stop may have arrived while the engine was starting: do not resurrect
-    // the session in that case.
-    if (notifier.state.pendingOffer?.sessionId != pending.sessionId) {
-      await notifier.stopEngine();
-      return notifier.state;
-    }
-    // The sender must learn that we are listening; retry once, then give up.
-    var (status, _) = await postScreenControl(pending.peerIp, notifier.controlPort, 'screen/accept', {
-      'session': pending.sessionId,
-      'port': kScreenDataPort,
-    });
-    if (status == null) {
-      await Future<void>.delayed(const Duration(milliseconds: 300));
-      (status, _) = await postScreenControl(pending.peerIp, notifier.controlPort, 'screen/accept', {
+    notifier.acceptingOffer = true;
+    try {
+      final started = await notifier.startReceiverSession(pending.peerIp, pending.peerAlias, pending.sessionId);
+      if (started == null) {
+        return state.copyWith(clearPendingOffer: true, lastError: t.ui2.screen.errStartReceiverFailed);
+      }
+      // A stop may have arrived while the engine was starting: do not
+      // resurrect the session in that case.
+      if (notifier.state.pendingOffer?.sessionId != pending.sessionId) {
+        await notifier.stopEngine();
+        return notifier.state;
+      }
+      // The sender must learn that we are listening; retry once, then give up.
+      var (status, _) = await postScreenControl(pending.peerIp, notifier.controlPort, 'screen/accept', {
         'session': pending.sessionId,
         'port': kScreenDataPort,
       });
+      if (status == null) {
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+        (status, _) = await postScreenControl(pending.peerIp, notifier.controlPort, 'screen/accept', {
+          'session': pending.sessionId,
+          'port': kScreenDataPort,
+        });
+      }
+      if (status == null) {
+        await notifier.stopEngine();
+        return state.copyWith(clearPendingOffer: true, lastError: t.ui2.screen.errNotifyFailed);
+      }
+      // A stop may also have arrived during the accept POST.
+      if (notifier.state.pendingOffer?.sessionId != pending.sessionId) {
+        await notifier.stopEngine();
+        return notifier.state;
+      }
+      return started;
+    } finally {
+      notifier.acceptingOffer = false;
     }
-    if (status == null) {
-      await notifier.stopEngine();
-      return state.copyWith(clearPendingOffer: true, lastError: '无法通知对方开始共享');
-    }
-    // A stop may also have arrived during the accept POST.
-    if (notifier.state.pendingOffer?.sessionId != pending.sessionId) {
-      await notifier.stopEngine();
-      return notifier.state;
-    }
-    return started;
   }
 }
 
@@ -529,15 +568,19 @@ class AcceptPendingScreenOfferAction extends AsyncReduxAction<ScreenService, Scr
 class AbortPendingScreenOfferAction extends AsyncReduxAction<ScreenService, ScreenState> {
   final String reason;
 
-  AbortPendingScreenOfferAction({this.reason = 'denied'});
+  /// The offer session id this abort belongs to; null aborts whatever is
+  /// pending. A mismatch (stale dialog/timeout) does nothing.
+  final String? sessionId;
+
+  AbortPendingScreenOfferAction({this.reason = 'denied', this.sessionId});
 
   @override
   Future<ScreenState> reduce() async {
     final pending = state.pendingOffer;
-    notifier.cancelTimer();
-    if (pending == null) {
+    if (pending == null || (sessionId != null && pending.sessionId != sessionId)) {
       return state;
     }
+    notifier.cancelTimer();
     // Fire-and-forget: clearing the pending state must not wait on the peer.
     unawaited(postScreenControl(pending.peerIp, notifier.controlPort, 'screen/stop', {
       'session': pending.sessionId,
@@ -645,7 +688,7 @@ class IncomingScreenStopAction extends AsyncReduxAction<ScreenService, ScreenSta
         return state;
       }
       notifier.cancelTimer();
-      return state.copyWith(clearWaiting: true, lastError: '对方取消了屏幕共享');
+      return state.copyWith(clearWaiting: true, lastError: t.ui2.screen.errCancelledByPeer);
     }
     return state;
   }
@@ -669,8 +712,14 @@ class _ScreenWaitingTimeoutAction extends AsyncReduxAction<ScreenService, Screen
       'session': sessionId,
       'reason': 'timeout',
     }));
-    return state.copyWith(clearWaiting: true, lastError: '对方未响应');
+    return state.copyWith(clearWaiting: true, lastError: t.ui2.screen.errNoResponse);
   }
+}
+
+/// Clears the last error shown in the UI banner (UI-2).
+class ClearScreenErrorAction extends ReduxAction<ScreenService, ScreenState> {
+  @override
+  ScreenState reduce() => state.copyWith(clearError: true);
 }
 
 /// The engine event stream closed without an Ended event (worker panic): do
@@ -687,7 +736,7 @@ class _ScreenStreamClosedAction extends AsyncReduxAction<ScreenService, ScreenSt
       return state;
     }
     notifier.detach();
-    return state.copyWith(clearActive: true, lastError: '屏幕共享会话意外结束');
+    return state.copyWith(clearActive: true, lastError: t.ui2.screen.errStreamEnded);
   }
 }
 
@@ -709,7 +758,7 @@ class _ReceiverNoStreamWatchdogAction extends AsyncReduxAction<ScreenService, Sc
       'session': sessionId,
       'reason': 'no_stream',
     }));
-    return state.copyWith(clearActive: true, lastError: '对方未开始传输画面');
+    return state.copyWith(clearActive: true, lastError: t.ui2.screen.errNoStream);
   }
 }
 

@@ -6,8 +6,10 @@ import 'package:localsend_app/provider/favorites_provider.dart';
 import 'package:localsend_app/provider/network/nearby_devices_provider.dart';
 import 'package:localsend_app/provider/network/server/server_provider.dart';
 import 'package:localsend_app/provider/owner_provider.dart';
+import 'package:localsend_app/provider/screen/screen_provider.dart';
 import 'package:localsend_app/provider/settings_provider.dart';
 import 'package:localsend_app/util/device_groups.dart';
+import 'package:localsend_app/util/screen_capabilities.dart';
 import 'package:localsend_app/util/send_flow.dart';
 import 'package:localsend_app/widget/device_card.dart';
 import 'package:localsend_app/widget/multi_send_info.dart';
@@ -108,7 +110,14 @@ class MyDevicesTab extends StatelessWidget {
           DeviceActionButton(
             icon: Icons.screen_share,
             label: t.ui2.card.shareScreen,
-            disabledTooltip: t.ui2.card.comingSoon,
+            // Same-owner devices may share even at temp trust (D2 same-owner
+            // rule takes precedence in evaluateScreenOffer).
+            onTap: (device != null && device.ip?.isNotEmpty == true && canSendScreenShare())
+                ? () => ref.redux(screenProvider).dispatchAsync(
+                      StartScreenShareAction(peerIp: device.ip!, peerAlias: device.alias),
+                    )
+                : null,
+            disabledTooltip: !canSendScreenShare() ? t.ui2.screen.unsupportedSend : t.ui2.deviceList.offlineHint,
           ),
           DeviceActionButton(
             icon: Icons.mouse,

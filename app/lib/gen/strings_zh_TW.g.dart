@@ -810,6 +810,8 @@ class Translations$ui2$zh_TW extends Translations$ui2$en {
   @override
   late final Translations$ui2$settings$zh_TW settings = Translations$ui2$settings$zh_TW.internal(_root);
   @override
+  late final Translations$ui2$screen$zh_TW screen = Translations$ui2$screen$zh_TW.internal(_root);
+  @override
   late final Translations$ui2$trust$zh_TW trust = Translations$ui2$trust$zh_TW.internal(_root);
 }
 
@@ -1677,6 +1679,61 @@ class Translations$ui2$settings$zh_TW extends Translations$ui2$settings$en {
   String get sharedDir => '共享目錄';
   @override
   String get screenShare => '螢幕分享';
+}
+
+// Path: ui2.screen
+class Translations$ui2$screen$zh_TW extends Translations$ui2$screen$en {
+  Translations$ui2$screen$zh_TW.internal(TranslationsZhTw root) : this._root = root, super.internal(root);
+
+  final TranslationsZhTw _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get requestTitle => '投放螢幕請求';
+  @override
+  String requestBody({required Object alias}) => '「${alias}」請求分享螢幕到本機。';
+  @override
+  String get accept => '接受';
+  @override
+  String get reject => '拒絕';
+  @override
+  String sending({required Object alias}) => '正在分享螢幕到「${alias}」';
+  @override
+  String waiting({required Object alias}) => '等待「${alias}」確認投放…';
+  @override
+  String receiving({required Object alias}) => '正在接收「${alias}」的螢幕';
+  @override
+  String get stop => '停止';
+  @override
+  String get unsupportedSend => '本平台暫不支援發起螢幕投放';
+  @override
+  String get unsupportedReceive => '本平台暫不支援接收螢幕投放';
+  @override
+  String get errBlocked => '對方已封鎖本機';
+  @override
+  String get errTempNotAllowed => '對方不允許臨時裝置分享螢幕';
+  @override
+  String get errBusy => '對方忙碌中';
+  @override
+  String get errOffline => '無法連線對方(離線或未開啟)';
+  @override
+  String errRejected({required Object code}) => '對方拒絕了螢幕投放(${code})';
+  @override
+  String get errNoResponse => '對方未回應';
+  @override
+  String get errStartSenderFailed => '啟動螢幕分享失敗';
+  @override
+  String get errStartReceiverFailed => '啟動接收失敗';
+  @override
+  String get errNotifyFailed => '無法通知對方開始分享';
+  @override
+  String get errStreamEnded => '螢幕分享工作階段意外結束';
+  @override
+  String get errNoStream => '對方未開始傳輸畫面';
+  @override
+  String get errReceiveUnsupported => '對方平台暫不支援接收螢幕投放';
+  @override
+  String get errCancelledByPeer => '對方取消了螢幕分享';
 }
 
 // Path: ui2.trust

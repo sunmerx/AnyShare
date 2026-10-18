@@ -92,6 +92,8 @@ void main() {
     final persistence = PersistenceService.test(prefs);
     await container.set(persistenceProvider.overrideWithValue(persistence));
     await container.set(screenEngineProvider.overrideWithValue(engine));
+    // The test host is not Linux; pretend we can receive screen shares.
+    await container.set(screenReceiveSupportedProvider.overrideWithValue(true));
     await container.set(screenControlPortProvider.overrideWithValue(peerServer.port));
     await container.redux(extensionServerProvider).dispatchAsync(StartExtensionServerAction(port: 0));
     port = container.read(extensionServerProvider).port ?? 0;
@@ -305,5 +307,36 @@ void main() {
     }
 
     expect(container.read(screenProvider).active, isNull);
+  });
+
+  test('start share to a reachable peer starts a sender session', () async {
+    await container.redux(screenProvider).dispatchAsync(
+          StartScreenShareAction(peerIp: '127.0.0.1', peerAlias: 'Peer'),
+        );
+
+    expect(engine.startedSenders, ['127.0.0.1:$kScreenDataPort']);
+    final state = container.read(screenProvider);
+    expect(state.active, isNotNull);
+    expect(state.active!.role, ScreenRole.sender);
+    expect(state.waiting, isNull);
+  });
+
+  test('offer is rejected when the platform cannot receive', () async {
+    await container.set(screenReceiveSupportedProvider.overrideWithValue(false));
+    final (status, body) = await offer();
+    expect(status, 403);
+    expect(body['error'], 'receive_unsupported');
+    expect(engine.startedReceivers, isEmpty);
+  });
+
+  test('clear error action resets the banner error', () async {
+    await container.redux(screenProvider).dispatchAsync(
+          StartScreenShareAction(peerIp: 'fe80::1', peerAlias: 'Peer'),
+        );
+    expect(container.read(screenProvider).lastError, isNotNull);
+
+    container.redux(screenProvider).dispatch(ClearScreenErrorAction());
+
+    expect(container.read(screenProvider).lastError, isNull);
   });
 }

@@ -3,7 +3,10 @@ import 'package:localsend_app/gen/strings.g.dart';
 import 'package:localsend_app/model/persistence/favorite_device.dart';
 import 'package:localsend_app/pages/verify_page.dart';
 import 'package:localsend_app/provider/favorites_provider.dart';
+import 'package:localsend_app/provider/screen/screen_provider.dart';
 import 'package:localsend_app/util/favorites.dart';
+import 'package:localsend_app/util/screen_capabilities.dart';
+import 'package:localsend_app/util/send_flow.dart';
 import 'package:localsend_app/util/system_date_time_formatter.dart';
 import 'package:localsend_app/widget/big_button.dart';
 import 'package:localsend_app/widget/dialogs/favorite_delete_dialog.dart';
@@ -114,6 +117,44 @@ class _DeviceDetailsPageState extends State<DeviceDetailsPage> with Refena {
                     extPort: 53318,
                     onPaired: (_) => setState(() {}),
                   );
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          // AnyShare modification (2026-10-18): action area (UI-2).
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              BigButton(
+                icon: Icons.upload,
+                label: t.ui2.card.sendFiles,
+                filled: true,
+                width: 140,
+                onTap: () async => await sendToDeviceAuto(context, ref, device),
+              ),
+              const SizedBox(width: 20),
+              BigButton(
+                icon: Icons.screen_share,
+                label: t.ui2.card.shareScreen,
+                filled: false,
+                width: 140,
+                onTap: () async {
+                  // Mirror the card gating; explain the reason when disabled.
+                  final String? reason = !canSendScreenShare()
+                      ? t.ui2.screen.unsupportedSend
+                      : (device.ip?.isNotEmpty != true)
+                          ? t.ui2.deviceList.offlineHint
+                          : (favoriteEntry?.trustLevel == TrustLevel.temp)
+                              ? t.ui2.card.tempNoScreen
+                              : null;
+                  if (reason != null) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(reason)));
+                    return;
+                  }
+                  await ref.redux(screenProvider).dispatchAsync(
+                        StartScreenShareAction(peerIp: device.ip!, peerAlias: device.alias),
+                      );
                 },
               ),
             ],

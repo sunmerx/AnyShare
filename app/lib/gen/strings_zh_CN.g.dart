@@ -941,6 +941,8 @@ class Translations$ui2$zh_CN extends Translations$ui2$en {
   @override
   late final Translations$ui2$settings$zh_CN settings = Translations$ui2$settings$zh_CN.internal(_root);
   @override
+  late final Translations$ui2$screen$zh_CN screen = Translations$ui2$screen$zh_CN.internal(_root);
+  @override
   late final Translations$ui2$trust$zh_CN trust = Translations$ui2$trust$zh_CN.internal(_root);
 }
 
@@ -1890,6 +1892,61 @@ class Translations$ui2$settings$zh_CN extends Translations$ui2$settings$en {
   String get sharedDir => '共享目录';
   @override
   String get screenShare => '屏幕共享';
+}
+
+// Path: ui2.screen
+class Translations$ui2$screen$zh_CN extends Translations$ui2$screen$en {
+  Translations$ui2$screen$zh_CN.internal(TranslationsZhCn root) : this._root = root, super.internal(root);
+
+  final TranslationsZhCn _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get requestTitle => '投屏请求';
+  @override
+  String requestBody({required Object alias}) => '「${alias}」请求共享屏幕到本机。';
+  @override
+  String get accept => '接受';
+  @override
+  String get reject => '拒绝';
+  @override
+  String sending({required Object alias}) => '正在共享屏幕到「${alias}」';
+  @override
+  String waiting({required Object alias}) => '等待「${alias}」确认投屏…';
+  @override
+  String receiving({required Object alias}) => '正在接收「${alias}」的投屏';
+  @override
+  String get stop => '停止';
+  @override
+  String get unsupportedSend => '本平台暂不支持发起投屏';
+  @override
+  String get unsupportedReceive => '本平台暂不支持接收投屏';
+  @override
+  String get errBlocked => '对方已拉黑本设备';
+  @override
+  String get errTempNotAllowed => '对方不允许临时设备共享屏幕';
+  @override
+  String get errBusy => '对方正忙';
+  @override
+  String get errOffline => '无法连接对方(离线或未开启)';
+  @override
+  String errRejected({required Object code}) => '对方拒绝了屏幕共享(${code})';
+  @override
+  String get errNoResponse => '对方未响应';
+  @override
+  String get errStartSenderFailed => '启动屏幕共享失败';
+  @override
+  String get errStartReceiverFailed => '启动接收失败';
+  @override
+  String get errNotifyFailed => '无法通知对方开始共享';
+  @override
+  String get errStreamEnded => '屏幕共享会话意外结束';
+  @override
+  String get errNoStream => '对方未开始传输画面';
+  @override
+  String get errReceiveUnsupported => '对方平台暂不支持接收投屏';
+  @override
+  String get errCancelledByPeer => '对方取消了屏幕共享';
 }
 
 // Path: ui2.trust

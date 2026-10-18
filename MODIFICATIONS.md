@@ -53,6 +53,21 @@
 - `pubspec.lock`:8 个 build 工具链传递依赖小版本再解析(archive/build_config/build_daemon 等,仅 codegen 使用;官方源解析,运行时依赖零漂移)
 - `app/pubspec.yaml`:description 重写、homepage → github.com/sunmerx/AnyShare
 
+### UI 重设计批次二:投屏 UI 接线(2026-10-18,UI-2/W3)
+
+- `app/lib/widget/dialogs/screen_offer_dialog.dart`(新增):接收端投屏请求弹窗(接受/拒绝;跟随 provider 状态,报价过期/被远端取消时自动关闭;防重复点击;会话 ID 绑定)
+- `app/lib/widget/screen_session_banner.dart`(新增):全局屏共状态横幅(待确认/等待/进行中/错误可叠加;仅发送端显示 Mbps;接收端显示 fps)
+- `app/lib/util/screen_capabilities.dart`(新增):平台能力(Windows 可发起、Linux 可接收)
+- `app/lib/provider/screen/screen_provider.dart`:attach 先停旧引擎(防会话泄漏);acceptingOffer/startingOffer 防重入守卫;Accept/Abort 增加会话 ID 绑定(陈旧对话框无效);接收能力 Provider 化(可注入/可测试);忙碌判定纳入 waiting;错误文案全部 i18n;ClearScreenErrorAction
+- `app/lib/provider/network/extension_server_provider.dart`:pending 报价推送投屏请求弹窗(推送与响应写入解耦,失败由状态横幅兜底)
+- `app/lib/pages/tabs/{my_devices_tab,device_list_tab}.dart`:共享屏幕按钮激活(门控:平台/离线/IP 空/临时设备);同归属者设备豁免临时限制(与 D2 判定链一致,含注释)
+- `app/lib/pages/device_details_page.dart`:操作区(发送文件/共享屏幕,禁用时说明原因)
+- `app/lib/main.dart`:状态横幅挂载于 Navigator 之上(所有页面可见);`home_page.dart` 同步调整
+- i18n:ui2.screen 块(含 13 条错误文案,en/zh-CN/zh-HK/zh-TW)
+- `app/test/unit/provider/screen_offer_test.dart`:+3 测试(发送端会话建立/接收能力拒绝/错误清除),共 15 项
+- 独立审查 17 项修复(高危:对话框跟随状态防"假接受"、接受防重入防双引擎;中危:引擎会话泄漏、推送与响应解耦、详情页门控对齐、横幅错误可见性)
+- 验证:analyze 0、144 测试全绿、Windows 构建 + 启动截图
+
 ### UI 重设计批次一:四区导航(2026-10-18,UI-1)
 
 - `app/lib/pages/home_page.dart`(重写):四区导航(我的设备/设备列表/黑名单/设置);落地页=我的设备;拖拽落文件→设备列表选择发送

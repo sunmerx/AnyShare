@@ -9,8 +9,10 @@ import 'package:localsend_app/provider/local_ip_provider.dart';
 import 'package:localsend_app/provider/network/nearby_devices_provider.dart';
 import 'package:localsend_app/provider/network/scan_facade.dart';
 import 'package:localsend_app/provider/owner_provider.dart';
+import 'package:localsend_app/provider/screen/screen_provider.dart';
 import 'package:localsend_app/provider/settings_provider.dart';
 import 'package:localsend_app/util/device_groups.dart';
+import 'package:localsend_app/util/screen_capabilities.dart';
 import 'package:localsend_app/util/send_flow.dart';
 import 'package:localsend_app/widget/circular_popup_button.dart';
 import 'package:localsend_app/widget/custom_icon_button.dart';
@@ -183,7 +185,14 @@ class _DeviceListTabState extends State<DeviceListTab> with Refena {
           DeviceActionButton(
             icon: Icons.screen_share,
             label: t.ui2.card.shareScreen,
-            disabledTooltip: isTemp ? t.ui2.card.tempNoScreen : t.ui2.card.comingSoon,
+            onTap: (device != null && device.ip?.isNotEmpty == true && !isTemp && canSendScreenShare())
+                ? () => ref.redux(screenProvider).dispatchAsync(
+                      StartScreenShareAction(peerIp: device.ip!, peerAlias: device.alias),
+                    )
+                : null,
+            disabledTooltip: isTemp
+                ? t.ui2.card.tempNoScreen
+                : (!canSendScreenShare() ? t.ui2.screen.unsupportedSend : t.ui2.deviceList.offlineHint),
           ),
           DeviceActionButton(
             icon: Icons.mouse,
