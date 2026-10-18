@@ -53,6 +53,18 @@
 - `pubspec.lock`:8 个 build 工具链传递依赖小版本再解析(archive/build_config/build_daemon 等,仅 codegen 使用;官方源解析,运行时依赖零漂移)
 - `app/pubspec.yaml`:description 重写、homepage → github.com/sunmerx/AnyShare
 
+### E-3 共享目录 UI 批次三:浏览页交互增强(2026-10-18,E3-3d)
+
+- `app/lib/util/dir_browse.dart`:sortDirEntriesBy(名称/大小/修改时间,升降序,目录恒在前)、filterDirEntries(名称搜索+标签筛选)、dirPreviewKindOf/dirPreviewCapOf(预览分类与上限:图片 10MB/MD 2MB/文本 1MB)
+- `app/lib/widget/dir_preview_panel.dart`(新增):宽屏预览面板(图片 cacheWidth 限解码/Markdown 禁远端外联/文本 UTF-8 容错);条目切换代际防护;size 为 null 也受 maxBytes 流式上限保护
+- `app/lib/provider/network/dir_client.dart`:downloadBytes 增加 maxBytes(超限中止抛 too_large)
+- `app/lib/widget/dialogs/dir_annotation_dialog.dart`(新增):标签/备注编辑弹窗
+- `app/lib/pages/dir_browse_page.dart`:搜索/排序菜单/视图切换、标签筛选 chips(已选恒可见防死角)、双视图(网格长按弹菜单)、右键菜单(showMenu)、拖放上传(DropTarget+提示)、宽屏(≥1000px)三栏、busy 提示、标签限宽
+- i18n:ui2.dirBrowse 新增 19 键(现 56 键,en/zh-CN/zh-TW/zh-HK)
+- 独立审查 14 项修复(major:预览竞态代际、未知大小无上限下载、Markdown 远端图片外联、Image.memory 解码尺寸、busy 静默丢弃、标签筛选死角、网格触屏无菜单)
+- 已知遗留(记账):网格 childAspectRatio 超大字号可能溢出(待确认);双机真实浏览验收随 E3-4
+- 验证:analyze 0、206 测试全绿、Windows debug 构建
+
 ### E-3 共享目录 UI 批次二:浏览页(2026-10-18,E3-3c)
 
 - `app/lib/util/dir_browse.dart`(新增):排序(目录优先/忽略大小写)、父路径/拼接、字节格式化纯函数
