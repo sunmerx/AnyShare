@@ -691,7 +691,8 @@
       "errStreamEnded": "螢幕分享工作階段意外結束",
       "errNoStream": "對方未開始傳輸畫面",
       "errReceiveUnsupported": "對方平台暫不支援接收螢幕投放",
-      "errCancelledByPeer": "對方取消了螢幕分享"
+      "errCancelledByPeer": "對方取消了螢幕分享",
+      "errIpv6": "對方位址為 IPv6,暫不支援螢幕分享"
     },
     "transfers": {
       "title": "傳輸",

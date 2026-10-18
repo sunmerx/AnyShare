@@ -811,7 +811,8 @@
       "errStreamEnded": "The screen session ended unexpectedly",
       "errNoStream": "The peer did not start streaming",
       "errReceiveUnsupported": "The peer's platform cannot receive screen shares yet",
-      "errCancelledByPeer": "The peer cancelled the screen share"
+      "errCancelledByPeer": "The peer cancelled the screen share",
+      "errIpv6": "The peer address is IPv6; screen sharing is not supported yet"
     },
     "transfers": {
       "title": "Transfers",

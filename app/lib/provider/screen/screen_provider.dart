@@ -402,8 +402,9 @@ class StartScreenShareAction extends AsyncReduxAction<ScreenService, ScreenState
       return state.copyWith(lastError: t.ui2.screen.errBusy);
     }
     if (peerIp.contains(':')) {
-      // The engine's data plane is IPv4-only in E2.0.
-      return state.copyWith(lastError: '对方地址为 IPv6,暂不支持屏幕共享');
+      // The engine's data plane is IPv4-only in E2.0 (callers should pass
+      // screenShareHostOf(device), but keep the guard as a last line).
+      return state.copyWith(lastError: t.ui2.screen.errIpv6);
     }
     notifier.startingShare = true;
     try {

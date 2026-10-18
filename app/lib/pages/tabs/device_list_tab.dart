@@ -196,14 +196,22 @@ class _DeviceListTabState extends State<DeviceListTab> with Refena {
           DeviceActionButton(
             icon: Icons.screen_share,
             label: t.ui2.card.shareScreen,
-            onTap: (device != null && device.ip?.isNotEmpty == true && !isTemp && canSendScreenShare())
+            // The E2.0 engine is IPv4-only: dial an IPv4 channel, not the
+            // (often IPv6) primary ip.
+            onTap: (device != null && screenShareHostOf(device) != null && !isTemp && canSendScreenShare())
                 ? () => ref
                       .redux(screenProvider)
                       .dispatchAsync(
-                        StartScreenShareAction(peerIp: device.ip!, peerAlias: device.alias),
+                        StartScreenShareAction(peerIp: screenShareHostOf(device)!, peerAlias: device.alias),
                       )
                 : null,
-            disabledTooltip: isTemp ? t.ui2.card.tempNoScreen : (!canSendScreenShare() ? t.ui2.screen.unsupportedSend : t.ui2.deviceList.offlineHint),
+            disabledTooltip: isTemp
+                ? t.ui2.card.tempNoScreen
+                : (!canSendScreenShare()
+                      ? t.ui2.screen.unsupportedSend
+                      : (device != null && screenShareHostOf(device) == null)
+                      ? t.ui2.screen.errIpv6
+                      : t.ui2.deviceList.offlineHint),
           ),
           DeviceActionButton(
             icon: Icons.mouse,

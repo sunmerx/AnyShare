@@ -2612,6 +2612,9 @@ class Translations$ui2$screen$en {
 
   /// en: 'The peer cancelled the screen share'
   String get errCancelledByPeer => 'The peer cancelled the screen share';
+
+  /// en: 'The peer address is IPv6; screen sharing is not supported yet'
+  String get errIpv6 => 'The peer address is IPv6; screen sharing is not supported yet';
 }
 
 // Path: ui2.transfers

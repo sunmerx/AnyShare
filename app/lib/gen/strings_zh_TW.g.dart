@@ -1938,6 +1938,8 @@ class Translations$ui2$screen$zh_TW extends Translations$ui2$screen$en {
   String get errReceiveUnsupported => '對方平台暫不支援接收螢幕投放';
   @override
   String get errCancelledByPeer => '對方取消了螢幕分享';
+  @override
+  String get errIpv6 => '對方位址為 IPv6,暫不支援螢幕分享';
 }
 
 // Path: ui2.transfers

@@ -2151,6 +2151,8 @@ class Translations$ui2$screen$zh_CN extends Translations$ui2$screen$en {
   String get errReceiveUnsupported => '对方平台暂不支持接收投屏';
   @override
   String get errCancelledByPeer => '对方取消了屏幕共享';
+  @override
+  String get errIpv6 => '对方地址为 IPv6,暂不支持屏幕共享';
 }
 
 // Path: ui2.transfers

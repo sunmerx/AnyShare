@@ -808,7 +808,8 @@
       "errStreamEnded": "屏幕共享会话意外结束",
       "errNoStream": "对方未开始传输画面",
       "errReceiveUnsupported": "对方平台暂不支持接收投屏",
-      "errCancelledByPeer": "对方取消了屏幕共享"
+      "errCancelledByPeer": "对方取消了屏幕共享",
+      "errIpv6": "对方地址为 IPv6,暂不支持屏幕共享"
     },
     "transfers": {
       "title": "传输",
