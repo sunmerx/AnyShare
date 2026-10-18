@@ -53,6 +53,19 @@
 - `pubspec.lock`:8 个 build 工具链传递依赖小版本再解析(archive/build_config/build_daemon 等,仅 codegen 使用;官方源解析,运行时依赖零漂移)
 - `app/pubspec.yaml`:description 重写、homepage → github.com/sunmerx/AnyShare
 
+### E-3 共享目录 UI 批次二:浏览页(2026-10-18,E3-3c)
+
+- `app/lib/util/dir_browse.dart`(新增):排序(目录优先/忽略大小写)、父路径/拼接、字节格式化纯函数
+- `app/lib/provider/dir_browse_provider.dart`(新增):按设备指纹的浏览会话(roots/根/路径/条目/可写/截断/requestId);`dirBrowsePortProvider`(测试可注入);Open/Load/Close 三个 action;会话单调 requestId 防旧响应覆盖新导航
+- `app/lib/pages/dir_browse_page.dart`(新增):根列表(窄屏横向固定宽)/面包屑/上一级/只读徽标/截断提示;上传(逐文件容错+跳过计数)/新建/重命名/删除(回收站)/下载(桌面另存、移动端文档目录;远端名剥路径分量防穿越);条目行显示标签/备注;全错误码 i18n 映射;退出关闭会话
+- `app/lib/pages/tabs/{my_devices_tab,device_list_tab}.dart`、`app/lib/pages/device_details_page.dart`:「浏览目录」入口激活(占位→真入口);详情页操作区 Row→Wrap 防窄屏溢出
+- `app/lib/provider/network/dir_endpoints.dart`:`kDirMaxListEntries` 公开(截断提示与服务端同源)
+- i18n:ui2.dirBrowse 块(~37 键,en/zh-CN/zh-TW/zh-HK)
+- 独立审查 14 项修复(blocker:窄屏根列表 ListTile 无界约束断言;major:session.loading 死状态改页面本地、旧响应覆盖新导航、下载路径穿越、详情页溢出)
+- `style` 独立提交 eba0a992:dart format 全量对齐 CI 格式检查(历史批次 28 文件漂移)
+- 已知遗留(记账):窄屏 widget 冒烟测试暂缺(无 RefenaScope widget 测试先例);双机真实浏览验收随 E3-3d 收尾
+- 验证:analyze 0、202 测试全绿(浏览 9 项,含延迟桩防串扰)、Windows debug 构建 + 启动冒烟
+
 ### E-3 共享目录 UI 批次一:客户端与本地标注(2026-10-18,E3-3a)
 
 - `app/lib/provider/network/dir_client.dart`(新增):`/dir/*` 端点 Dart 客户端(roots/list/downloadToFile/downloadBytes/uploadFile/mkdir/rename/delete);服务端错误码透传;超时/畸形 JSON/源文件缺失分别映射 unreachable/protocol/source_error;下载经 `.part` 原子落盘(失败清理);上传 30 分钟窗口(服务端接收完成才响应)
