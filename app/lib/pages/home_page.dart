@@ -13,6 +13,7 @@ import 'package:localsend_app/pages/tabs/settings_tab.dart';
 import 'package:localsend_app/provider/selection/selected_sending_files_provider.dart';
 import 'package:localsend_app/util/native/cross_file_converters.dart';
 import 'package:localsend_app/widget/responsive_builder.dart';
+import 'package:localsend_app/widget/transfer_panel.dart';
 import 'package:refena_flutter/refena_flutter.dart';
 
 /// AnyShare modification (2026-10-18): home navigation redesigned (UI-1).
@@ -115,30 +116,47 @@ class _HomePageState extends State<HomePage> with Refena {
             body: Row(
               children: [
                 if (!sizingInformation.isMobile)
-                  NavigationRail(
-                    selectedIndex: vm.currentTab.index,
-                    onDestinationSelected: (index) => vm.changeTab(HomeTab.values[index]),
-                    extended: sizingInformation.isDesktop,
-                    backgroundColor: Theme.of(context).cardColorWithElevation,
-                    leading: sizingInformation.isDesktop
-                        ? const Column(
-                            children: [
-                              SizedBox(height: 20),
-                              Text(
-                                'AnyShare',
-                                style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
-                                textAlign: TextAlign.center,
-                              ),
-                              SizedBox(height: 20),
-                            ],
-                          )
-                        : null,
-                    destinations: HomeTab.values.map((tab) {
-                      return NavigationRailDestination(
-                        icon: Icon(tab.icon),
-                        label: Text(tab.label),
-                      );
-                    }).toList(),
+                  Container(
+                    color: Theme.of(context).cardColorWithElevation,
+                    // Fixed width (extended rail is 256, compact is 72): the
+                    // transfer section must not stretch the rail with long
+                    // file names.
+                    width: sizingInformation.isDesktop ? 256 : 72,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(
+                          child: NavigationRail(
+                            selectedIndex: vm.currentTab.index,
+                            onDestinationSelected: (index) => vm.changeTab(HomeTab.values[index]),
+                            extended: sizingInformation.isDesktop,
+                            scrollable: true,
+                            backgroundColor: Colors.transparent,
+                            leading: sizingInformation.isDesktop
+                                ? const Column(
+                                    children: [
+                                      SizedBox(height: 20),
+                                      Text(
+                                        'AnyShare',
+                                        style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                      SizedBox(height: 20),
+                                    ],
+                                  )
+                                : null,
+                            destinations: HomeTab.values.map((tab) {
+                              return NavigationRailDestination(
+                                icon: Icon(tab.icon),
+                                label: Text(tab.label),
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                        // UI-3: transfer panel pinned under the rail.
+                        TransferRailSection(compact: !sizingInformation.isDesktop),
+                      ],
+                    ),
                   ),
                 Expanded(
                   child: SafeArea(
@@ -169,6 +187,13 @@ class _HomePageState extends State<HomePage> with Refena {
                                 Text(t.sendTab.placeItems, style: Theme.of(context).textTheme.titleLarge),
                               ],
                             ),
+                          ),
+                        // UI-3: mobile transfer pill above the navigation bar.
+                        if (sizingInformation.isMobile)
+                          const Positioned(
+                            right: 16,
+                            bottom: 16,
+                            child: TransferPill(),
                           ),
                       ],
                     ),

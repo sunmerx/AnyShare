@@ -719,6 +719,20 @@
       "errReceiveUnsupported": "The peer's platform cannot receive screen shares yet",
       "errCancelledByPeer": "The peer cancelled the screen share"
     },
+    "transfers": {
+      "title": "Transfers",
+      "active": "Active",
+      "history": "History",
+      "none": "No active transfers",
+      "viewAll": "View all",
+      "sendTo": "Send to…",
+      "pickTarget": "Choose a target device",
+      "noTargets": "No devices to send to nearby",
+      "pill": "{n} transferring · View",
+      "failed": "Failed",
+      "fromPeer": "From {alias}",
+      "toPeer": "To {alias}"
+    },
     "trust": {
       "temp": "Temporary",
       "limited": "Limited",

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:localsend_app/gen/strings.g.dart';
 import 'package:localsend_app/pages/selected_files_page.dart';
 import 'package:localsend_app/provider/selection/selected_sending_files_provider.dart';
+import 'package:localsend_app/widget/dialogs/send_target_dialog.dart';
 import 'package:localsend_isolates/util/file_size_helper.dart';
 import 'package:refena_flutter/refena_flutter.dart';
 import 'package:routerino/routerino.dart';
@@ -39,6 +40,11 @@ class SelectionBanner extends StatelessWidget {
               TextButton(
                 onPressed: () async => await context.push(() => const SelectedFilesPage()),
                 child: Text(t.general.edit),
+              ),
+              FilledButton.tonal(
+                style: FilledButton.styleFrom(visualDensity: VisualDensity.compact),
+                onPressed: () => showSendTargetDialog(context),
+                child: Text(t.ui2.transfers.sendTo),
               ),
               IconButton(
                 tooltip: t.general.close,

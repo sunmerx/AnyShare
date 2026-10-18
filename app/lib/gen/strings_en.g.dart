@@ -1057,6 +1057,7 @@ class Translations$ui2$en {
   late final Translations$ui2$blocklist$en blocklist = Translations$ui2$blocklist$en.internal(_root);
   late final Translations$ui2$settings$en settings = Translations$ui2$settings$en.internal(_root);
   late final Translations$ui2$screen$en screen = Translations$ui2$screen$en.internal(_root);
+  late final Translations$ui2$transfers$en transfers = Translations$ui2$transfers$en.internal(_root);
   late final Translations$ui2$trust$en trust = Translations$ui2$trust$en.internal(_root);
 }
 
@@ -2320,6 +2321,51 @@ class Translations$ui2$screen$en {
 
   /// en: 'The peer cancelled the screen share'
   String get errCancelledByPeer => 'The peer cancelled the screen share';
+}
+
+// Path: ui2.transfers
+class Translations$ui2$transfers$en {
+  Translations$ui2$transfers$en.internal(this._root);
+
+  final Translations _root; // ignore: unused_field
+
+  // Translations
+
+  /// en: 'Transfers'
+  String get title => 'Transfers';
+
+  /// en: 'Active'
+  String get active => 'Active';
+
+  /// en: 'History'
+  String get history => 'History';
+
+  /// en: 'No active transfers'
+  String get none => 'No active transfers';
+
+  /// en: 'View all'
+  String get viewAll => 'View all';
+
+  /// en: 'Send to…'
+  String get sendTo => 'Send to…';
+
+  /// en: 'Choose a target device'
+  String get pickTarget => 'Choose a target device';
+
+  /// en: 'No devices to send to nearby'
+  String get noTargets => 'No devices to send to nearby';
+
+  /// en: '{n} transferring · View'
+  String pill({required Object n}) => '${n} transferring · View';
+
+  /// en: 'Failed'
+  String get failed => 'Failed';
+
+  /// en: 'From {alias}'
+  String fromPeer({required Object alias}) => 'From ${alias}';
+
+  /// en: 'To {alias}'
+  String toPeer({required Object alias}) => 'To ${alias}';
 }
 
 // Path: ui2.trust

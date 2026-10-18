@@ -716,6 +716,20 @@
       "errReceiveUnsupported": "对方平台暂不支持接收投屏",
       "errCancelledByPeer": "对方取消了屏幕共享"
     },
+    "transfers": {
+      "title": "传输",
+      "active": "进行中",
+      "history": "历史",
+      "none": "暂无进行中的传输",
+      "viewAll": "查看全部",
+      "sendTo": "发送到…",
+      "pickTarget": "选择目标设备",
+      "noTargets": "附近没有可发送的设备",
+      "pill": "传输中 {n} · 查看",
+      "failed": "失败",
+      "fromPeer": "接收自 {alias}",
+      "toPeer": "发送到 {alias}"
+    },
     "trust": {
       "temp": "临时",
       "limited": "一般",

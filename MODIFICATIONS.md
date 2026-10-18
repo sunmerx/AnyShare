@@ -53,6 +53,17 @@
 - `pubspec.lock`:8 个 build 工具链传递依赖小版本再解析(archive/build_config/build_daemon 等,仅 codegen 使用;官方源解析,运行时依赖零漂移)
 - `app/pubspec.yaml`:description 重写、homepage → github.com/sunmerx/AnyShare
 
+### UI 重设计批次三:传输面板与发送到…(2026-10-18,UI-3/F-XFER-16)
+
+- `app/lib/util/transfer_overview.dart`(新增):传输聚合纯函数(活动传输:发送会话+接收会话,进度含校验和阶段;历史合并排序)+ 4 项单测
+- `app/lib/widget/transfer_panel.dart`(新增):侧栏常驻「传输」区(活动进度/取消/查看全部)、移动端浮标、传输记录弹窗(活动+合并历史+历史页入口);空闲时不订阅进度源(避免逐块重绘)
+- `app/lib/widget/dialogs/send_target_dialog.dart`(新增):"发送到…"设备选择(在线设备可选,离线置灰提示;空 IP 设备排除)
+- `app/lib/widget/selection_banner.dart`:新增「发送到…」按钮
+- `app/lib/pages/home_page.dart`:侧栏固定宽度(256/72)+ 可滚动;移动端传输浮标
+- i18n:ui2.transfers 块(en/zh-CN/zh-HK/zh-TW)
+- 独立审查 15 项修复(高危:接收方向进度恒 0——接收文件以 desiredName 而非 token 判定已接受;接收取消改走 serverProvider.cancelSession 完整路径——原 isolate 直调不清会话状态/不通知发送方/不停通知;中危:接收状态 watch、IntrinsicWidth 换固定宽度、recipientBusy 终态排除、空闲免订阅)
+- 验证:analyze 0、148 测试全绿、Windows 构建 + 启动截图
+
 ### UI 重设计批次二:投屏 UI 接线(2026-10-18,UI-2/W3)
 
 - `app/lib/widget/dialogs/screen_offer_dialog.dart`(新增):接收端投屏请求弹窗(接受/拒绝;跟随 provider 状态,报价过期/被远端取消时自动关闭;防重复点击;会话 ID 绑定)

@@ -596,6 +596,20 @@
       "errReceiveUnsupported": "對方平台暫不支援接收螢幕投放",
       "errCancelledByPeer": "對方取消了螢幕分享"
     },
+    "transfers": {
+      "title": "傳輸",
+      "active": "進行中",
+      "history": "歷史",
+      "none": "暫無進行中的傳輸",
+      "viewAll": "檢視全部",
+      "sendTo": "傳送到…",
+      "pickTarget": "選擇目標裝置",
+      "noTargets": "附近沒有可傳送的裝置",
+      "pill": "傳輸中 {n} · 檢視",
+      "failed": "失敗",
+      "fromPeer": "接收自 {alias}",
+      "toPeer": "傳送到 {alias}"
+    },
     "trust": {
       "temp": "臨時",
       "limited": "一般",

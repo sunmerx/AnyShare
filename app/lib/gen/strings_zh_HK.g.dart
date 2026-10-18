@@ -812,6 +812,8 @@ class Translations$ui2$zh_HK extends Translations$ui2$en {
   @override
   late final Translations$ui2$screen$zh_HK screen = Translations$ui2$screen$zh_HK.internal(_root);
   @override
+  late final Translations$ui2$transfers$zh_HK transfers = Translations$ui2$transfers$zh_HK.internal(_root);
+  @override
   late final Translations$ui2$trust$zh_HK trust = Translations$ui2$trust$zh_HK.internal(_root);
 }
 
@@ -1737,6 +1739,39 @@ class Translations$ui2$screen$zh_HK extends Translations$ui2$screen$en {
   String get errReceiveUnsupported => '對方平台暫不支援接收螢幕投放';
   @override
   String get errCancelledByPeer => '對方取消了螢幕分享';
+}
+
+// Path: ui2.transfers
+class Translations$ui2$transfers$zh_HK extends Translations$ui2$transfers$en {
+  Translations$ui2$transfers$zh_HK.internal(TranslationsZhHk root) : this._root = root, super.internal(root);
+
+  final TranslationsZhHk _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get title => '傳輸';
+  @override
+  String get active => '進行中';
+  @override
+  String get history => '歷史';
+  @override
+  String get none => '暫無進行中的傳輸';
+  @override
+  String get viewAll => '檢視全部';
+  @override
+  String get sendTo => '傳送到…';
+  @override
+  String get pickTarget => '選擇目標裝置';
+  @override
+  String get noTargets => '附近沒有可傳送的裝置';
+  @override
+  String pill({required Object n}) => '傳輸中 ${n} · 檢視';
+  @override
+  String get failed => '失敗';
+  @override
+  String fromPeer({required Object alias}) => '接收自 ${alias}';
+  @override
+  String toPeer({required Object alias}) => '傳送到 ${alias}';
 }
 
 // Path: ui2.trust
