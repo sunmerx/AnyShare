@@ -53,6 +53,15 @@
 - `pubspec.lock`:8 个 build 工具链传递依赖小版本再解析(archive/build_config/build_daemon 等,仅 codegen 使用;官方源解析,运行时依赖零漂移)
 - `app/pubspec.yaml`:description 重写、homepage → github.com/sunmerx/AnyShare
 
+### 投屏关键帧控制面批次(2026-10-20)
+
+- `packages/localsend_isolates/rust/src/api/screen.rs` + FRB codegen:RsScreenEvent 新增 `RequestKeyframe`;`RsScreenSender::request_keyframe()`(Windows)
+- `packages/localsend_isolates/lib/src/screen/screen_session.dart`:事件类 + `ScreenSenderSession.requestKeyframe()`
+- `app/lib/provider/screen/screen_provider.dart`:会话接口 `requestKeyframe()`(默认 no-op);receiver 事件自动中继 POST;`requestKeyframeFor()`(role/session 校验 + 500ms 节流)
+- `app/lib/provider/network/extension_server_provider.dart`:POST `/api/anyshare/v1/screen/keyframe`(参数/会话/来源 IP 校验,豁免限速)
+- `app/test/unit/provider/screen_offer_test.dart`:3 个用例(sender 收请求不外发、stale 忽略、receiver 中继携带 session)
+- 验证:226 Dart 测试 + analyze 0;双端 release 重建;Ubuntu→Windows 端点 409 实测可达
+
 ### 投屏关键帧请求批次(2026-10-20)
 
 - `packages/screen-stream/src/events.rs`:StreamEvent 新增 `RequestKeyframe`(接收端丢帧上报)
