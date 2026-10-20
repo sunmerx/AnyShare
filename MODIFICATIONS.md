@@ -53,6 +53,14 @@
 - `pubspec.lock`:8 个 build 工具链传递依赖小版本再解析(archive/build_config/build_daemon 等,仅 codegen 使用;官方源解析,运行时依赖零漂移)
 - `app/pubspec.yaml`:description 重写、homepage → github.com/sunmerx/AnyShare
 
+### 投屏解码默认切换与 vaapi 排查批次(2026-10-20)
+
+- `packages/screen-stream/src/receiver.rs`:Auto 解码器默认改为 ffmpeg 子进程(`ANYSHARE_FFMPEG_PATH` 覆盖二进制);原生 VAAPI 改为 `ANYSHARE_DECODER=vaapi` 显式启用(仅 Linux);`start_receiver` 启动前预检 ffmpeg 可执行文件,缺失同步报错(新增 `ffmpeg_available` 辅助)
+- `packages/screen-stream/src/vaapi/mod.rs`:POC 补全 pic_order_cnt_type=2(8.2.1.3:FrameNumOffset 回绕累加 MaxFrameNum、非参考帧 POC=-1、IDR 重置);新增 `ANYSHARE_VAAPI_TRACE` 亮度采样诊断(行号 clamp)
+- `packages/screen-stream/src/bin/ss-vaapidebug.rs`(新增)、`Cargo.toml`:离线 vaapi 解码复现工具(Annex-B 访问单元切分、PPM/亮度统计)
+- 背景:原生 vaapi 解码在当前 iHD 栈静默输出纯灰(Y=128),离线可复现,根因未明;默认切 ffmpeg 保证出画
+- 验证:Ubuntu cargo check/test(21 项)通过;Ubuntu release 应用重启仅设 `ANYSHARE_FFMPEG_PATH` 即正常服务
+
 ### 投屏 GPU 转换批次(2026-10-20)
 
 - `packages/screen-stream/src/gpu_convert.rs`(新增):D3D11 VideoProcessor 硬件缩放+色彩转换(BGRA→NV12,BT.601 limited);每帧输入视图显式回收;NV12 回读 1.5MB
