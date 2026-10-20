@@ -53,6 +53,14 @@
 - `pubspec.lock`:8 个 build 工具链传递依赖小版本再解析(archive/build_config/build_daemon 等,仅 codegen 使用;官方源解析,运行时依赖零漂移)
 - `app/pubspec.yaml`:description 重写、homepage → github.com/sunmerx/AnyShare
 
+### 投屏选择性重传批次(2026-10-21)
+
+- `packages/screen-stream/src/transport.rs`:FLAG_NACK + Nack 位图编解码;NACK_GRACE=15ms 静默窗口;PacketHistory 48 帧历史;Reassembler::missing_candidates/session
+- `packages/screen-stream/src/sender.rs`:非阻塞双工 socket;有界 NACK 排空(32/轮、帧级预算 2、检查 stop);重传计入统计;WouldBlock 丢弃不阻塞
+- `packages/screen-stream/src/receiver.rs`:对端地址会话校验;2ms 扫描门控;每帧 2 次 NACK(8ms 间隔)
+- 审查 1 blocker + 6 major 修复;26 Rust 测试全绿;双端 release 重建
+- 已知限制:connected UDP 在多网卡/VPN 回程地址不一致时可能丢弃 NACK(单网卡 Lan 场景正常)
+
 ### 投屏强制 IDR 回归批次(2026-10-21)
 
 - `packages/screen-stream/src/windows_encoder.rs`:`force_keyframe()` VT_UI4 失败回退 VT_BOOL(部分 MFT 类型要求);新增 Windows 编码器级测试(基线仅启动 IDR,force 后 5 个 AU 内必须出 IDR,排除周期 GOP 假通过)
