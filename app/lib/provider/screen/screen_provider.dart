@@ -53,6 +53,10 @@ abstract class ScreenEngineSession {
   /// doubles treat this as a no-op.
   Future<void> requestKeyframe() async {}
 
+  /// Sender sessions: request an encoder bitrate. Receiver sessions and test
+  /// doubles treat this as a no-op.
+  Future<void> setBitrate(int bitrateBps) async {}
+
   Future<void> stop();
 }
 
@@ -86,6 +90,9 @@ class _SenderAdapter implements ScreenEngineSession {
   Future<void> requestKeyframe() => _session.requestKeyframe();
 
   @override
+  Future<void> setBitrate(int bitrateBps) => _session.setBitrate(bitrateBps);
+
+  @override
   Future<void> stop() => _session.stop();
 }
 
@@ -103,6 +110,11 @@ class _ReceiverAdapter implements ScreenEngineSession {
   @override
   Future<void> requestKeyframe() async {
     // Receivers never serve keyframe requests (sender-side feature only).
+  }
+
+  @override
+  Future<void> setBitrate(int bitrateBps) async {
+    // Receivers never serve bitrate changes (sender-side feature only).
   }
 
   @override
@@ -263,6 +275,11 @@ class ScreenService extends ReduxNotifier<ScreenState> {
     if (_engineSession != null) {
       await stopEngine();
     }
+    // New session: reset adaptive-quality bookkeeping.
+    _currentBitrateBps = null;
+    _lastFeedbackLost = null;
+    _lastBitrateFeedbackAt = null;
+    _lastBitrateAdjustAt = null;
     unawaited(_subscription?.cancel());
     _engineSession = session;
     _subscription = session.events.listen(
@@ -330,6 +347,77 @@ class ScreenService extends ReduxNotifier<ScreenState> {
 
   DateTime? _lastKeyframeRelayAt;
   String? _lastKeyframeRelaySession;
+
+  /// Adaptive bitrate state (sender role). The receiver posts its loss
+  /// counters ~1/s; AIMD trims the encoder bitrate on loss and cautiously
+  /// restores it when the link is clean.
+  static const int _minBitrateBps = 2_000_000;
+  static const int _maxBitrateBps = 8_000_000;
+  int? _currentBitrateBps;
+  int? _lastFeedbackLost;
+  DateTime? _lastBitrateFeedbackAt;
+  DateTime? _lastBitrateAdjustAt;
+
+  /// Applies one receiver feedback sample. Ignores stale sessions, non-sender
+  /// roles, and samples that arrive faster than once per 500 ms.
+  ///
+  /// Semantics: `frames` is the receiver's decoded frames in the last second
+  /// (window), `lost` is cumulative. The loss rate therefore uses the
+  /// cumulative delta over the current window (transmitted ≈ frames + delta).
+  Future<void> adjustBitrateFor(String sessionId, int? lost, int? frames) async {
+    final active = state.active;
+    if (active == null || active.role != ScreenRole.sender || active.sessionId != sessionId) {
+      return;
+    }
+    if (lost == null || frames == null || lost < 0 || frames < 0) {
+      return;
+    }
+    final now = DateTime.now();
+    final lastAt = _lastBitrateAdjustAt;
+    if (lastAt != null && now.difference(lastAt) < const Duration(milliseconds: 500)) {
+      return;
+    }
+    _lastBitrateAdjustAt = now;
+    final prevLost = _lastFeedbackLost;
+    _lastFeedbackLost = lost;
+    if (prevLost == null) {
+      // First sample only seeds the delta baseline.
+      return;
+    }
+    final deltaLost = lost - prevLost;
+    if (deltaLost <= 0) {
+      // Clean window: cautiously restore, but only when frames actually flowed.
+      if (frames <= 0) {
+        return;
+      }
+    } else if (frames + deltaLost <= 0) {
+      return;
+    }
+    final lossRate = deltaLost <= 0 ? 0.0 : deltaLost / (frames + deltaLost);
+    final current = _currentBitrateBps ?? _maxBitrateBps;
+    int next;
+    if (lossRate > 0.02) {
+      next = (current * 0.8).round().clamp(_minBitrateBps, _maxBitrateBps);
+    } else if (lossRate < 0.005) {
+      next = (current * 1.05).round().clamp(_minBitrateBps, _maxBitrateBps);
+    } else {
+      next = current;
+    }
+    if (next == current) {
+      _currentBitrateBps = current;
+      return;
+    }
+    _currentBitrateBps = next;
+    final session = _engineSession;
+    if (session == null) {
+      return;
+    }
+    try {
+      await session.setBitrate(next);
+    } catch (e) {
+      _logger.fine('changing bitrate failed: $e');
+    }
+  }
 
   void startTimer(Duration duration, void Function() onFire) {
     _timer?.cancel();
@@ -703,6 +791,21 @@ class IncomingScreenAcceptAction extends AsyncReduxAction<ScreenService, ScreenS
 /// Either side: the peer stopped (or declined) the session. Only acts when the
 /// `session` id matches (or is absent), so stale stops cannot kill a newer
 /// session.
+/// Receiver reported its loss counters; adjust the encoder bitrate (AIMD).
+class IncomingScreenBitrateAction extends AsyncReduxAction<ScreenService, ScreenState> {
+  final String sessionId;
+  final int? lost;
+  final int? frames;
+
+  IncomingScreenBitrateAction({required this.sessionId, this.lost, this.frames});
+
+  @override
+  Future<ScreenState> reduce() async {
+    await notifier.adjustBitrateFor(sessionId, lost, frames);
+    return state;
+  }
+}
+
 /// Receiver asked the sender for an IDR after unrecovered loss.
 class IncomingScreenKeyframeAction extends AsyncReduxAction<ScreenService, ScreenState> {
   final String sessionId;
@@ -846,6 +949,22 @@ class _ScreenSessionEventAction extends AsyncReduxAction<ScreenService, ScreenSt
       case ScreenSessionStatsEvent(:final stats):
         // Frames are flowing: disarm the receiver watchdog.
         notifier.cancelTimer();
+        if (active.role == ScreenRole.receiver) {
+          // Feed our loss counters back to the sender (~1/s; the stats event
+          // itself is emitted every second). Fire-and-forget.
+          final now = DateTime.now();
+          final last = notifier._lastBitrateFeedbackAt;
+          if (last == null || now.difference(last) >= const Duration(seconds: 1)) {
+            notifier._lastBitrateFeedbackAt = now;
+            unawaited(
+              postScreenControl(active.peerIp, notifier.controlPort, 'screen/bitrate', {
+                'session': active.sessionId,
+                'lost': stats.lost,
+                'frames': stats.frames,
+              }),
+            );
+          }
+        }
         return state.copyWith(active: active.copyWith(lastStats: stats));
       case ScreenSessionRequestKeyframe():
         // Receiver detected unrecovered loss: ask the sender for an IDR.

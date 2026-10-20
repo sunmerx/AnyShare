@@ -243,6 +243,42 @@ extension ExtensionServerHandler on ExtensionServerService {
       return;
     }
 
+    if (request.method == 'POST' && path == '/api/anyshare/v1/screen/bitrate') {
+      // The receiver reports loss counters for adaptive quality. Same
+      // session/peer checks as screen/keyframe; the app does the AIMD math.
+      try {
+        final body = await readJsonBody(request);
+        if (body == null || body['session'] is! String) {
+          await writeJson(request, {'error': 'bad_request'}, status: 400);
+          return;
+        }
+        final active = ref.read(screenProvider).active;
+        if (active == null || active.role != ScreenRole.sender) {
+          await writeJson(request, {'error': 'no_session'}, status: 409);
+          return;
+        }
+        final remote = request.connectionInfo?.remoteAddress.address;
+        if (remote != null && _normalizedIp(remote) != _normalizedIp(active.peerIp)) {
+          await writeJson(request, {'error': 'forbidden'}, status: 403);
+          return;
+        }
+        await ref
+            .redux(screenProvider)
+            .dispatchAsync(
+              IncomingScreenBitrateAction(
+                sessionId: body['session'] as String,
+                lost: (body['lost'] as num?)?.toInt(),
+                frames: (body['frames'] as num?)?.toInt(),
+              ),
+            );
+        await writeJson(request, {'ok': true});
+      } catch (e, st) {
+        _logger.warning('screen/bitrate failed: $e\n$st');
+        await writeJson(request, {'error': 'internal'}, status: 500);
+      }
+      return;
+    }
+
     if (request.method == 'POST' && path == '/api/anyshare/v1/screen/keyframe') {
       // The receiver detected unrecovered loss and asks us to emit an IDR.
       // Exempt from the rate limiter (see accept); the app throttles to one

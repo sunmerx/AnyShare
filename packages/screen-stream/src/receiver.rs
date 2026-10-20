@@ -1051,6 +1051,7 @@ fn receive_loop(
     let mut peer_addr: Option<std::net::SocketAddr> = None;
     let mut nack_state: std::collections::HashMap<u32, (u8, Instant)> = std::collections::HashMap::new();
     let mut last_nack_scan = Instant::now();
+    let mut last_counter_publish = Instant::now();
     let mut last_lost = 0u64;
     let mut keyframe_request_pending = false;
     let mut last_keyframe_request: Option<Instant> = None;
@@ -1148,10 +1149,17 @@ fn receive_loop(
             last_keyframe_request = Some(now);
             let _ = events.send(StreamEvent::RequestKeyframe);
         }
-        if last_stats.elapsed() >= Duration::from_secs(5) {
+        // Publish counters every second: the app uses the cumulative loss
+        // delta against the per-second window frames for adaptive bitrate, so
+        // a coarse (5 s) refresh would break the feedback math.
+        if last_counter_publish.elapsed() >= Duration::from_secs(1) {
             let stats = reassembler.stats();
             shared.delivered.store(stats.delivered, Ordering::Release);
             shared.lost.store(stats.lost_frames, Ordering::Release);
+            last_counter_publish = Instant::now();
+        }
+        if last_stats.elapsed() >= Duration::from_secs(5) {
+            let stats = reassembler.stats();
             eprintln!(
                 "recv: delivered={} lost={} recovered={} dup={} stale={}",
                 stats.delivered, stats.lost_frames, stats.recovered_frames, stats.duplicate_packets, stats.stale_packets

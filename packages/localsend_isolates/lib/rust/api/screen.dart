@@ -55,6 +55,11 @@ abstract class RsScreenSender implements RustOpaqueInterface {
   /// `listen` is running: it only touches the handle.
   Future<void> requestKeyframe();
 
+  /// Requests a new encoder bitrate (the receiver's adaptive-quality
+  /// feedback, relayed by the app control plane). Safe to call while
+  /// `listen` runs.
+  Future<void> setBitrate({required int bitrateBps});
+
   Future<RsScreenStats?> stats();
 
   /// Stops the session; the join happens on a background thread so the

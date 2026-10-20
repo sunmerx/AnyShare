@@ -39,6 +39,7 @@ impl Default for SenderConfig {
 pub struct SenderHandle {
     stop: Arc<AtomicBool>,
     force_keyframe: Arc<AtomicBool>,
+    bitrate_bps: Arc<std::sync::atomic::AtomicU32>,
     stats: Arc<Mutex<StreamStats>>,
     join: Option<JoinHandle<()>>,
 }
@@ -56,6 +57,14 @@ impl SenderHandle {
     /// recovery). Safe to call from any thread; requests coalesce.
     pub fn request_keyframe(&self) {
         self.force_keyframe.store(true, Ordering::Release);
+    }
+
+    /// Requests a new encoder bitrate (adaptive quality). 0 is ignored;
+    /// requests coalesce, the latest value wins.
+    pub fn set_bitrate(&self, bitrate_bps: u32) {
+        if bitrate_bps >= 500_000 && bitrate_bps <= 50_000_000 {
+            self.bitrate_bps.store(bitrate_bps, Ordering::Release);
+        }
     }
 
     /// Waits for the sender thread to finish (stops it first).
@@ -139,17 +148,19 @@ mod imp {
     pub fn start(config: SenderConfig, event_tx: Sender<StreamEvent>) -> Result<SenderHandle> {
         let stop = Arc::new(AtomicBool::new(false));
         let force_keyframe = Arc::new(AtomicBool::new(false));
+        let bitrate_bps = Arc::new(std::sync::atomic::AtomicU32::new(0));
         let stats = Arc::new(Mutex::new(StreamStats::default()));
 
         let thread_stop = Arc::clone(&stop);
         let thread_force_keyframe = Arc::clone(&force_keyframe);
+        let thread_bitrate = Arc::clone(&bitrate_bps);
         let thread_stats = Arc::clone(&stats);
         // Everything COM/DXGI/MF related (output enumeration, duplicator,
         // encoder) is created and used on this one worker thread: the objects
         // are not Send, and MF wants a stable apartment per object.
         let join = std::thread::spawn(move || {
             send_event(&event_tx, StreamEvent::Status(StreamState::Starting));
-            if let Err(e) = run(config, thread_stop, thread_force_keyframe, Arc::clone(&thread_stats), &event_tx) {
+            if let Err(e) = run(config, thread_stop, thread_force_keyframe, thread_bitrate, Arc::clone(&thread_stats), &event_tx) {
                 send_event(&event_tx, StreamEvent::Error(format!("{e:#}")));
                 send_event(&event_tx, StreamEvent::Ended(EndReason::Error));
                 return;
@@ -160,6 +171,7 @@ mod imp {
         Ok(SenderHandle {
             stop,
             force_keyframe,
+            bitrate_bps,
             stats,
             join: Some(join),
         })
@@ -169,6 +181,7 @@ mod imp {
         config: SenderConfig,
         stop: Arc<AtomicBool>,
         force_keyframe: Arc<AtomicBool>,
+        bitrate_bps: Arc<std::sync::atomic::AtomicU32>,
         stats: Arc<Mutex<StreamStats>>,
         event_tx: &Sender<StreamEvent>,
     ) -> Result<()> {
@@ -268,7 +281,7 @@ mod imp {
         };
         eprintln!("sender: gpu convert = {}", gpu.is_some());
 
-        run_loop(config, socket, session, encoder, dup, gpu, stop, force_keyframe, stats, event_tx)
+        run_loop(config, socket, session, encoder, dup, gpu, stop, force_keyframe, bitrate_bps, stats, event_tx)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -281,11 +294,14 @@ mod imp {
         mut gpu: Option<crate::gpu_convert::GpuConverter>,
         stop: Arc<AtomicBool>,
         force_keyframe: Arc<AtomicBool>,
+        bitrate_bps: Arc<std::sync::atomic::AtomicU32>,
         stats: Arc<Mutex<StreamStats>>,
         event_tx: &Sender<StreamEvent>,
     ) -> Result<()> {
         let mut gate = VfrGate::new(VfrConfig::default());
         let mut force_rejected_warned = false;
+        let mut bitrate_pending: Option<(u32, Instant)> = None;
+        let mut bitrate_warned = false;
         let mut i420: Vec<u8> = Vec::new();
         let mut scaled_bgra: Vec<u8> = Vec::new();
         let mut pending_meta: std::collections::VecDeque<(bool, bool, u64)> = std::collections::VecDeque::new();
@@ -378,6 +394,32 @@ mod imp {
             }
             if nack_budget.len() > 64 {
                 nack_budget.retain(|frame_id, budget| *budget > 0 && history.get(*frame_id).is_some());
+            }
+
+            // Adaptive bitrate: apply the latest receiver feedback request.
+            // 0 means "no pending request". On failure keep retrying with a
+            // 5 s backoff (some encoders reject changes transiently) and log
+            // only once so the capture loop stays quiet.
+            let requested_bitrate = bitrate_bps.swap(0, Ordering::AcqRel);
+            if requested_bitrate != 0 {
+                bitrate_pending = Some((requested_bitrate, Instant::now()));
+            }
+            if let Some((target, retry_at)) = bitrate_pending {
+                if Instant::now() >= retry_at {
+                    match encoder.set_bitrate(target) {
+                        Ok(()) => {
+                            bitrate_pending = None;
+                            bitrate_warned = false;
+                        }
+                        Err(e) => {
+                            if !bitrate_warned {
+                                bitrate_warned = true;
+                                eprintln!("sender: bitrate change to {target} failed (retrying): {e:#}");
+                            }
+                            bitrate_pending = Some((target, Instant::now() + Duration::from_secs(5)));
+                        }
+                    }
+                }
             }
 
             let iter_started = Instant::now();

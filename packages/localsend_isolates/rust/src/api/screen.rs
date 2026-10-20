@@ -232,6 +232,23 @@ impl RsScreenSender {
             }
         }
     }
+
+    /// Requests a new encoder bitrate (the receiver's adaptive-quality
+    /// feedback, relayed by the app control plane). Safe to call while
+    /// `listen` runs.
+    pub fn set_bitrate(&self, bitrate_bps: u32) {
+        #[cfg(target_os = "windows")]
+        {
+            let inner = self.inner.lock().unwrap();
+            if let Some(handle) = inner.handle.as_ref() {
+                handle.set_bitrate(bitrate_bps);
+            }
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            let _ = bitrate_bps;
+        }
+    }
 }
 
 impl RsScreenReceiver {

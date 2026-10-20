@@ -11,7 +11,7 @@ use windows::Win32::Media::MediaFoundation::{
     MFT_MESSAGE_NOTIFY_BEGIN_STREAMING, MFT_MESSAGE_NOTIFY_END_OF_STREAM, MFT_MESSAGE_NOTIFY_START_OF_STREAM,
     MFT_OUTPUT_DATA_BUFFER, MF_EVENT_FLAG_NO_WAIT, MF_MT_AVG_BITRATE, MF_MT_FRAME_RATE, MF_MT_FRAME_SIZE,
     MF_MT_INTERLACE_MODE, MF_MT_MAJOR_TYPE, MF_MT_MPEG_SEQUENCE_HEADER, MF_MT_SUBTYPE, MF_TRANSFORM_ASYNC,
-    MF_TRANSFORM_ASYNC_UNLOCK, CODECAPI_AVEncCommonLowLatency, CODECAPI_AVEncCommonRateControlMode,
+    MF_TRANSFORM_ASYNC_UNLOCK, CODECAPI_AVEncCommonLowLatency, CODECAPI_AVEncCommonMeanBitRate, CODECAPI_AVEncCommonRateControlMode,
     CODECAPI_AVEncMPVDefaultBPictureCount, CODECAPI_AVEncVideoForceKeyFrame, CODECAPI_AVEncVideoMaxNumRefFrame,
 };
 
@@ -489,6 +489,27 @@ impl H264Encoder {
                     return Err(anyhow::anyhow!("ProcessOutput failed: {e:?}"));
                 }
             }
+        }
+    }
+
+    /// Live bitrate change for adaptive quality. Uses
+    /// CODECAPI_AVEncCommonMeanBitRate, which is safe mid-stream. There is no
+    /// output-type fallback: renegotiating while streaming requires a drain
+    /// and a fresh SPS/PPS + IDR, so a failure keeps the old bitrate and the
+    /// caller retries with backoff.
+    pub fn set_bitrate(&mut self, bitrate_bps: u32) -> Result<()> {
+        if bitrate_bps == 0 || bitrate_bps == self.config.bitrate_bps {
+            return Ok(());
+        }
+        let Some(api) = &self.codec_api else {
+            anyhow::bail!("encoder exposes no CodecAPI for live bitrate changes");
+        };
+        let value = VARIANT::from(bitrate_bps);
+        if unsafe { api.SetValue(&CODECAPI_AVEncCommonMeanBitRate, &value) }.is_ok() {
+            self.config.bitrate_bps = bitrate_bps;
+            Ok(())
+        } else {
+            anyhow::bail!("encoder rejected CODECAPI_AVEncCommonMeanBitRate")
         }
     }
 

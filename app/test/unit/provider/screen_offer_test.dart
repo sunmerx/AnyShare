@@ -32,6 +32,13 @@ class FakeScreenSession implements ScreenEngineSession {
   int keyframeRequests = 0;
 
   @override
+  Future<void> setBitrate(int bitrateBps) async {
+    bitrates.add(bitrateBps);
+  }
+
+  final List<int> bitrates = [];
+
+  @override
   Future<void> stop() async {
     stopped = true;
   }
@@ -380,6 +387,56 @@ void main() {
     final relayed = peerBodies.where((entry) => entry.$1.endsWith('/screen/keyframe')).toList();
     expect(relayed, hasLength(1));
     expect((jsonDecode(relayed.single.$2) as Map<String, dynamic>)['session'], active.sessionId);
+  });
+
+  test('sender adapts the bitrate from receiver loss feedback', () async {
+    await container.redux(screenProvider).dispatchAsync(StartScreenShareAction(peerIp: '127.0.0.1', peerAlias: 'Peer'));
+    final active = container.read(screenProvider).active!;
+    final session = engine.sessions.last;
+
+    // First sample seeds the delta baseline.
+    await post('screen/bitrate', {'session': active.sessionId, 'lost': 0, 'frames': 100});
+    expect(session.bitrates, isEmpty);
+
+    // The endpoint throttles to one sample per 500 ms.
+    await Future<void>.delayed(const Duration(milliseconds: 600));
+
+    // 10 lost frames over a 90-frame second ~ 10% loss -> back off 20%.
+    await post('screen/bitrate', {'session': active.sessionId, 'lost': 10, 'frames': 90});
+    expect(session.bitrates, [6400000]);
+  });
+
+  test('bitrate feedback with a stale session is ignored', () async {
+    await container.redux(screenProvider).dispatchAsync(StartScreenShareAction(peerIp: '127.0.0.1', peerAlias: 'Peer'));
+    final session = engine.sessions.last;
+
+    await post('screen/bitrate', {'session': 'stale', 'lost': 0, 'frames': 100});
+    await post('screen/bitrate', {'session': 'stale', 'lost': 10, 'frames': 200});
+
+    expect(session.bitrates, isEmpty);
+  });
+
+  test('receiver stats events post bitrate feedback to the peer', () async {
+    await addFavorite(fingerprint: 'FPPEER01', trustLevel: TrustLevel.full);
+    await offer();
+    final active = container.read(screenProvider).active!;
+    expect(active.role, ScreenRole.receiver);
+
+    engine.sessions.single.emit(
+      const ScreenSessionStatsEvent(
+        ScreenSessionStats(frames: 30, keyframes: 1, fps: 30, mbps: 8, packets: 900, lost: 2, decodeErrors: 0),
+      ),
+    );
+    for (var i = 0; i < 40 && !peerRequests.any((path) => path.endsWith('/screen/bitrate')); i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    }
+
+    final relayed = peerBodies.where((entry) => entry.$1.endsWith('/screen/bitrate')).toList();
+    expect(relayed, hasLength(1));
+    final body = jsonDecode(relayed.single.$2) as Map<String, dynamic>;
+    expect(body['session'], active.sessionId);
+    expect(body['lost'], 2);
+    expect(body['frames'], 30);
   });
 
   test('clear error action resets the banner error', () async {

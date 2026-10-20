@@ -132,6 +132,9 @@ class ScreenSenderSession {
   /// Asks the encoder for an IDR (receiver loss recovery).
   Future<void> requestKeyframe() => _inner.requestKeyframe();
 
+  /// Requests a new encoder bitrate (adaptive quality feedback).
+  Future<void> setBitrate(int bitrateBps) => _inner.setBitrate(bitrateBps: bitrateBps);
+
   Future<void> stop() => _inner.stop();
 }
 
