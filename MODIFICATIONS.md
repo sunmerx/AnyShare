@@ -53,6 +53,16 @@
 - `pubspec.lock`:8 个 build 工具链传递依赖小版本再解析(archive/build_config/build_daemon 等,仅 codegen 使用;官方源解析,运行时依赖零漂移)
 - `app/pubspec.yaml`:description 重写、homepage → github.com/sunmerx/AnyShare
 
+### 投屏关键帧请求批次(2026-10-20)
+
+- `packages/screen-stream/src/events.rs`:StreamEvent 新增 `RequestKeyframe`(接收端丢帧上报)
+- `packages/screen-stream/src/receiver.rs`:receive_loop 检测未恢复丢帧增量 → pending + 500ms 去抖发送(窗口内新增丢包延后不吞)
+- `packages/screen-stream/src/sender.rs`:`SenderHandle::request_keyframe()`;run_loop 接受请求时绕过 VFR 强制编码并置 keyframe;关键帧标记以码流 NAL type 5 为准(`au_has_idr`),MFT 忽略属性时重试
+- `packages/screen-stream/src/windows_encoder.rs`:`force_keyframe()` 公开(CODECAPI_AVEncVideoForceKeyFrame)
+- `packages/localsend_isolates/rust/src/api/screen.rs`:`map_event` 返回 Option,`RequestKeyframe` 暂不进入 FRB 事件模型(控制面接线后启用)
+- `packages/screen-stream/src/bin/ss-{send,view}.rs`:事件 match 补臂
+- 验证:Windows/Linux cargo check + 21 Rust 测试全绿;Ubuntu release 重建运行正常;Dart 控制面中继为下一步
+
 ### 投屏解码默认切换与 vaapi 排查批次(2026-10-20)
 
 - `packages/screen-stream/src/receiver.rs`:Auto 解码器默认改为 ffmpeg 子进程(`ANYSHARE_FFMPEG_PATH` 覆盖二进制);原生 VAAPI 改为 `ANYSHARE_DECODER=vaapi` 显式启用(仅 Linux);`start_receiver` 启动前预检 ffmpeg 可执行文件,缺失同步报错(新增 `ffmpeg_available` 辅助)
