@@ -53,6 +53,16 @@
 - `pubspec.lock`:8 个 build 工具链传递依赖小版本再解析(archive/build_config/build_daemon 等,仅 codegen 使用;官方源解析,运行时依赖零漂移)
 - `app/pubspec.yaml`:description 重写、homepage → github.com/sunmerx/AnyShare
 
+### 投屏自适应码率批次(2026-10-21)
+
+- `packages/screen-stream/src/windows_encoder.rs`:`set_bitrate()`(CODECAPI_AVEncCommonMeanBitRate,成功才提交,无流中重协商回退)
+- `packages/screen-stream/src/sender.rs`:`SenderHandle::set_bitrate()` + run_loop 应用与 5s 退避重试
+- `packages/screen-stream/src/receiver.rs`:共享计数改为每秒发布(反馈 delta 语义)
+- `packages/localsend_isolates/rust/src/api/screen.rs` + FRB codegen:`RsScreenSender::set_bitrate`
+- `app/lib/provider/screen/screen_provider.dart`:AIMD(2–8Mbps,>2% 降 20%,<0.5% 升 5%,500ms 采样间隔,会话重置);接收端每秒上报
+- `app/lib/provider/network/extension_server_provider.dart`:POST `/api/anyshare/v1/screen/bitrate`(同 keyframe 校验)
+- 测试 +3;229 Dart + 26 Rust 全绿;审查 1 blocker + 4 major 修复
+
 ### 投屏选择性重传批次(2026-10-21)
 
 - `packages/screen-stream/src/transport.rs`:FLAG_NACK + Nack 位图编解码;NACK_GRACE=15ms 静默窗口;PacketHistory 48 帧历史;Reassembler::missing_candidates/session
