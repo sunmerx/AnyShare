@@ -18,7 +18,8 @@ use windows::Win32::Graphics::Dxgi::Common::{
 use windows::Win32::Graphics::Dxgi::{
     CreateDXGIFactory1, IDXGIAdapter, IDXGIAdapter1, IDXGIFactory1, IDXGIOutput, IDXGIOutput1, IDXGIOutputDuplication,
     IDXGIResource, DXGI_ERROR_ACCESS_DENIED, DXGI_ERROR_ACCESS_LOST, DXGI_ERROR_INVALID_CALL, DXGI_ERROR_NOT_FOUND,
-    DXGI_ERROR_WAIT_TIMEOUT, DXGI_OUTDUPL_FRAME_INFO, DXGI_OUTDUPL_MOVE_RECT, DXGI_OUTPUT_DESC,
+    DXGI_ERROR_WAIT_TIMEOUT, DXGI_OUTDUPL_FRAME_INFO, DXGI_OUTDUPL_MOVE_RECT, DXGI_OUTDUPL_POINTER_SHAPE_INFO,
+    DXGI_OUTDUPL_POINTER_SHAPE_TYPE_COLOR, DXGI_OUTDUPL_POINTER_SHAPE_TYPE_MONOCHROME, DXGI_OUTPUT_DESC,
 };
 
 use crate::types::{Acquire, FrameMeta, FramePixels, MoveRect, OutputInfo, Rect};
@@ -121,6 +122,12 @@ pub struct Duplicator {
     staging: Option<ID3D11Texture2D>,
     staging_size: (u32, u32),
     pixel_buffer: Vec<u8>,
+    // Cursor state: DXGI duplication frames do not include the pointer, it
+    // must be composited from the frame metadata.
+    pointer_shape: Vec<u8>,
+    pointer_shape_info: DXGI_OUTDUPL_POINTER_SHAPE_INFO,
+    pointer_position: (i32, i32),
+    pointer_visible: bool,
 }
 
 impl Duplicator {
@@ -145,11 +152,26 @@ impl Duplicator {
             staging: None,
             staging_size: (0, 0),
             pixel_buffer: Vec::new(),
+            pointer_shape: Vec::new(),
+            pointer_shape_info: DXGI_OUTDUPL_POINTER_SHAPE_INFO::default(),
+            pointer_position: (0, 0),
+            pointer_visible: false,
         })
     }
 
     pub fn output_info(&self) -> &OutputInfo {
         &self.output_info
+    }
+
+    /// The size the duplication texture actually carries. This can differ from
+    /// [`OutputInfo::desktop_rect`] when the driver GPU-scales a lower desktop
+    /// resolution onto a larger panel mode (e.g. 1920x1200 desktop on a
+    /// 2880x1800 panel); the encoder must be configured with this size or it
+    /// is fed mismatched buffers and emits garbage.
+    pub fn capture_size(&self) -> Result<(u32, u32)> {
+        let dup = self.duplication.as_ref().context("duplication session missing")?;
+        let desc = unsafe { dup.GetDesc() };
+        Ok((desc.ModeDesc.Width, desc.ModeDesc.Height))
     }
 
     /// Number of session rebuilds (ACCESS_LOST / invalid-call recovery) since creation.
@@ -194,11 +216,51 @@ impl Duplicator {
         match acquired {
             Ok(()) => {
                 self.frame_index += 1;
-                let meta = {
+                let mut meta = {
                     let dup = self.duplication.as_ref().context("duplication session missing")?;
                     let buffer = &mut self.metadata_buffer;
                     unsafe { read_metadata(dup, buffer, self.frame_index, &info) }
                 };
+
+                // Pointer state: the position fields are only valid when
+                // LastMouseUpdateTime says the mouse actually changed —
+                // overwriting them on desktop-only frames would teleport the
+                // cursor to (0,0) / mark it invisible.
+                if info.LastMouseUpdateTime != 0 {
+                    let new_position = (info.PointerPosition.Position.x, info.PointerPosition.Position.y);
+                    let new_visible = info.PointerPosition.Visible.as_bool();
+                    if let Ok(meta) = meta.as_mut() {
+                        meta.pointer_moved =
+                            new_visible != self.pointer_visible || (new_visible && new_position != self.pointer_position);
+                    }
+                    self.pointer_position = new_position;
+                    self.pointer_visible = new_visible;
+                }
+                if info.PointerShapeBufferSize > 0 {
+                    let size = info.PointerShapeBufferSize as usize;
+                    self.pointer_shape.resize(size, 0);
+                    let mut required = 0u32;
+                    let mut shape_info = DXGI_OUTDUPL_POINTER_SHAPE_INFO::default();
+                    let dup = self.duplication.as_ref().context("duplication session missing")?;
+                    let fetched = unsafe {
+                        dup.GetFramePointerShape(
+                            size as u32,
+                            self.pointer_shape.as_mut_ptr() as *mut _,
+                            &mut required,
+                            &mut shape_info,
+                        )
+                    };
+                    match fetched {
+                        Ok(()) => {
+                            self.pointer_shape.truncate((required as usize).min(size));
+                            self.pointer_shape_info = shape_info;
+                        }
+                        Err(e) => {
+                            eprintln!("windows_capture: GetFramePointerShape failed: {e}");
+                            self.pointer_shape.clear();
+                        }
+                    }
+                }
 
                 let pixels = if copy_pixels {
                     match resource.as_ref() {
@@ -285,11 +347,154 @@ impl Duplicator {
         }
         self.context.Unmap(staging, 0);
 
+        self.composite_pointer(width, height);
+
         Ok(FramePixels {
             width,
             height,
             bgra: std::mem::take(&mut self.pixel_buffer),
         })
+    }
+
+    /// Draws the cursor into the BGRA buffer. DXGI duplication frames never
+    /// contain the pointer; without this the stream looks frozen (the VFR gate
+    /// sees no change while the user moves the mouse).
+    fn composite_pointer(&mut self, width: u32, height: u32) {
+        if !self.pointer_visible || self.pointer_shape.is_empty() {
+            return;
+        }
+        let info = self.pointer_shape_info;
+        if info.Width == 0 || info.Height == 0 || info.Pitch == 0 {
+            return;
+        }
+        // DXGI reports the pointer relative to this output's top-left corner;
+        // scale it when the duplication texture differs from the desktop rect
+        // (GPU-scaled modes).
+        let origin_w = self.output_info.desktop_rect.width().max(1);
+        let origin_h = self.output_info.desktop_rect.height().max(1);
+        let px = (self.pointer_position.0 as i64 * width as i64 / origin_w as i64) as i32;
+        let py = (self.pointer_position.1 as i64 * height as i64 / origin_h as i64) as i32;
+        let buffer = &mut self.pixel_buffer;
+        let shape = &self.pointer_shape;
+        match info.Type {
+            t if t == DXGI_OUTDUPL_POINTER_SHAPE_TYPE_COLOR.0 as u32 => {
+                let pitch = info.Pitch as usize;
+                for row in 0..info.Height as usize {
+                    let dy = py + row as i32;
+                    if dy < 0 || dy >= height as i32 {
+                        continue;
+                    }
+                    for col in 0..info.Width as usize {
+                        let dx = px + col as i32;
+                        if dx < 0 || dx >= width as i32 {
+                            continue;
+                        }
+                        let s = row * pitch + col * 4;
+                        if s + 4 > shape.len() {
+                            continue;
+                        }
+                        let alpha = shape[s + 3] as u32;
+                        if alpha == 0 {
+                            continue;
+                        }
+                        // COLOR shapes are premultiplied BGRA.
+                        let b = shape[s] as u32;
+                        let g = shape[s + 1] as u32;
+                        let r = shape[s + 2] as u32;
+                        let di = (dy as usize * width as usize + dx as usize) * 4;
+                        let db = buffer[di] as u32;
+                        let dg = buffer[di + 1] as u32;
+                        let dr = buffer[di + 2] as u32;
+                        let inv = 255 - alpha;
+                        buffer[di] = (b + db * inv / 255).min(255) as u8;
+                        buffer[di + 1] = (g + dg * inv / 255).min(255) as u8;
+                        buffer[di + 2] = (r + dr * inv / 255).min(255) as u8;
+                    }
+                }
+            }
+            t if t == DXGI_OUTDUPL_POINTER_SHAPE_TYPE_MONOCHROME.0 as u32 => {
+                // 1bpp AND mask followed by the XOR mask, MSB-first rows.
+                let row_bytes = info.Pitch as usize;
+                let mask_len = row_bytes * info.Height as usize;
+                for row in 0..info.Height as usize {
+                    let dy = py + row as i32;
+                    if dy < 0 || dy >= height as i32 {
+                        continue;
+                    }
+                    for col in 0..info.Width as usize {
+                        let dx = px + col as i32;
+                        if dx < 0 || dx >= width as i32 {
+                            continue;
+                        }
+                        let byte = col / 8;
+                        let bit = 7 - (col % 8) as u32;
+                        let and_off = row * row_bytes + byte;
+                        let xor_off = mask_len + and_off;
+                        if xor_off >= shape.len() {
+                            continue;
+                        }
+                        let and_b = (shape[and_off] >> bit) & 1;
+                        let xor_b = (shape[xor_off] >> bit) & 1;
+                        let di = (dy as usize * width as usize + dx as usize) * 4;
+                        match (and_b, xor_b) {
+                            (0, 0) => {
+                                buffer[di] = 0;
+                                buffer[di + 1] = 0;
+                                buffer[di + 2] = 0;
+                            }
+                            (0, 1) => {
+                                buffer[di] = 255;
+                                buffer[di + 1] = 255;
+                                buffer[di + 2] = 255;
+                            }
+                            (1, 0) => {}
+                            (1, 1) => {
+                                buffer[di] = !buffer[di];
+                                buffer[di + 1] = !buffer[di + 1];
+                                buffer[di + 2] = !buffer[di + 2];
+                            }
+                            _ => unreachable!(),
+                        }
+                    }
+                }
+            }
+            t if t == 4u32 => {
+                // MASKED_COLOR: alpha 0 replaces RGB, alpha 255 XORs the
+                // destination (per DXGI semantics).
+                let pitch = info.Pitch as usize;
+                for row in 0..info.Height as usize {
+                    let dy = py + row as i32;
+                    if dy < 0 || dy >= height as i32 {
+                        continue;
+                    }
+                    for col in 0..info.Width as usize {
+                        let dx = px + col as i32;
+                        if dx < 0 || dx >= width as i32 {
+                            continue;
+                        }
+                        let s = row * pitch + col * 4;
+                        if s + 4 > shape.len() {
+                            continue;
+                        }
+                        let di = (dy as usize * width as usize + dx as usize) * 4;
+                        match shape[s + 3] {
+                            0 => {
+                                buffer[di] = shape[s];
+                                buffer[di + 1] = shape[s + 1];
+                                buffer[di + 2] = shape[s + 2];
+                            }
+                            0xFF => {
+                                buffer[di] = !buffer[di];
+                                buffer[di + 1] = !buffer[di + 1];
+                                buffer[di + 2] = !buffer[di + 2];
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
     }
 
     /// Returns the pixel buffer to the duplicator so the next capture can reuse
@@ -319,6 +524,7 @@ unsafe fn read_metadata(
         dirty: Vec::new(),
         moved: Vec::new(),
         pointer_shape_updated: info.PointerShapeBufferSize > 0,
+        pointer_moved: false,
     };
 
     let cap = info.TotalMetadataBufferSize as usize;

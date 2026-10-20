@@ -145,7 +145,7 @@ class _DeviceDetailsPageState extends State<DeviceDetailsPage> with Refena {
                 onTap: () async {
                   // Mirror the card gating; explain the reason when disabled.
                   // The E2.0 engine is IPv4-only: dial an IPv4 channel.
-                  final screenHost = screenShareHostOf(device);
+                  final screenHost = screenShareHostOfWithFallback(device, favoriteEntry?.ip ?? '');
                   final String? reason = !canSendScreenShare()
                       ? t.ui2.screen.unsupportedSend
                       : (device.ip?.isNotEmpty != true)

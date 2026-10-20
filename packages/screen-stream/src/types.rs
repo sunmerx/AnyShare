@@ -51,6 +51,11 @@ pub struct FrameMeta {
     pub dirty: Vec<Rect>,
     pub moved: Vec<MoveRect>,
     pub pointer_shape_updated: bool,
+    /// The cursor moved (or its visibility changed) since the previous
+    /// frame. Pointer-only updates carry no dirty rects, so the VFR gate
+    /// must treat this as content change (the cursor is composited into the
+    /// frames by the capture layer).
+    pub pointer_moved: bool,
 }
 
 #[derive(Clone, Debug)]

@@ -11,7 +11,8 @@ use windows::Win32::Media::MediaFoundation::{
     MFT_MESSAGE_NOTIFY_BEGIN_STREAMING, MFT_MESSAGE_NOTIFY_END_OF_STREAM, MFT_MESSAGE_NOTIFY_START_OF_STREAM,
     MFT_OUTPUT_DATA_BUFFER, MF_EVENT_FLAG_NO_WAIT, MF_MT_AVG_BITRATE, MF_MT_FRAME_RATE, MF_MT_FRAME_SIZE,
     MF_MT_INTERLACE_MODE, MF_MT_MAJOR_TYPE, MF_MT_MPEG_SEQUENCE_HEADER, MF_MT_SUBTYPE, MF_TRANSFORM_ASYNC,
-    MF_TRANSFORM_ASYNC_UNLOCK, CODECAPI_AVEncVideoForceKeyFrame,
+    MF_TRANSFORM_ASYNC_UNLOCK, CODECAPI_AVEncCommonLowLatency, CODECAPI_AVEncCommonRateControlMode,
+    CODECAPI_AVEncMPVDefaultBPictureCount, CODECAPI_AVEncVideoForceKeyFrame, CODECAPI_AVEncVideoMaxNumRefFrame,
 };
 
 use crate::windows_encoders::h264_encoder_candidates;
@@ -212,6 +213,18 @@ impl H264Encoder {
             select_input_type(&transform, config).context("input type negotiation")?;
         unsafe {
             transform.SetInputType(0, &input, 0).map_err(mf_err("SetInputType"))?;
+        }
+
+        // Low-latency streaming profile, applied after the types are set but
+        // before streaming starts (some MFTs ignore CodecAPI changes later).
+        // The default (VBR with lookahead and B-frames) delayed every
+        // ProcessOutput by ~30 ms; live screen streaming needs
+        // CBR/LowDelayVBR, no B-frames and one reference.
+        if let Some(api) = &codec_api {
+            configure_low_latency(api);
+        }
+
+        unsafe {
             transform
                 .ProcessMessage(MFT_MESSAGE_NOTIFY_BEGIN_STREAMING, 0)
                 .map_err(mf_err("BEGIN_STREAMING"))?;
@@ -248,6 +261,11 @@ impl H264Encoder {
 
     pub fn input_format(&self) -> InputPixelFormat {
         self.input_format
+    }
+
+    /// Encoder frame dimensions (after any sender-side scaling).
+    pub fn dimensions(&self) -> (u32, u32) {
+        (self.config.width, self.config.height)
     }
 
     pub fn is_hardware(&self) -> bool {
@@ -310,11 +328,6 @@ impl H264Encoder {
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
         if self.event_driven {
             self.pump_events(&mut outputs, EventPumpMode::NonBlocking, deadline)?;
-            self.pump_events(
-                &mut outputs,
-                EventPumpMode::UntilNeedInput,
-                std::time::Instant::now() + std::time::Duration::from_millis(50),
-            )?;
         }
 
         loop {
@@ -336,7 +349,14 @@ impl H264Encoder {
         }
 
         if self.event_driven {
-            self.pump_events(&mut outputs, EventPumpMode::NonBlocking, deadline)?;
+            // Pipelined: do not wait for THIS frame's output — it arrives while
+            // the next frame is being submitted (waiting here serialised the
+            // pipeline and made every frame cost the full encoder latency).
+            self.pump_events(
+                &mut outputs,
+                EventPumpMode::NonBlocking,
+                std::time::Instant::now() + std::time::Duration::from_millis(1),
+            )?;
         } else {
             self.drain_sync(&mut outputs)?;
         }
@@ -501,7 +521,6 @@ impl H264Encoder {
             self.keyframe_force_supported = true;
         }
     }
-
     pub fn shutdown(&mut self) -> Result<Vec<Vec<u8>>> {
         let mut outputs: Vec<Vec<u8>> = Vec::new();
         unsafe {
@@ -510,7 +529,20 @@ impl H264Encoder {
         }
         let deadline = std::time::Instant::now() + std::time::Duration::from_millis(500);
         if self.event_driven {
-            let _ = self.pump_events(&mut outputs, EventPumpMode::NonBlocking, deadline);
+            // Pipelined encoding leaves 1-2 access units in flight; keep
+            // pumping until they emerge (or the deadline passes) instead of
+            // returning on the first empty pump.
+            let mut idle_since = std::time::Instant::now();
+            while std::time::Instant::now() < deadline {
+                let before = outputs.len();
+                let _ = self.pump_events(&mut outputs, EventPumpMode::NonBlocking, deadline);
+                if outputs.len() > before {
+                    idle_since = std::time::Instant::now();
+                } else if idle_since.elapsed() > std::time::Duration::from_millis(100) {
+                    break;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(2));
+            }
         } else {
             let _ = self.drain_sync(&mut outputs);
         }
@@ -572,4 +604,24 @@ pub fn create_best_encoder(config: &EncoderConfig) -> Result<H264Encoder> {
     }
 
     bail!("all encoder candidates failed: {}", failures.join(" | "))
+}
+
+/// Best-effort low-latency streaming configuration via ICodecAPI. Unsupported
+/// properties are skipped (the encoder decides).
+fn configure_low_latency(api: &ICodecAPI) {
+    fn set_u32(api: &ICodecAPI, guid: &windows::core::GUID, value: u32) -> bool {
+        unsafe { api.SetValue(guid, &VARIANT::from(value)).is_ok() }
+    }
+    fn set_bool(api: &ICodecAPI, guid: &windows::core::GUID, value: bool) -> bool {
+        unsafe { api.SetValue(guid, &VARIANT::from(value)).is_ok() }
+    }
+
+    // LowDelayVBR (4) keeps the rate control window short; CBR (0) is the
+    // fallback when the encoder rejects it.
+    if !set_u32(api, &CODECAPI_AVEncCommonRateControlMode, 4) {
+        let _ = set_u32(api, &CODECAPI_AVEncCommonRateControlMode, 0);
+    }
+    let _ = set_bool(api, &CODECAPI_AVEncCommonLowLatency, true);
+    let _ = set_u32(api, &CODECAPI_AVEncMPVDefaultBPictureCount, 0);
+    let _ = set_u32(api, &CODECAPI_AVEncVideoMaxNumRefFrame, 1);
 }

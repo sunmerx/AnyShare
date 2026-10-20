@@ -75,7 +75,13 @@ impl VfrGate {
     }
 
     fn has_content_change(meta: &FrameMeta) -> bool {
-        meta.last_present_time != 0 || !meta.dirty.is_empty() || !meta.moved.is_empty()
+        // Pointer movement counts: the capture layer composites the cursor
+        // into the frames, and pointer-only frames carry no dirty rects.
+        meta.last_present_time != 0
+            || !meta.dirty.is_empty()
+            || !meta.moved.is_empty()
+            || meta.pointer_moved
+            || meta.pointer_shape_updated
     }
 
     fn min_interval(&self) -> Duration {

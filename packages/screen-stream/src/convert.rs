@@ -109,6 +109,63 @@ pub fn i420_to_yv12_in_place(buf: &mut [u8], width: u32, height: u32) {
     }
 }
 
+/// Box-averages a compact BGRA image down to (dw, dh). Downscaling at the
+/// sender is the E2.0 decision (1080p cap): it cuts the CPU conversion,
+/// encode, transport, decode and present costs by the pixel ratio, and the
+/// fixed bitrate then buys much sharper pixels.
+pub fn bgra_box_scale(src: &[u8], sw: u32, sh: u32, dw: u32, dh: u32, out: &mut Vec<u8>) {
+    let sw = sw as usize;
+    let sh = sh as usize;
+    let dw = dw as usize;
+    let dh = dh as usize;
+    assert!(src.len() >= sw * sh * 4, "bgra buffer too small");
+    out.clear();
+    out.resize(dw * dh * 4, 0);
+    for dy in 0..dh {
+        let sy0 = dy * sh / dh;
+        let sy1 = (((dy + 1) * sh) / dh).max(sy0 + 1).min(sh);
+        for dx in 0..dw {
+            let sx0 = dx * sw / dw;
+            let sx1 = (((dx + 1) * sw) / dw).max(sx0 + 1).min(sw);
+            let (mut b, mut g, mut r, mut a, mut n) = (0u32, 0u32, 0u32, 0u32, 0u32);
+            for sy in sy0..sy1 {
+                let row = sy * sw * 4;
+                for sx in sx0..sx1 {
+                    let i = row + sx * 4;
+                    b += src[i] as u32;
+                    g += src[i + 1] as u32;
+                    r += src[i + 2] as u32;
+                    a += src[i + 3] as u32;
+                    n += 1;
+                }
+            }
+            let o = (dy * dw + dx) * 4;
+            out[o] = (b / n) as u8;
+            out[o + 1] = (g / n) as u8;
+            out[o + 2] = (r / n) as u8;
+            out[o + 3] = (a / n) as u8;
+        }
+    }
+}
+
+/// Cheap blank-frame check: samples every 4096th pixel (used to drop the
+/// driver's blank first frame after a duplication session starts).
+pub fn bgra_looks_blank(bgra: &[u8]) -> bool {
+    bgra.chunks_exact(4).step_by(4096).all(|px| px[0] < 8 && px[1] < 8 && px[2] < 8)
+}
+
+/// Scales (w, h) down so it fits into (max_w, max_h), preserving the aspect
+/// ratio, with even dimensions (NV12/I420 require them).
+pub fn scale_to_fit(w: u32, h: u32, max_w: u32, max_h: u32) -> (u32, u32) {
+    if w <= max_w && h <= max_h {
+        return (w & !1, h & !1);
+    }
+    let scale = f64::min(max_w as f64 / w as f64, max_h as f64 / h as f64);
+    let dw = ((w as f64 * scale).round() as u32).max(2) & !1;
+    let dh = ((h as f64 * scale).round() as u32).max(2) & !1;
+    (dw, dh)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -24,3 +24,10 @@ String? screenShareHostOf(Device device) {
   }
   return null;
 }
+
+/// Like [screenShareHostOf], but falls back to [fallbackIp] (the stored
+/// favorite address) when discovery only produced IPv6 addresses — the
+/// sender side is IPv4-only.
+String? screenShareHostOfWithFallback(Device device, String fallbackIp) {
+  return screenShareHostOf(device) ?? ((fallbackIp.isNotEmpty && !fallbackIp.contains(':')) ? fallbackIp : null);
+}

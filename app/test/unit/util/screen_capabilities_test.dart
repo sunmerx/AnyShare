@@ -41,4 +41,18 @@ void main() {
       isNull,
     );
   });
+
+  test('screenShareHostOfWithFallback uses the stored favorite IPv4', () {
+    final v6Only = _device(
+      ip: 'fe80::1%3',
+      channels: [HttpChannel(host: 'fe80::1%3', port: 53317, https: true)],
+    );
+    expect(screenShareHostOfWithFallback(v6Only, '192.168.1.180'), '192.168.1.180');
+    // IPv6 fallback is not usable either.
+    expect(screenShareHostOfWithFallback(v6Only, 'fe80::9'), isNull);
+    expect(screenShareHostOfWithFallback(v6Only, ''), isNull);
+    // A discovered IPv4 channel wins over the stored address.
+    final v4 = _device(ip: null, channels: [HttpChannel(host: '192.168.1.50', port: 53317, https: true)]);
+    expect(screenShareHostOfWithFallback(v4, '192.168.1.180'), '192.168.1.50');
+  });
 }

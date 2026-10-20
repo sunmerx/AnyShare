@@ -44,6 +44,7 @@ fn run() -> anyhow::Result<()> {
     let mut vfr_enabled = false;
     let mut encode_enabled = false;
     let mut dump_path: Option<String> = None;
+    let mut dump_frame_path: Option<String> = None;
     let mut bitrate_bps = 8_000_000u32;
     let mut want_output: Option<String> = None;
     let mut seconds = 10u64;
@@ -56,6 +57,7 @@ fn run() -> anyhow::Result<()> {
             "--vfr" => vfr_enabled = true,
             "--encode" => encode_enabled = true,
             "--dump" => dump_path = Some(next_value(&args, &mut i, "--dump")?),
+            "--dump-frame" => dump_frame_path = Some(next_value(&args, &mut i, "--dump-frame")?),
             "--bitrate" => {
                 let raw = next_value(&args, &mut i, "--bitrate")?;
                 bitrate_bps = raw
@@ -143,6 +145,36 @@ fn run() -> anyhow::Result<()> {
 
     let mut dup = Duplicator::new(target.index)?;
     let area = target.desktop_rect.area().max(1);
+
+    if let Some(path) = &dump_frame_path {
+        // Acceptance diagnostic: keep acquiring for a few seconds and write
+        // the LAST frame (the first frame of a fresh duplication session can
+        // be blank on some drivers).
+        use std::io::Write;
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(4);
+        let mut last: Option<(u32, u32, Vec<u8>)> = None;
+        let mut frames = 0u32;
+        while std::time::Instant::now() < deadline {
+            if let Some((_meta, pixels)) = dup.acquire_full(500)? {
+                // Skip the driver's blank first frame (AMD); keep the last
+                // non-blank frame, falling back to any frame.
+                if !screen_stream::convert::bgra_looks_blank(&pixels.bgra) || last.is_none() {
+                    last = Some((pixels.width, pixels.height, pixels.bgra));
+                }
+                frames += 1;
+            }
+        }
+        let (width, height, bgra) = last.ok_or_else(|| anyhow::anyhow!("no frame acquired for --dump-frame"))?;
+        let mut file = std::fs::File::create(path)?;
+        write!(file, "P6\n{} {}\n255\n", width, height)?;
+        let mut bytes = Vec::with_capacity((width * height * 3) as usize);
+        for chunk in bgra.chunks_exact(4) {
+            bytes.extend_from_slice(&[chunk[2], chunk[1], chunk[0]]);
+        }
+        file.write_all(&bytes)?;
+        println!("dumped capture frame {}x{} ({} frames) to {path}", width, height, frames);
+        return Ok(());
+    }
 
     if encode_enabled && screen_stream::windows_capture::rotation_name(target.rotation) != "identity" {
         anyhow::bail!(

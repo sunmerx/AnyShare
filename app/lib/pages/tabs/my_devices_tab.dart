@@ -126,16 +126,16 @@ class MyDevicesTab extends StatelessWidget {
             // Same-owner devices may share even at temp trust (D2 same-owner
             // rule takes precedence in evaluateScreenOffer). The E2.0 engine
             // is IPv4-only: dial an IPv4 channel, not the (often IPv6) ip.
-            onTap: (device != null && screenShareHostOf(device) != null && canSendScreenShare())
+            onTap: (device != null && screenShareHostOfWithFallback(device, entry.ip) != null && canSendScreenShare())
                 ? () => ref
                       .redux(screenProvider)
                       .dispatchAsync(
-                        StartScreenShareAction(peerIp: screenShareHostOf(device)!, peerAlias: device.alias),
+                        StartScreenShareAction(peerIp: screenShareHostOfWithFallback(device, entry.ip)!, peerAlias: device.alias),
                       )
                 : null,
             disabledTooltip: !canSendScreenShare()
                 ? t.ui2.screen.unsupportedSend
-                : (device != null && screenShareHostOf(device) == null)
+                : (device != null && screenShareHostOfWithFallback(device, entry.ip) == null)
                 ? t.ui2.screen.errIpv6
                 : t.ui2.deviceList.offlineHint,
           ),

@@ -146,7 +146,13 @@ mod imp {
             }
             None => attached
                 .iter()
-                .min_by_key(|o| o.desktop_rect.area())
+                // Primary output sits at the desktop origin (0,0). Sharing the
+                // real main screen is what "share screen" means; the old
+                // smallest-output auto-pick selected the (often empty) virtual
+                // display and sent blank frames.
+                .find(|o| o.desktop_rect.left == 0 && o.desktop_rect.top == 0)
+                .or_else(|| attached.iter().max_by_key(|o| o.desktop_rect.area()))
+                .or_else(|| attached.first())
                 .cloned()
                 .ok_or_else(|| anyhow::anyhow!("no attached output to auto-pick"))?,
         };
@@ -165,16 +171,33 @@ mod imp {
 
         let session = (SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos() & 0xFFFF_FFFF) as u32 | 1;
 
+        let dup = Duplicator::new(target_output.index)?;
+
+        // The duplication texture size can differ from the desktop rect when
+        // the driver GPU-scales (panel mode 2880x1800 vs 1920x1200 desktop):
+        // the encoder must match the actual capture size.
+        let (capture_width, capture_height) = dup.capture_size()?;
+        // E2.0 decision D5: encode at most 1080p (the capture may be larger,
+        // e.g. a 2880x1800 panel). The fixed base bitrate then buys a much
+        // sharper picture and every downstream stage gets cheaper.
+        let (encode_width, encode_height) = crate::convert::scale_to_fit(capture_width, capture_height, 1920, 1080);
         let encoder_config = crate::EncoderConfig {
-            width: target_output.desktop_rect.width() as u32,
-            height: target_output.desktop_rect.height() as u32,
+            width: encode_width,
+            height: encode_height,
             bitrate_bps: config.bitrate_bps,
             fps: config.fps,
         };
         let encoder = create_best_encoder(&encoder_config)?;
-        eprintln!("sender: encoder {} (input {})", encoder.name(), encoder.input_format().name());
-
-        let dup = Duplicator::new(target_output.index)?;
+        eprintln!(
+            "sender: encoder {} (input {}), capture {}x{}, encode {}x{}, bitrate {} Mbps",
+            encoder.name(),
+            encoder.input_format().name(),
+            capture_width,
+            capture_height,
+            encode_width,
+            encode_height,
+            config.bitrate_bps / 1_000_000
+        );
 
         run_loop(config, socket, session, encoder, dup, stop, stats, event_tx)
     }
@@ -192,6 +215,9 @@ mod imp {
     ) -> Result<()> {
         let mut gate = VfrGate::new(VfrConfig::default());
         let mut i420: Vec<u8> = Vec::new();
+        let mut scaled_bgra: Vec<u8> = Vec::new();
+        let mut pending_meta: std::collections::VecDeque<(bool, bool, u64)> = std::collections::VecDeque::new();
+        let (encode_width, encode_height) = encoder.dimensions();
 
         let mut frame_id: u32 = 1;
         let mut packets_sent: u64 = 0;
@@ -200,6 +226,8 @@ mod imp {
         let mut keyframes_sent: u64 = 0;
         let mut last_enc_time_100ns: i64 = -1;
         let mut last_rebuild_count = dup.rebuild_count();
+        // Drop the first frame of each duplication session (it can be blank).
+        let mut skip_first_frame = true;
         let mut last_send_time_100ns: i64 = -1;
 
         let mut sequence_header: Option<Vec<u8>> = encoder.take_sequence_header();
@@ -217,6 +245,18 @@ mod imp {
         let mut window_packets: u64 = 0;
         let mut window_bytes: u64 = 0;
         let mut window_frames: u64 = 0;
+        let mut window_encode_ms: f64 = 0.0;
+        let mut window_acquires: u64 = 0;
+        let mut window_none: u64 = 0;
+        let mut window_dirty: u64 = 0;
+        let mut window_moved: u64 = 0;
+        let mut window_pointer_moved: u64 = 0;
+        let mut window_pointer_shape: u64 = 0;
+        let mut window_zero_present: u64 = 0;
+        let mut window_acquire_ms: f64 = 0.0;
+        let mut window_convert_ms: f64 = 0.0;
+        let mut window_loop_ms: f64 = 0.0;
+        let mut window_encode_frames: u64 = 0;
         let mut window_keyframes: u64 = 0;
 
         while !stop.load(Ordering::Acquire) {
@@ -226,30 +266,86 @@ mod imp {
                 }
             }
 
-            match dup.acquire_full(config.timeout_ms)? {
+            let iter_started = Instant::now();
+            let acquire_started = Instant::now();
+            let acquired = dup.acquire_full(config.timeout_ms)?;
+            window_acquire_ms += acquire_started.elapsed().as_secs_f64() * 1000.0;
+            match acquired {
                 None => {
+                    window_none += 1;
                     let _ = gate.decide(&FrameMeta::default(), Instant::now());
                 }
                 Some((meta, pixels)) => {
                     let rebuild_changed = dup.rebuild_count() != last_rebuild_count;
                     last_rebuild_count = dup.rebuild_count();
+                    window_acquires += 1;
+                    if !meta.dirty.is_empty() {
+                        window_dirty += 1;
+                    }
+                    if !meta.moved.is_empty() {
+                        window_moved += 1;
+                    }
+                    if meta.pointer_moved {
+                        window_pointer_moved += 1;
+                    }
+                    if meta.pointer_shape_updated {
+                        window_pointer_shape += 1;
+                    }
+                    if meta.last_present_time == 0 {
+                        window_zero_present += 1;
+                    }
+
+                    // The first frame of a fresh duplication session can be
+                    // blank (observed on AMD with scaled displays): encoding it
+                    // would publish a black keyframe and VFR would then only
+                    // stream tiny diffs, leaving the receiver stuck on black.
+                    if rebuild_changed {
+                        skip_first_frame = true;
+                    }
+                    if skip_first_frame {
+                        skip_first_frame = false;
+                        // Only drop a BLANK frame; a static desktop may never
+                        // produce another frame, and dropping a valid first
+                        // frame would leave the receiver black forever.
+                        if crate::convert::bgra_looks_blank(&pixels.bgra) {
+                            dup.recycle_pixels(pixels);
+                            continue;
+                        }
+                    }
 
                     if let EncodeDecision::Encode { keyframe } = gate.decide(&meta, Instant::now()) {
+                        let convert_started = Instant::now();
                         {
                             use crate::windows_encoder::InputPixelFormat;
+                            // E2.0 decision D5: encode at most 1080p. The panel
+                            // may be larger (2880x1800); downscale at the
+                            // sender so conversion, encoding, transport and the
+                            // receiver all pay the smaller pixel bill.
+                            let (sw, sh) = if (pixels.width, pixels.height) == (encode_width, encode_height) {
+                                (pixels.width, pixels.height)
+                            } else {
+                                crate::convert::bgra_box_scale(
+                                    &pixels.bgra,
+                                    pixels.width,
+                                    pixels.height,
+                                    encode_width,
+                                    encode_height,
+                                    &mut scaled_bgra,
+                                );
+                                (encode_width, encode_height)
+                            };
+                            let bgra = if (pixels.width, pixels.height) == (sw, sh) { &pixels.bgra } else { &scaled_bgra };
                             match encoder.input_format() {
-                                InputPixelFormat::Nv12 => {
-                                    crate::convert::bgra_to_nv12(&pixels.bgra, pixels.width, pixels.height, &mut i420)
-                                }
-                                InputPixelFormat::I420 => {
-                                    crate::convert::bgra_to_i420(&pixels.bgra, pixels.width, pixels.height, &mut i420)
-                                }
+                                InputPixelFormat::Nv12 => crate::convert::bgra_to_nv12(bgra, sw, sh, &mut i420),
+                                InputPixelFormat::I420 => crate::convert::bgra_to_i420(bgra, sw, sh, &mut i420),
                                 InputPixelFormat::Yv12 => {
-                                    crate::convert::bgra_to_i420(&pixels.bgra, pixels.width, pixels.height, &mut i420);
-                                    crate::convert::i420_to_yv12_in_place(&mut i420, pixels.width, pixels.height);
+                                    crate::convert::bgra_to_i420(bgra, sw, sh, &mut i420);
+                                    crate::convert::i420_to_yv12_in_place(&mut i420, sw, sh);
                                 }
                             }
                         }
+
+                        window_convert_ms += convert_started.elapsed().as_secs_f64() * 1000.0;
 
                         let t100 = started.elapsed().as_nanos() as i64 / 100;
                         let delta = if last_enc_time_100ns >= 0 {
@@ -273,18 +369,28 @@ mod imp {
                             sequence_header = Some(header);
                         }
 
+                        let encode_started = Instant::now();
                         let outputs = encoder.encode(&i420, t100, duration, discontinuity, keyframe)?;
-                        let mut flags = 0u8;
-                        if keyframe {
-                            flags |= FLAG_KEYFRAME;
-                        }
-                        if discontinuity {
-                            flags |= FLAG_DISCONTINUITY;
-                        }
+                        window_encode_ms += encode_started.elapsed().as_secs_f64() * 1000.0;
+                        window_encode_frames += 1;
+                        // With pipelined encoding, outputs belong to EARLIER
+                        // submissions: queue the per-request flags and pair them
+                        // in order instead of using the current gate decision.
+                        pending_meta.push_back((keyframe, discontinuity, t100 as u64));
                         let had_output = !outputs.is_empty();
                         for chunk in &outputs {
+                            let (out_keyframe, out_discontinuity, out_ts) = pending_meta
+                                .pop_front()
+                                .unwrap_or((keyframe, discontinuity, t100 as u64));
+                            let mut flags = 0u8;
+                            if out_keyframe {
+                                flags |= FLAG_KEYFRAME;
+                            }
+                            if out_discontinuity {
+                                flags |= FLAG_DISCONTINUITY;
+                            }
                             let with_header;
-                            let payload: &[u8] = if keyframe {
+                            let payload: &[u8] = if out_keyframe {
                                 match &sequence_header {
                                     Some(header) => {
                                         let mut combined = Vec::with_capacity(header.len() + chunk.len());
@@ -298,7 +404,7 @@ mod imp {
                             } else {
                                 chunk
                             };
-                            let packets = packetize(session, frame_id, flags, t100 as u64, payload);
+                            let packets = packetize(session, frame_id, flags, out_ts, payload);
                             for packet in &packets {
                                 socket.send(&packet.encode())?;
                                 packets_sent += 1;
@@ -309,14 +415,15 @@ mod imp {
                             frame_id = frame_id.wrapping_add(1);
                             frames_sent += 1;
                             window_frames += 1;
+                            if out_keyframe {
+                                keyframes_sent += 1;
+                                window_keyframes += 1;
+                            }
                             if frames_sent == 1 {
                                 send_event(event_tx, StreamEvent::Status(StreamState::Streaming));
                             }
                         }
-                        if keyframe && had_output {
-                            keyframes_sent += 1;
-                            window_keyframes += 1;
-                        }
+                        let _ = had_output;
                         if last_enc_time_100ns < 0 && started.elapsed() > Duration::from_secs(5) {
                             anyhow::bail!("encoder produced no output within 5s (activating-but-mute MFT?)");
                         }
@@ -324,11 +431,37 @@ mod imp {
                         last_send_time_100ns = t100;
                     }
                     dup.recycle_pixels(pixels);
+                    window_loop_ms += iter_started.elapsed().as_secs_f64() * 1000.0;
                 }
             }
 
             if last_stats.elapsed() >= Duration::from_secs(1) {
                 let mbps = window_bytes as f64 * 8.0 / 1_000_000.0;
+                eprintln!(
+                    "sender: t={:.0}s fps={} kf={} mbps={:.2} enc_ms={:.1}",
+                    started.elapsed().as_secs_f64(),
+                    window_frames,
+                    window_keyframes,
+                    mbps,
+                    if window_encode_frames > 0 { window_encode_ms / window_encode_frames as f64 } else { 0.0 }
+                );
+                eprintln!(
+                    "sender meta: acq={} none={} dirty={} moved={} pm={} ps={} zp={} rebuilds={}",
+                    window_acquires,
+                    window_none,
+                    window_dirty,
+                    window_moved,
+                    window_pointer_moved,
+                    window_pointer_shape,
+                    window_zero_present,
+                    last_rebuild_count
+                );
+                eprintln!(
+                    "sender timing: acq_ms={:.1} conv_ms={:.1} loop_ms={:.1} (per frame with data)",
+                    if window_acquires > 0 { window_acquire_ms / window_acquires as f64 } else { 0.0 },
+                    if window_encode_frames > 0 { window_convert_ms / window_encode_frames as f64 } else { 0.0 },
+                    if window_acquires > 0 { window_loop_ms / window_acquires as f64 } else { 0.0 }
+                );
                 {
                     let mut shared = stats.lock().unwrap();
                     shared.frames = window_frames;
@@ -352,6 +485,18 @@ mod imp {
                 window_bytes = 0;
                 window_frames = 0;
                 window_keyframes = 0;
+                window_encode_ms = 0.0;
+                window_encode_frames = 0;
+                window_acquires = 0;
+                window_none = 0;
+                window_dirty = 0;
+                window_moved = 0;
+                window_pointer_moved = 0;
+                window_pointer_shape = 0;
+                window_zero_present = 0;
+                window_acquire_ms = 0.0;
+                window_convert_ms = 0.0;
+                window_loop_ms = 0.0;
                 last_stats = Instant::now();
             }
         }

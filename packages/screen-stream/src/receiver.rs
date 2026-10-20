@@ -1,4 +1,4 @@
-//! Screen receiver: UDP -> reassembly -> H.264 decode -> minifb window.
+//! Screen receiver: UDP -> reassembly -> H.264 decode -> winit window.
 //! Library form of the former ss-view main loop. Requires the `viewer`
 //! feature; the window is opened on a dedicated thread so the caller's main
 //! thread (e.g. the Flutter engine) is never blocked.
@@ -124,7 +124,17 @@ impl Drop for ReceiverHandle {
 pub fn start_receiver(config: ReceiverConfig, event_tx: Sender<StreamEvent>) -> Result<ReceiverHandle> {
     let decoder = match &config.decoder {
         ReceiverDecoder::Auto => {
-            if cfg!(target_os = "linux") {
+            // Acceptance/debug escape hatch: ANYSHARE_DECODER=ffmpeg forces
+            // the ffmpeg child pipeline (ANYSHARE_FFMPEG_PATH overrides the
+            // binary). Used while the native VAAPI path is being fixed for
+            // non-1080p stream sizes.
+            if std::env::var("ANYSHARE_DECODER").as_deref() == Ok("ffmpeg") {
+                ReceiverDecoder::Ffmpeg {
+                    path: std::env::var("ANYSHARE_FFMPEG_PATH").unwrap_or_else(|_| "ffmpeg".to_string()),
+                    hwaccel: None,
+                    hwaccel_device: None,
+                }
+            } else if cfg!(target_os = "linux") {
                 ReceiverDecoder::Vaapi {
                     device: "/dev/dri/renderD128".to_string(),
                 }
@@ -248,6 +258,14 @@ fn media_loop(
     }
 }
 
+use std::num::NonZeroU32;
+use winit::application::ApplicationHandler;
+use winit::dpi::LogicalSize;
+use winit::event::{ElementState, WindowEvent};
+use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
+use winit::keyboard::{Key, NamedKey};
+use winit::window::{Fullscreen, Window, WindowId};
+
 fn window_loop(
     shared: Arc<Shared>,
     title: &str,
@@ -258,86 +276,319 @@ fn window_loop(
     reason: Arc<Mutex<Option<EndReason>>>,
     event_tx: &Sender<StreamEvent>,
 ) -> Result<()> {
-    use minifb::{Key, Scale, Window, WindowOptions};
+    let (done_tx, done_rx) = std::sync::mpsc::channel::<()>();
+    let proxy = viewer_proxy()?;
+    proxy
+        .send_event(ViewerCommand::Start(ViewerSession {
+            shared,
+            stop,
+            stats,
+            reason,
+            event_tx: event_tx.clone(),
+            title: title.to_string(),
+            scale,
+            duration,
+            started: Instant::now(),
+            last_stats: Instant::now(),
+            last_presented_generation: 0,
+            last_presented_size: (0, 0),
+            done: done_tx,
+        }))
+        .map_err(|_| anyhow::anyhow!("viewer event loop is gone"))?;
+    let _ = done_rx.recv();
+    Ok(())
+}
 
-    let mut window = Window::new(
-        title,
-        1280,
-        720,
-        WindowOptions {
-            resize: true,
-            scale: Scale::X1,
-            ..WindowOptions::default()
-        },
-    )?;
-    if (scale - 1.0).abs() > f32::EPSILON {
-        window.set_target_fps(0);
+enum ViewerCommand {
+    Start(ViewerSession),
+}
+
+struct ViewerSession {
+    shared: Arc<Shared>,
+    stop: Arc<AtomicBool>,
+    stats: Arc<Mutex<StreamStats>>,
+    reason: Arc<Mutex<Option<EndReason>>>,
+    event_tx: Sender<StreamEvent>,
+    title: String,
+    scale: f32,
+    duration: Option<Duration>,
+    started: Instant,
+    last_stats: Instant,
+    last_presented_generation: u64,
+    last_presented_size: (u32, u32),
+    done: Sender<()>,
+}
+
+/// winit allows exactly one EventLoop per process (the created flag is never
+/// reset), so a single daemon loop owns the viewer window for the whole
+/// process and hosts one session at a time. Sessions arrive as user events;
+/// commands are delivered through the proxy.
+fn viewer_proxy() -> Result<&'static winit::event_loop::EventLoopProxy<ViewerCommand>> {
+    use std::sync::OnceLock;
+    use winit::event_loop::EventLoopProxy;
+
+    static PROXY: OnceLock<EventLoopProxy<ViewerCommand>> = OnceLock::new();
+    if let Some(proxy) = PROXY.get() {
+        return Ok(proxy);
+    }
+    let (init_tx, init_rx) = std::sync::mpsc::channel::<Result<EventLoopProxy<ViewerCommand>, String>>();
+    std::thread::spawn(move || {
+        let mut builder = EventLoop::<ViewerCommand>::with_user_event();
+        #[cfg(target_os = "linux")]
+        {
+            // The daemon thread is not the process main thread.
+            use winit::platform::x11::EventLoopBuilderExtX11;
+            builder.with_any_thread(true);
+        }
+        match builder.build() {
+            Ok(event_loop) => {
+                let proxy = event_loop.create_proxy();
+                let _ = init_tx.send(Ok(proxy.clone()));
+                let mut host = ViewerHost {
+                    active: None,
+                    window: None,
+                    context: None,
+                    surface: None,
+                    present_errors: 0,
+                };
+                if let Err(e) = event_loop.run_app(&mut host) {
+                    eprintln!("receiver: viewer event loop ended: {e}");
+                }
+            }
+            Err(e) => {
+                let _ = init_tx.send(Err(format!("{e}")));
+            }
+        }
+    });
+    match init_rx.recv() {
+        Ok(Ok(proxy)) => {
+            let _ = PROXY.set(proxy);
+            Ok(PROXY.get().expect("proxy just set"))
+        }
+        Ok(Err(e)) => Err(anyhow::anyhow!("viewer event loop: {e}")),
+        Err(_) => Err(anyhow::anyhow!("viewer event loop init failed")),
+    }
+}
+
+struct ViewerHost {
+    active: Option<ViewerSession>,
+    window: Option<Arc<Window>>,
+    context: Option<softbuffer::Context<Arc<Window>>>,
+    surface: Option<softbuffer::Surface<Arc<Window>, Arc<Window>>>,
+    present_errors: u64,
+}
+
+impl ViewerHost {
+    fn toggle_fullscreen(&self) {
+        let Some(window) = &self.window else { return };
+        if window.fullscreen().is_some() {
+            window.set_fullscreen(None);
+        } else if let Some(monitor) = window.current_monitor() {
+            window.set_fullscreen(Some(Fullscreen::Borderless(Some(monitor))));
+        }
     }
 
-    let started = Instant::now();
-    let mut last_generation = 0u64;
-    let blank = vec![0u32; 1280 * 720];
-    let mut last_stats = Instant::now();
-    let mut scaled_buffer: Vec<u32> = Vec::new();
+    /// Ends the active session: reports the end reason, stops the pipeline,
+    /// releases the window and idles the loop.
+    fn finish(&mut self, event_loop: &ActiveEventLoop, active: ViewerSession, ended_by_stop: bool) {
+        let end = active
+            .reason
+            .lock()
+            .unwrap()
+            .unwrap_or(if ended_by_stop { EndReason::Stopped } else { EndReason::WindowClosed });
+        let _ = active.event_tx.send(StreamEvent::Ended(end));
+        active.stop.store(true, Ordering::Release);
+        let _ = active.done.send(());
+        self.window = None;
+        self.surface = None;
+        self.context = None;
+        event_loop.set_control_flow(ControlFlow::Wait);
+    }
 
-    let mut ended_by_stop = false;
-    while window.is_open() && !window.is_key_down(Key::Escape) {
-        if stop.load(Ordering::Acquire) {
-            ended_by_stop = true;
-            break;
-        }
-        if let Some(duration) = duration {
-            if started.elapsed() >= duration {
-                ended_by_stop = true;
-                break;
-            }
-        }
+    fn fail(&mut self, active: ViewerSession, message: String) {
+        let _ = active.event_tx.send(StreamEvent::Error(message));
+        let _ = active.event_tx.send(StreamEvent::Ended(EndReason::Error));
+        active.stop.store(true, Ordering::Release);
+        let _ = active.done.send(());
+    }
 
-        let frame = shared.frame.lock().unwrap().clone();
-        let generation = shared.generation.load(Ordering::Acquire);
-        let result = match &frame {
-            Some(frame) if (scale - 1.0).abs() <= f32::EPSILON => {
-                window.update_with_buffer(&frame.argb, frame.width, frame.height)
+    fn present(&mut self) {
+        let failure = {
+            let (Some(window), Some(surface), Some(active)) = (self.window.as_ref(), self.surface.as_mut(), self.active.as_mut()) else {
+                return;
+            };
+            let size = window.inner_size();
+            let (w, h) = (size.width.max(1), size.height.max(1));
+            let generation = active.shared.generation.load(Ordering::Acquire);
+            // Idle skip: re-presenting an unchanged frame at tick rate burned
+            // CPU (and fans) for a static screen.
+            if generation == active.last_presented_generation && (w, h) == active.last_presented_size {
+                return;
             }
-            Some(frame) => {
-                let width = (frame.width as f32 * scale) as usize;
-                let height = (frame.height as f32 * scale) as usize;
-                scaled_buffer.clear();
-                scaled_buffer.resize(width * height, 0);
-                for y in 0..height {
-                    let src_y = y * frame.height / height;
-                    for x in 0..width {
-                        let src_x = x * frame.width / width;
-                        scaled_buffer[y * width + x] = frame.argb[src_y * frame.width + src_x];
+            let (Some(nw), Some(nh)) = (NonZeroU32::new(w), NonZeroU32::new(h)) else {
+                return;
+            };
+            if let Err(e) = surface.resize(nw, nh) {
+                Some(format!("resize failed: {e}"))
+            } else {
+                match surface.buffer_mut() {
+                    Err(e) => Some(format!("buffer failed: {e}")),
+                    Ok(mut buffer) => {
+                        let frame = active.shared.frame.lock().unwrap().clone();
+                        buffer.fill(0);
+                        if let Some(frame) = &frame {
+                            // Letterbox: scale the frame to fit, keep aspect,
+                            // center. Fixed-point stepping avoids a float
+                            // division per pixel.
+                            let scale = (w as f32 / frame.width as f32).min(h as f32 / frame.height as f32);
+                            let dw = ((frame.width as f32 * scale) as u32).clamp(1, w);
+                            let dh = ((frame.height as f32 * scale) as u32).clamp(1, h);
+                            let ox = (w - dw) / 2;
+                            let oy = (h - dh) / 2;
+                            let step_x = ((frame.width as u64) << 32) / dw as u64;
+                            let step_y = ((frame.height as u64) << 32) / dh as u64;
+                            let mut sy_acc = 0u64;
+                            for y in 0..dh {
+                                let sy = ((sy_acc >> 32) as usize).min(frame.height - 1);
+                                sy_acc += step_y;
+                                let src_row = sy * frame.width;
+                                let dst_row = (oy + y) as usize * w as usize + ox as usize;
+                                let mut sx_acc = 0u64;
+                                for x in 0..dw {
+                                    let sx = ((sx_acc >> 32) as usize).min(frame.width - 1);
+                                    sx_acc += step_x;
+                                    buffer[dst_row + x as usize] = frame.argb[src_row + sx];
+                                }
+                            }
+                            active.shared.displayed.fetch_add(1, Ordering::AcqRel);
+                        }
+                        match buffer.present() {
+                            Ok(()) => {
+                                active.last_presented_generation = generation;
+                                active.last_presented_size = (w, h);
+                                None
+                            }
+                            Err(e) => Some(format!("present failed: {e}")),
+                        }
                     }
                 }
-                window.update_with_buffer(&scaled_buffer, width, height)
             }
-            None => window.update_with_buffer(&blank, 1280, 720),
         };
-        if let Err(e) = result {
-            eprintln!("receiver: present failed: {e}");
+        if let Some(message) = failure {
+            self.log_present_error(message);
         }
-        if generation != last_generation && frame.is_some() {
-            last_generation = generation;
-            shared.displayed.fetch_add(1, Ordering::AcqRel);
-        }
+    }
 
-        if last_stats.elapsed() >= Duration::from_secs(1) {
-            let displayed = shared.displayed.swap(0, Ordering::AcqRel);
-            let decoded = shared.decoded.swap(0, Ordering::AcqRel);
-            let decode_errors = shared.decode_errors.load(Ordering::Acquire);
-            let delivered = shared.delivered.load(Ordering::Acquire);
-            let lost = shared.lost.load(Ordering::Acquire);
+    fn log_present_error(&mut self, message: String) {
+        self.present_errors += 1;
+        if self.present_errors <= 5 || self.present_errors.is_multiple_of(300) {
+            eprintln!("receiver: window {message} (#{})", self.present_errors);
+        }
+    }
+}
+
+impl ApplicationHandler<ViewerCommand> for ViewerHost {
+    fn resumed(&mut self, _event_loop: &ActiveEventLoop) {}
+
+    fn user_event(&mut self, event_loop: &ActiveEventLoop, event: ViewerCommand) {
+        let ViewerCommand::Start(session) = event;
+        if let Some(existing) = self.active.take() {
+            // One viewer at a time: finish the previous session synchronously
+            // (a quick stop→start must not lose the new session).
+            self.finish(event_loop, existing, true);
+        }
+        let attributes = Window::default_attributes()
+            .with_title(session.title.clone())
+            .with_inner_size(LogicalSize::new(1280.0 * session.scale as f64, 720.0 * session.scale as f64));
+        let window = match event_loop.create_window(attributes) {
+            Ok(window) => Arc::new(window),
+            Err(e) => {
+                self.fail(session, format!("creating the viewer window failed: {e}"));
+                return;
+            }
+        };
+        // Fullscreen on the current monitor: a shared screen is watched, not
+        // decorated. F11 toggles, Esc ends the session.
+        if let Some(monitor) = window.current_monitor() {
+            window.set_fullscreen(Some(Fullscreen::Borderless(Some(monitor))));
+        }
+        let context = softbuffer::Context::new(window.clone()).ok();
+        let surface = context
+            .as_ref()
+            .and_then(|context| softbuffer::Surface::new(context, window.clone()).ok());
+        eprintln!(
+            "receiver: viewer window {}x{} context={} surface={}",
+            window.inner_size().width,
+            window.inner_size().height,
+            context.is_some(),
+            surface.is_some()
+        );
+        if context.is_none() || surface.is_none() {
+            self.fail(session, "creating the viewer surface failed".to_string());
+            return;
+        }
+        self.context = context;
+        self.surface = surface;
+        self.window = Some(window);
+        self.present_errors = 0;
+        self.active = Some(session);
+        event_loop.set_control_flow(ControlFlow::WaitUntil(Instant::now() + Duration::from_millis(8)));
+    }
+
+    fn window_event(&mut self, event_loop: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
+        match event {
+            WindowEvent::CloseRequested => {
+                if let Some(active) = self.active.take() {
+                    self.finish(event_loop, active, false);
+                }
+            }
+            WindowEvent::RedrawRequested => self.present(),
+            WindowEvent::KeyboardInput { event, .. } => {
+                if event.state == ElementState::Pressed {
+                    match event.logical_key {
+                        Key::Named(NamedKey::Escape) => {
+                            if let Some(active) = self.active.take() {
+                                self.finish(event_loop, active, false);
+                            }
+                        }
+                        Key::Named(NamedKey::F11) => self.toggle_fullscreen(),
+                        _ => {}
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
+        let Some(mut active) = self.active.take() else {
+            return;
+        };
+        if active.stop.load(Ordering::Acquire) {
+            self.finish(event_loop, active, true);
+            return;
+        }
+        if let Some(duration) = active.duration {
+            if active.started.elapsed() >= duration {
+                self.finish(event_loop, active, true);
+                return;
+            }
+        }
+        if active.last_stats.elapsed() >= Duration::from_secs(1) {
+            let displayed = active.shared.displayed.swap(0, Ordering::AcqRel);
+            let decoded = active.shared.decoded.swap(0, Ordering::AcqRel);
+            let decode_errors = active.shared.decode_errors.load(Ordering::Acquire);
+            let delivered = active.shared.delivered.load(Ordering::Acquire);
+            let lost = active.shared.lost.load(Ordering::Acquire);
             {
-                let mut shared_stats = stats.lock().unwrap();
+                let mut shared_stats = active.stats.lock().unwrap();
                 shared_stats.frames = decoded;
                 shared_stats.fps = displayed as f64;
                 shared_stats.packets = delivered;
                 shared_stats.lost = lost;
                 shared_stats.decode_errors = decode_errors;
             }
-            let _ = event_tx.send(StreamEvent::Stats(StreamStats {
+            let _ = active.event_tx.send(StreamEvent::Stats(StreamStats {
                 frames: decoded,
                 fps: displayed as f64,
                 packets: delivered,
@@ -345,19 +596,16 @@ fn window_loop(
                 decode_errors,
                 ..Default::default()
             }));
-            last_stats = Instant::now();
+            active.last_stats = Instant::now();
         }
-        std::thread::sleep(Duration::from_millis(16));
+        if let Some(window) = &self.window {
+            window.request_redraw();
+        }
+        // Tick at ~125 Hz instead of busy-polling: cheap when the screen is
+        // static, responsive enough for 60 fps content.
+        event_loop.set_control_flow(ControlFlow::WaitUntil(Instant::now() + Duration::from_millis(8)));
+        self.active = Some(active);
     }
-
-    // Ending the session because the window closed is a user action too.
-    stop.store(true, Ordering::Release);
-    let end = reason
-        .lock()
-        .unwrap()
-        .unwrap_or(if ended_by_stop { EndReason::Stopped } else { EndReason::WindowClosed });
-    let _ = event_tx.send(StreamEvent::Ended(end));
-    Ok(())
 }
 
 fn ffmpeg_loop(
@@ -577,6 +825,24 @@ fn vaapi_loop(
                 let t0 = Instant::now();
                 match decoder.decode(&frame.payload) {
                     Ok(Some((width, height, argb))) => {
+                        // Diagnostic: dump the first decoded frame as PPM when
+                        // ANYSHARE_FRAME_DUMP is set (acceptance debugging).
+                        if let Ok(path) = std::env::var("ANYSHARE_FRAME_DUMP") {
+                            // Keep overwriting for the first ~10s so the file
+                            // holds the LAST frame (what the window shows).
+                            static DUMP_COUNT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+                            if DUMP_COUNT.fetch_add(1, Ordering::AcqRel) < 600 {
+                                use std::io::Write;
+                                if let Ok(mut file) = std::fs::File::create(&path) {
+                                    let _ = write!(file, "P6\n{} {}\n255\n", width, height);
+                                    let mut bytes = Vec::with_capacity((width * height * 3) as usize);
+                                    for pixel in &argb {
+                                        bytes.extend_from_slice(&[(pixel >> 16) as u8, (pixel >> 8) as u8, *pixel as u8]);
+                                    }
+                                    let _ = file.write_all(&bytes);
+                                }
+                            }
+                        }
                         publish(
                             &shared,
                             Frame {

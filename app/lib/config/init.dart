@@ -22,6 +22,7 @@ import 'package:localsend_app/provider/persistence_provider.dart';
 // [FOSS_REMOVE_START]
 import 'package:localsend_app/provider/purchase_provider.dart';
 // [FOSS_REMOVE_END]
+import 'package:localsend_app/provider/screen/screen_provider.dart';
 import 'package:localsend_app/provider/selection/selected_sending_files_provider.dart';
 import 'package:localsend_app/provider/settings_provider.dart';
 import 'package:localsend_app/provider/tv_provider.dart';
@@ -202,6 +203,24 @@ Future<RefenaContainer> preInit(List<String> args) async {
     await container.redux(extensionServerProvider).dispatchAsync(StartExtensionServerAction());
   } catch (e, st) {
     _logger.warning('Starting extension server failed: $e $st');
+  }
+
+  // AnyShare diagnostic hook (env-gated): auto-start a screen share toward the
+  // given IPv4 so app-side streaming can be measured without UI automation.
+  final autoshareIp = Platform.environment['ANYSHARE_AUTOSHARE_IP'];
+  if (kDebugMode && autoshareIp != null && autoshareIp.isNotEmpty) {
+    Future<void>.delayed(const Duration(seconds: 4), () async {
+      try {
+        await container
+            .redux(screenProvider)
+            .dispatchAsync(
+              StartScreenShareAction(peerIp: autoshareIp, peerAlias: 'diag'),
+            );
+        _logger.info('Autoshare started toward $autoshareIp');
+      } catch (e, st) {
+        _logger.warning('Autoshare failed: $e $st');
+      }
+    });
   }
 
   return container;
