@@ -53,6 +53,15 @@
 - `pubspec.lock`:8 个 build 工具链传递依赖小版本再解析(archive/build_config/build_daemon 等,仅 codegen 使用;官方源解析,运行时依赖零漂移)
 - `app/pubspec.yaml`:description 重写、homepage → github.com/sunmerx/AnyShare
 
+### 投屏 GPU 转换批次(2026-10-20)
+
+- `packages/screen-stream/src/gpu_convert.rs`(新增):D3D11 VideoProcessor 硬件缩放+色彩转换(BGRA→NV12,BT.601 limited);每帧输入视图显式回收;NV12 回读 1.5MB
+- `packages/screen-stream/src/sender.rs`:GPU/CPU 双路径(`ANYSHARE_CPU_CONVERT=1` 强制 CPU);运行时 GPU 错误自动降级;复制会话重建时重建 converter
+- `packages/screen-stream/src/windows_capture.rs`:acquire_texture/frame_texture/release_frame/device/context、read_frame_meta 提取、composite_pointer_nv12(YUV 混合+位图随帧缩放)、D3D11 设备加 VIDEO_SUPPORT
+- `packages/screen-stream/src/convert.rs`:nv12_looks_blank(limited-range 黑=Y16,阈值 20)
+- `packages/screen-stream/src/lib.rs`:模块注册
+- 验证:conv_ms 20→0;码流 ffmpeg 解码真实画面;223 Dart + 21 Rust 测试;审查 1 blocker+3 major+4 minor 全修
+
 ### 投屏链路大修(2026-10-20,双机验收驱动)
 
 - `packages/screen-stream/src/sender.rs`:编码流水线化(不等本帧输出,输出按请求队列配对关键帧/SPS/时间戳;2880x1800 avg 59-63ms→11.7ms)、发送端 box 降采样 1080p(D5;1728x1080)、码率配置、仅丢弃确认空白的会话首帧(修静态桌面永久黑屏)、逐秒诊断日志
