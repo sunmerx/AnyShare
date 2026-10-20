@@ -513,18 +513,19 @@ impl H264Encoder {
     }
 
     /// Requests an IDR at the next encoded frame. Returns false when the
-    /// encoder does not expose CODECAPI_AVEncVideoForceKeyFrame.
+    /// encoder does not expose CODECAPI_AVEncVideoForceKeyFrame. VT_UI4 is
+    /// the documented type, but some MFTs (AMD) reject it and accept VT_BOOL.
     pub fn force_keyframe(&mut self) -> bool {
         let Some(api) = &self.codec_api else {
             return false;
         };
-        let value = VARIANT::from(1u32);
-        if unsafe { api.SetValue(&CODECAPI_AVEncVideoForceKeyFrame, &value) }.is_ok() {
-            self.keyframe_force_supported = true;
-            true
-        } else {
-            false
+        for value in [VARIANT::from(1u32), VARIANT::from(true)] {
+            if unsafe { api.SetValue(&CODECAPI_AVEncVideoForceKeyFrame, &value) }.is_ok() {
+                self.keyframe_force_supported = true;
+                return true;
+            }
         }
+        false
     }
     pub fn shutdown(&mut self) -> Result<Vec<Vec<u8>>> {
         let mut outputs: Vec<Vec<u8>> = Vec::new();
@@ -629,4 +630,100 @@ fn configure_low_latency(api: &ICodecAPI) {
     let _ = set_bool(api, &CODECAPI_AVEncCommonLowLatency, true);
     let _ = set_u32(api, &CODECAPI_AVEncMPVDefaultBPictureCount, 0);
     let _ = set_u32(api, &CODECAPI_AVEncVideoMaxNumRefFrame, 1);
+}
+
+#[cfg(all(test, windows))]
+mod tests {
+    use super::*;
+
+    /// Annex-B scan for an IDR slice (NAL type 5).
+    fn has_idr(au: &[u8]) -> bool {
+        let mut i = 0;
+        while i + 3 < au.len() {
+            if au[i] == 0 && au[i + 1] == 0 && au[i + 2] == 1 {
+                if au[i + 3] & 0x1f == 5 {
+                    return true;
+                }
+                i += 3;
+            } else {
+                i += 1;
+            }
+        }
+        false
+    }
+
+    fn mid_gray_frame(format: InputPixelFormat, width: u32, height: u32) -> Vec<u8> {
+        let luma = (width * height) as usize;
+        let chroma = luma / 4;
+        let mut frame = vec![128u8; luma];
+        frame.resize(luma + chroma * 2, 128);
+        let _ = format;
+        frame
+    }
+
+    /// Regression for the receiver loss-recovery path: a forced keyframe must
+    /// actually put an IDR on the wire (the MF property can report success and
+    /// be ignored, which is why the sender verifies the bitstream).
+    #[test]
+    fn forced_keyframe_produces_idr() {
+        let config = EncoderConfig {
+            width: 320,
+            height: 240,
+            bitrate_bps: 1_500_000,
+            fps: 30,
+        };
+        let mut encoder = match create_best_encoder(&config) {
+            Ok(encoder) => encoder,
+            Err(e) => {
+                eprintln!("skipping (no encoder on this host): {e:#}");
+                return;
+            }
+        };
+        let frame = mid_gray_frame(encoder.input_format(), config.width, config.height);
+        // Baseline: exactly the startup IDR, nothing else. Counted instead of
+        // pinning arrival indexes because async/hardware MFTs buffer outputs.
+        let mut baseline_idrs = 0;
+        for index in 0..10i64 {
+            let outputs = encoder
+                .encode(&frame, index * 333_333, 333_333, false, false)
+                .expect("encode");
+            baseline_idrs += outputs.iter().filter(|au| has_idr(au)).count();
+        }
+        assert_eq!(baseline_idrs, 1, "expected exactly the startup IDR before the force request");
+        let mut forced_seen = false;
+        let mut idr_after_force = false;
+        // The forced IDR must follow the request promptly; a late IDR would
+        // just be a periodic GOP one (default GOP is far larger than this).
+        let mut aus_after_force = 0;
+        for index in 10..40i64 {
+            let force = !forced_seen;
+            let outputs = encoder
+                .encode(&frame, index * 333_333, 333_333, false, force)
+                .expect("encode");
+            let had_output = !outputs.is_empty();
+            if force && had_output {
+                forced_seen = true;
+            }
+            for au in &outputs {
+                if !forced_seen {
+                    continue;
+                }
+                aus_after_force += 1;
+                if has_idr(au) {
+                    idr_after_force = true;
+                    break;
+                }
+            }
+            if idr_after_force {
+                break;
+            }
+        }
+        let _ = encoder.shutdown();
+        assert!(forced_seen, "no output after the forced request");
+        assert!(idr_after_force, "forced keyframe did not produce an IDR");
+        assert!(
+            aus_after_force <= 5,
+            "forced IDR arrived after {aus_after_force} access units (likely a periodic GOP, not the request)"
+        );
+    }
 }
