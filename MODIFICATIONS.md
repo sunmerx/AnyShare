@@ -53,6 +53,11 @@
 - `pubspec.lock`:8 个 build 工具链传递依赖小版本再解析(archive/build_config/build_daemon 等,仅 codegen 使用;官方源解析,运行时依赖零漂移)
 - `app/pubspec.yaml`:description 重写、homepage → github.com/sunmerx/AnyShare
 
+### 投屏强制 IDR 回归批次(2026-10-21)
+
+- `packages/screen-stream/src/windows_encoder.rs`:`force_keyframe()` VT_UI4 失败回退 VT_BOOL(部分 MFT 类型要求);新增 Windows 编码器级测试(基线仅启动 IDR,force 后 5 个 AU 内必须出 IDR,排除周期 GOP 假通过)
+- 验证:22 Rust 测试全绿;Windows release 重建
+
 ### 投屏关键帧控制面批次(2026-10-20)
 
 - `packages/localsend_isolates/rust/src/api/screen.rs` + FRB codegen:RsScreenEvent 新增 `RequestKeyframe`;`RsScreenSender::request_keyframe()`(Windows)
