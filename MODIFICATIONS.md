@@ -53,6 +53,21 @@
 - `pubspec.lock`:8 个 build 工具链传递依赖小版本再解析(archive/build_config/build_daemon 等,仅 codegen 使用;官方源解析,运行时依赖零漂移)
 - `app/pubspec.yaml`:description 重写、homepage → github.com/sunmerx/AnyShare
 
+### 投屏链路大修(2026-10-20,双机验收驱动)
+
+- `packages/screen-stream/src/sender.rs`:编码流水线化(不等本帧输出,输出按请求队列配对关键帧/SPS/时间戳;2880x1800 avg 59-63ms→11.7ms)、发送端 box 降采样 1080p(D5;1728x1080)、码率配置、仅丢弃确认空白的会话首帧(修静态桌面永久黑屏)、逐秒诊断日志
+- `packages/screen-stream/src/windows_encoder.rs`:CodecAPI 低延迟档(LowDelayVBR→CBR、LowLatency、B帧=0、参考=1,置于开流前)、encode 流水线、dimensions()、shutdown 持续排空在途 AU
+- `packages/screen-stream/src/windows_capture.rs`:光标合成(COLOR 预乘 alpha/MONOCHROME AND-XOR/MASKED_COLOR)、PointerPosition 仅在 LastMouseUpdateTime 非零时更新、输出相对坐标并按纹理缩放、capture_size()(复制纹理实际尺寸)
+- `packages/screen-stream/src/{convert.rs,types.rs,vfr.rs}`:bgra_box_scale/scale_to_fit/bgra_looks_blank;FrameMeta.pointer_moved;VFR 将指针移动/形状更新计为内容变化(修"仅移动鼠标"被判静态)
+- `packages/screen-stream/src/receiver.rs`:窗口 minifb→winit 0.30+softbuffer(进程级常驻事件循环、默认全屏、F11/Esc、静态跳过重绘、整数定点缩放、present 成功后才记账、surface 失败上报)、ANYSHARE_DECODER=ffmpeg 覆盖(vaapi 灰帧临时绕行)、ANYSHARE_FRAME_DUMP
+- `packages/screen-stream/Cargo.toml`、`Cargo.lock`:winit 0.30 + softbuffer 0.4 替换 minifb
+- `packages/screen-stream/src/bin/ss-probe.rs`:`--dump-frame`(取最后的非空白帧为 PPM)
+- `app/lib/util/screen_capabilities.dart`:screenShareHostOfWithFallback(仅 IPv6 时回退收藏 IPv4)
+- `app/lib/pages/{tabs/my_devices_tab,tabs/device_list_tab,device_details_page}.dart`:「共享屏幕」入口使用回退逻辑
+- `app/lib/config/init.dart`:kDebugMode 限定的 ANYSHARE_AUTOSHARE_IP 诊断自启钩子
+- 验证(两机 release):发送 32-35fps/1080p/~11Mbps、接收 34-35fps(parse 7ms);根因教训:debug 构建 Rust 慢 8.6 倍(转换 178ms vs 20ms/帧)
+- 已知遗留(记账):vaapi 解码器非 1080p 灰帧、发送端消失后接收会话不释放端口、呈现为 CPU 缩放(零拷贝待后续)
+
 ### 投屏 IPv4 拨号修复(2026-10-19,双机验收实测)
 
 - `app/lib/util/screen_capabilities.dart`:新增 `screenShareHostOf`(优先 IPv4 HTTP 通道,回退 IPv4 ip,全 IPv6 返回 null)
