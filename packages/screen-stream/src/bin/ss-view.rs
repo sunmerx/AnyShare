@@ -1,4 +1,4 @@
-﻿//! ss-view: CLI wrapper around the screen-stream receiver library.
+//! ss-view: CLI wrapper around the screen-stream receiver library.
 //! Usage: ss-view [--port N] [--seconds N] [--scale N]
 //! Build: cargo build --release --features viewer --bin ss-view
 
@@ -89,6 +89,9 @@ fn run() -> anyhow::Result<()> {
     for event in event_rx {
         match event {
             StreamEvent::Status(_) => {}
+            StreamEvent::RequestKeyframe => {
+                eprintln!("viewer: loss detected, requesting keyframe");
+            }
             StreamEvent::Stats(stats) => {
                 eprintln!("viewer: displayed={} ({} fps window)", stats.frames, stats.fps);
             }

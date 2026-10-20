@@ -128,13 +128,16 @@ pub fn start_screen_receiver(port: u16) -> anyhow::Result<RsScreenReceiver> {
 }
 
 #[cfg(desktop)]
-fn map_event(event: screen_stream::events::StreamEvent) -> RsScreenEvent {
+fn map_event(event: screen_stream::events::StreamEvent) -> Option<RsScreenEvent> {
     use screen_stream::events::StreamEvent;
     match event {
-        StreamEvent::Status(state) => RsScreenEvent::Status {
+        // No Dart consumer yet: the HTTP control-plane relay
+        // (/screen/keyframe, 53318) lands in the next step.
+        StreamEvent::RequestKeyframe => None,
+        StreamEvent::Status(state) => Some(RsScreenEvent::Status {
             state: format!("{state:?}").to_lowercase(),
-        },
-        StreamEvent::Stats(stats) => RsScreenEvent::Stats {
+        }),
+        StreamEvent::Stats(stats) => Some(RsScreenEvent::Stats {
             frames: stats.frames,
             keyframes: stats.keyframes,
             fps: stats.fps,
@@ -142,11 +145,11 @@ fn map_event(event: screen_stream::events::StreamEvent) -> RsScreenEvent {
             packets: stats.packets,
             lost: stats.lost,
             decode_errors: stats.decode_errors,
-        },
-        StreamEvent::Ended(reason) => RsScreenEvent::Ended {
+        }),
+        StreamEvent::Ended(reason) => Some(RsScreenEvent::Ended {
             reason: format!("{reason:?}").to_lowercase(),
-        },
-        StreamEvent::Error(message) => RsScreenEvent::Error { message },
+        }),
+        StreamEvent::Error(message) => Some(RsScreenEvent::Error { message }),
     }
 }
 
@@ -167,7 +170,8 @@ impl RsScreenSender {
             };
             let _ = tokio::task::spawn_blocking(move || {
                 while let Ok(event) = rx.recv() {
-                    if sink.add(map_event(event)).is_err() {
+                    let Some(event) = map_event(event) else { continue };
+                    if sink.add(event).is_err() {
                         break;
                     }
                 }
@@ -233,7 +237,8 @@ impl RsScreenReceiver {
             };
             let _ = tokio::task::spawn_blocking(move || {
                 while let Ok(event) = rx.recv() {
-                    if sink.add(map_event(event)).is_err() {
+                    let Some(event) = map_event(event) else { continue };
+                    if sink.add(event).is_err() {
                         break;
                     }
                 }

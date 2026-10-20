@@ -319,7 +319,7 @@ impl H264Encoder {
         force_keyframe: bool,
     ) -> Result<Vec<Vec<u8>>> {
         if force_keyframe {
-            self.try_force_keyframe();
+            let _ = self.force_keyframe();
         }
 
         let sample = self.make_sample(i420, time_100ns, duration_100ns, discontinuity)?;
@@ -512,13 +512,18 @@ impl H264Encoder {
         Ok(())
     }
 
-    fn try_force_keyframe(&mut self) {
+    /// Requests an IDR at the next encoded frame. Returns false when the
+    /// encoder does not expose CODECAPI_AVEncVideoForceKeyFrame.
+    pub fn force_keyframe(&mut self) -> bool {
         let Some(api) = &self.codec_api else {
-            return;
+            return false;
         };
         let value = VARIANT::from(1u32);
         if unsafe { api.SetValue(&CODECAPI_AVEncVideoForceKeyFrame, &value) }.is_ok() {
             self.keyframe_force_supported = true;
+            true
+        } else {
+            false
         }
     }
     pub fn shutdown(&mut self) -> Result<Vec<Vec<u8>>> {

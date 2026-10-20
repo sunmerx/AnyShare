@@ -76,6 +76,9 @@ fn run() -> anyhow::Result<()> {
     for event in event_rx {
         match event {
             StreamEvent::Status(_) => {}
+            StreamEvent::RequestKeyframe => {
+                eprintln!("sender: keyframe requested by receiver");
+            }
             StreamEvent::Stats(stats) => {
                 println!(
                     "t={:>3}s frames={} kf={} packets={} {:.2} Mbps",

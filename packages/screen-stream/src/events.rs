@@ -47,6 +47,10 @@ pub enum StreamEvent {
     Stats(StreamStats),
     Ended(EndReason),
     Error(String),
+    /// Receiver only: unrecovered frame loss was detected; the peer should
+    /// send an IDR (relayed by the app control plane). Debounced by the
+    /// receiver (at most one every 500 ms).
+    RequestKeyframe,
 }
 
 /// A session runs until stopped, or for [Self::duration] when set.

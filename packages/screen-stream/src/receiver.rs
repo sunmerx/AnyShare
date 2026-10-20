@@ -195,7 +195,7 @@ pub fn start_receiver(config: ReceiverConfig, event_tx: Sender<StreamEvent>) -> 
         let event_tx = event_tx.clone();
         let verbose = config.verbose;
         joins.push(std::thread::spawn(move || {
-            if let Err(e) = receive_loop(socket, tx, verbose, Arc::clone(&stop), shared) {
+            if let Err(e) = receive_loop(socket, tx, event_tx.clone(), verbose, Arc::clone(&stop), shared) {
                 eprintln!("receiver: receive thread: {e:#}");
                 *reason.lock().unwrap() = Some(EndReason::Error);
                 let _ = event_tx.send(StreamEvent::Error(format!("{e:#}")));
@@ -1039,6 +1039,7 @@ fn yuv_to_argb(yuv: &impl openh264::formats::YUVSource, width: usize, height: us
 fn receive_loop(
     socket: std::net::UdpSocket,
     tx: std::sync::mpsc::SyncSender<Delivered>,
+    events: Sender<StreamEvent>,
     verbose: bool,
     stop: Arc<AtomicBool>,
     shared: Arc<Shared>,
@@ -1047,6 +1048,9 @@ fn receive_loop(
     let mut buffer = vec![0u8; 65536];
     let mut last_stats = Instant::now();
     let mut verbose_count = 0u64;
+    let mut last_lost = 0u64;
+    let mut keyframe_request_pending = false;
+    let mut last_keyframe_request: Option<Instant> = None;
     loop {
         if stop.load(Ordering::Acquire) {
             return Ok(());
@@ -1086,6 +1090,24 @@ fn receive_loop(
                 }
             }
             Err(e) => return Err(anyhow::anyhow!("recv_from failed: {e}")),
+        }
+        // Loss recovery: an unrecovered frame drop leaves the decoder with a
+        // missing reference until the next IDR, visible as smearing/stutter.
+        // Report it so the control plane can ask the sender for a keyframe.
+        // Debounced: one request per 500 ms is plenty (an IDR is expensive),
+        // but losses inside the debounce window stay pending so they are sent
+        // when the window opens instead of being swallowed.
+        let lost = reassembler.stats().lost_frames;
+        if lost > last_lost {
+            last_lost = lost;
+            keyframe_request_pending = true;
+        }
+        if keyframe_request_pending
+            && last_keyframe_request.map_or(true, |at| now.duration_since(at) >= Duration::from_millis(500))
+        {
+            keyframe_request_pending = false;
+            last_keyframe_request = Some(now);
+            let _ = events.send(StreamEvent::RequestKeyframe);
         }
         if last_stats.elapsed() >= Duration::from_secs(5) {
             let stats = reassembler.stats();

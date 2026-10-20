@@ -38,6 +38,7 @@ impl Default for SenderConfig {
 
 pub struct SenderHandle {
     stop: Arc<AtomicBool>,
+    force_keyframe: Arc<AtomicBool>,
     stats: Arc<Mutex<StreamStats>>,
     join: Option<JoinHandle<()>>,
 }
@@ -49,6 +50,12 @@ impl SenderHandle {
 
     pub fn stats(&self) -> StreamStats {
         *self.stats.lock().unwrap()
+    }
+
+    /// Asks the encoder for an IDR on the next frame (receiver loss
+    /// recovery). Safe to call from any thread; requests coalesce.
+    pub fn request_keyframe(&self) {
+        self.force_keyframe.store(true, Ordering::Release);
     }
 
     /// Waits for the sender thread to finish (stops it first).
@@ -99,18 +106,36 @@ mod imp {
         let _ = event_tx.send(event);
     }
 
+    /// True when the Annex-B access unit contains an IDR slice (NAL type 5).
+    fn au_has_idr(payload: &[u8]) -> bool {
+        let mut i = 0;
+        while i + 3 < payload.len() {
+            if payload[i] == 0 && payload[i + 1] == 0 && payload[i + 2] == 1 {
+                if payload[i + 3] & 0x1f == 5 {
+                    return true;
+                }
+                i += 3;
+            } else {
+                i += 1;
+            }
+        }
+        false
+    }
+
     pub fn start(config: SenderConfig, event_tx: Sender<StreamEvent>) -> Result<SenderHandle> {
         let stop = Arc::new(AtomicBool::new(false));
+        let force_keyframe = Arc::new(AtomicBool::new(false));
         let stats = Arc::new(Mutex::new(StreamStats::default()));
 
         let thread_stop = Arc::clone(&stop);
+        let thread_force_keyframe = Arc::clone(&force_keyframe);
         let thread_stats = Arc::clone(&stats);
         // Everything COM/DXGI/MF related (output enumeration, duplicator,
         // encoder) is created and used on this one worker thread: the objects
         // are not Send, and MF wants a stable apartment per object.
         let join = std::thread::spawn(move || {
             send_event(&event_tx, StreamEvent::Status(StreamState::Starting));
-            if let Err(e) = run(config, thread_stop, Arc::clone(&thread_stats), &event_tx) {
+            if let Err(e) = run(config, thread_stop, thread_force_keyframe, Arc::clone(&thread_stats), &event_tx) {
                 send_event(&event_tx, StreamEvent::Error(format!("{e:#}")));
                 send_event(&event_tx, StreamEvent::Ended(EndReason::Error));
                 return;
@@ -120,12 +145,19 @@ mod imp {
 
         Ok(SenderHandle {
             stop,
+            force_keyframe,
             stats,
             join: Some(join),
         })
     }
 
-    fn run(config: SenderConfig, stop: Arc<AtomicBool>, stats: Arc<Mutex<StreamStats>>, event_tx: &Sender<StreamEvent>) -> Result<()> {
+    fn run(
+        config: SenderConfig,
+        stop: Arc<AtomicBool>,
+        force_keyframe: Arc<AtomicBool>,
+        stats: Arc<Mutex<StreamStats>>,
+        event_tx: &Sender<StreamEvent>,
+    ) -> Result<()> {
         let outputs = enumerate_outputs()?;
         let attached: Vec<_> = outputs.iter().filter(|o| o.attached).cloned().collect();
         let target_output = match &config.output {
@@ -219,7 +251,7 @@ mod imp {
         };
         eprintln!("sender: gpu convert = {}", gpu.is_some());
 
-        run_loop(config, socket, session, encoder, dup, gpu, stop, stats, event_tx)
+        run_loop(config, socket, session, encoder, dup, gpu, stop, force_keyframe, stats, event_tx)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -231,10 +263,12 @@ mod imp {
         mut dup: Duplicator,
         mut gpu: Option<crate::gpu_convert::GpuConverter>,
         stop: Arc<AtomicBool>,
+        force_keyframe: Arc<AtomicBool>,
         stats: Arc<Mutex<StreamStats>>,
         event_tx: &Sender<StreamEvent>,
     ) -> Result<()> {
         let mut gate = VfrGate::new(VfrConfig::default());
+        let mut force_rejected_warned = false;
         let mut i420: Vec<u8> = Vec::new();
         let mut scaled_bgra: Vec<u8> = Vec::new();
         let mut pending_meta: std::collections::VecDeque<(bool, bool, u64)> = std::collections::VecDeque::new();
@@ -394,7 +428,24 @@ mod imp {
                         }
                     }
 
-                    if let EncodeDecision::Encode { keyframe } = gate.decide(&meta, Instant::now()) {
+                    let mut decision = gate.decide(&meta, Instant::now());
+                    if force_keyframe.load(Ordering::Acquire) {
+                        // Loss-recovery request from the receiver: force an IDR
+                        // and bypass the VFR skip. The flag is only cleared once
+                        // the encoder accepted the request; a rejected request
+                        // stays pending. Note: while the screen is completely
+                        // static no frame is encoded at all, so the request is
+                        // serviced by the next content change (the stale frame
+                        // stays on screen until then).
+                        if encoder.force_keyframe() {
+                            force_keyframe.store(false, Ordering::Release);
+                            decision = EncodeDecision::Encode { keyframe: true };
+                        } else if !force_rejected_warned {
+                            force_rejected_warned = true;
+                            eprintln!("sender: encoder rejected the keyframe request (unsupported CodecAPI)");
+                        }
+                    }
+                    if let EncodeDecision::Encode { keyframe } = decision {
                         let convert_started = Instant::now();
                         if nv12_ready.is_none() {
                         {
@@ -467,9 +518,19 @@ mod imp {
                         pending_meta.push_back((keyframe, discontinuity, t100 as u64));
                         let had_output = !outputs.is_empty();
                         for chunk in &outputs {
-                            let (out_keyframe, out_discontinuity, out_ts) = pending_meta
+                            let (out_keyframe_requested, out_discontinuity, out_ts) = pending_meta
                                 .pop_front()
                                 .unwrap_or((keyframe, discontinuity, t100 as u64));
+                            // The MF force-keyframe property can be accepted
+                            // (S_OK) and silently ignored, so the bitstream is
+                            // the ground truth: only an actual IDR slice (NAL
+                            // type 5) is flagged/keyframe-prefixed here.
+                            let out_keyframe = out_keyframe_requested && au_has_idr(chunk);
+                            if out_keyframe_requested && !out_keyframe {
+                                // Ask again on the next frame; the MFT ignored
+                                // the property this time.
+                                force_keyframe.store(true, Ordering::Release);
+                            }
                             let mut flags = 0u8;
                             if out_keyframe {
                                 flags |= FLAG_KEYFRAME;
