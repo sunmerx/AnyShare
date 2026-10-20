@@ -25,6 +25,13 @@ class FakeScreenSession implements ScreenEngineSession {
   Future<ScreenSessionStats?> stats() async => null;
 
   @override
+  Future<void> requestKeyframe() async {
+    keyframeRequests++;
+  }
+
+  int keyframeRequests = 0;
+
+  @override
   Future<void> stop() async {
     stopped = true;
   }
@@ -61,6 +68,8 @@ void main() {
   late FakeScreenEngine engine;
   late int port;
   late HttpServer peerServer;
+  late List<String> peerRequests;
+  late List<(String, String)> peerBodies;
 
   setUp(() async {
     // SharedPreferences caches its instance statically; without the reset the
@@ -77,9 +86,13 @@ void main() {
     // Stub peer: acts as the remote side's extension server (accepts all
     // control posts with 200).
     peerServer = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    peerRequests = [];
+    peerBodies = [];
     unawaited(
       peerServer.listen((request) async {
-        await request.drain<void>();
+        final body = await utf8.decoder.bind(request).join();
+        peerRequests.add(request.uri.path);
+        peerBodies.add((request.uri.path, body));
         request.response.statusCode = 200;
         request.response.headers.contentType = ContentType.json;
         request.response.write('{"ok":true}');
@@ -327,6 +340,46 @@ void main() {
     expect(status, 403);
     expect(body['error'], 'receive_unsupported');
     expect(engine.startedReceivers, isEmpty);
+  });
+
+  test('incoming keyframe request reaches the sender engine', () async {
+    await container.redux(screenProvider).dispatchAsync(StartScreenShareAction(peerIp: '127.0.0.1', peerAlias: 'Peer'));
+    final active = container.read(screenProvider).active!;
+    final session = engine.sessions.last;
+
+    final (status, body) = await post('screen/keyframe', {'session': active.sessionId});
+
+    expect(status, 200);
+    expect(body['ok'], true);
+    expect(session.keyframeRequests, 1);
+    // The sender must not relay the request back out.
+    expect(peerBodies.where((entry) => entry.$1.endsWith('/screen/keyframe')), isEmpty);
+  });
+
+  test('incoming keyframe request with a stale session is ignored', () async {
+    await container.redux(screenProvider).dispatchAsync(StartScreenShareAction(peerIp: '127.0.0.1', peerAlias: 'Peer'));
+    final session = engine.sessions.last;
+
+    final (status, _) = await post('screen/keyframe', {'session': 'stale'});
+
+    expect(status, 200);
+    expect(session.keyframeRequests, 0);
+  });
+
+  test('receiver loss event asks the peer for a keyframe', () async {
+    await addFavorite(fingerprint: 'FPPEER01', trustLevel: TrustLevel.full);
+    await offer();
+    final active = container.read(screenProvider).active!;
+    expect(active.role, ScreenRole.receiver);
+
+    engine.sessions.single.emit(const ScreenSessionRequestKeyframe());
+    for (var i = 0; i < 40 && !peerRequests.any((path) => path.endsWith('/screen/keyframe')); i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    }
+
+    final relayed = peerBodies.where((entry) => entry.$1.endsWith('/screen/keyframe')).toList();
+    expect(relayed, hasLength(1));
+    expect((jsonDecode(relayed.single.$2) as Map<String, dynamic>)['session'], active.sessionId);
   });
 
   test('clear error action resets the banner error', () async {

@@ -50,6 +50,11 @@ abstract class RsScreenSender implements RustOpaqueInterface {
   /// the session ends).
   Stream<RsScreenEvent> listen();
 
+  /// Asks the encoder for an IDR on the next frame (the receiver's loss
+  /// recovery request, relayed by the app control plane). Safe to call while
+  /// `listen` is running: it only touches the handle.
+  Future<void> requestKeyframe();
+
   Future<RsScreenStats?> stats();
 
   /// Stops the session; the join happens on a background thread so the
@@ -84,6 +89,10 @@ sealed class RsScreenEvent with _$RsScreenEvent {
   const factory RsScreenEvent.error({
     required String message,
   }) = RsScreenEvent_Error;
+
+  /// Receiver only: unrecovered loss detected; the app relays this to the
+  /// sender's `/screen/keyframe` endpoint (Rust debounces to 500 ms).
+  const factory RsScreenEvent.requestKeyframe() = RsScreenEvent_RequestKeyframe;
 }
 
 class RsScreenStats {

@@ -49,6 +49,10 @@ abstract class ScreenEngineSession {
 
   Future<ScreenSessionStats?> stats();
 
+  /// Sender sessions: ask the encoder for an IDR. Receiver sessions and test
+  /// doubles treat this as a no-op.
+  Future<void> requestKeyframe() async {}
+
   Future<void> stop();
 }
 
@@ -79,6 +83,9 @@ class _SenderAdapter implements ScreenEngineSession {
   Future<ScreenSessionStats?> stats() => _session.stats();
 
   @override
+  Future<void> requestKeyframe() => _session.requestKeyframe();
+
+  @override
   Future<void> stop() => _session.stop();
 }
 
@@ -92,6 +99,11 @@ class _ReceiverAdapter implements ScreenEngineSession {
 
   @override
   Future<ScreenSessionStats?> stats() => _session.stats();
+
+  @override
+  Future<void> requestKeyframe() async {
+    // Receivers never serve keyframe requests (sender-side feature only).
+  }
 
   @override
   Future<void> stop() => _session.stop();
@@ -288,6 +300,36 @@ class ScreenService extends ReduxNotifier<ScreenState> {
       }
     }
   }
+
+  /// Relays a receiver keyframe request to the local sender engine. Ignores
+  /// stale session ids and non-sender roles (staleness/spoofing guard) and
+  /// throttle one IDR per 500 ms per session (abuse guard: the endpoint is
+  /// reachable by any host that knows the session id).
+  Future<void> requestKeyframeFor(String sessionId) async {
+    final active = state.active;
+    if (active == null || active.role != ScreenRole.sender || active.sessionId != sessionId) {
+      return;
+    }
+    final now = DateTime.now();
+    final lastAt = _lastKeyframeRelayAt;
+    if (_lastKeyframeRelaySession == sessionId && lastAt != null && now.difference(lastAt) < const Duration(milliseconds: 500)) {
+      return;
+    }
+    _lastKeyframeRelaySession = sessionId;
+    _lastKeyframeRelayAt = now;
+    final session = _engineSession;
+    if (session == null) {
+      return;
+    }
+    try {
+      await session.requestKeyframe();
+    } catch (e) {
+      _logger.fine('requesting keyframe failed: $e');
+    }
+  }
+
+  DateTime? _lastKeyframeRelayAt;
+  String? _lastKeyframeRelaySession;
 
   void startTimer(Duration duration, void Function() onFire) {
     _timer?.cancel();
@@ -661,6 +703,19 @@ class IncomingScreenAcceptAction extends AsyncReduxAction<ScreenService, ScreenS
 /// Either side: the peer stopped (or declined) the session. Only acts when the
 /// `session` id matches (or is absent), so stale stops cannot kill a newer
 /// session.
+/// Receiver asked the sender for an IDR after unrecovered loss.
+class IncomingScreenKeyframeAction extends AsyncReduxAction<ScreenService, ScreenState> {
+  final String sessionId;
+
+  IncomingScreenKeyframeAction({required this.sessionId});
+
+  @override
+  Future<ScreenState> reduce() async {
+    await notifier.requestKeyframeFor(sessionId);
+    return state;
+  }
+}
+
 class IncomingScreenStopAction extends AsyncReduxAction<ScreenService, ScreenState> {
   final String reason;
   final String? session;
@@ -792,6 +847,18 @@ class _ScreenSessionEventAction extends AsyncReduxAction<ScreenService, ScreenSt
         // Frames are flowing: disarm the receiver watchdog.
         notifier.cancelTimer();
         return state.copyWith(active: active.copyWith(lastStats: stats));
+      case ScreenSessionRequestKeyframe():
+        // Receiver detected unrecovered loss: ask the sender for an IDR.
+        // The Rust receiver already debounces (one per 500 ms), so this is
+        // fire-and-forget.
+        if (active.role == ScreenRole.receiver) {
+          unawaited(
+            postScreenControl(active.peerIp, notifier.controlPort, 'screen/keyframe', {
+              'session': active.sessionId,
+            }),
+          );
+        }
+        return state;
       case ScreenSessionError(:final message):
         _logger.warning('screen session error: $message');
         return state.copyWith(lastError: message);

@@ -72,8 +72,15 @@ class ScreenSessionError extends ScreenSessionEvent {
   const ScreenSessionError(this.message);
 }
 
+/// Receiver only: unrecovered loss detected. The app relays this to the
+/// sender's control plane so it emits an IDR.
+class ScreenSessionRequestKeyframe extends ScreenSessionEvent {
+  const ScreenSessionRequestKeyframe();
+}
+
 ScreenSessionEvent _convert(rust.RsScreenEvent event) {
   return switch (event) {
+    rust.RsScreenEvent_RequestKeyframe() => const ScreenSessionRequestKeyframe(),
     rust.RsScreenEvent_Status(:final state) => ScreenSessionStatus(state),
     rust.RsScreenEvent_Stats(:final frames, :final keyframes, :final fps, :final mbps, :final packets, :final lost, :final decodeErrors) =>
       ScreenSessionStatsEvent(
@@ -121,6 +128,9 @@ class ScreenSenderSession {
   Stream<ScreenSessionEvent> get events => _inner.listen().map(_convert);
 
   Future<ScreenSessionStats?> stats() async => _convertStats(await _inner.stats());
+
+  /// Asks the encoder for an IDR (receiver loss recovery).
+  Future<void> requestKeyframe() => _inner.requestKeyframe();
 
   Future<void> stop() => _inner.stop();
 }

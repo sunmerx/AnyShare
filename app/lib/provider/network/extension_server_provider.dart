@@ -243,6 +243,36 @@ extension ExtensionServerHandler on ExtensionServerService {
       return;
     }
 
+    if (request.method == 'POST' && path == '/api/anyshare/v1/screen/keyframe') {
+      // The receiver detected unrecovered loss and asks us to emit an IDR.
+      // Exempt from the rate limiter (see accept); the app throttles to one
+      // IDR per 500 ms per session and the request must come from the peer
+      // that owns the active sender session.
+      try {
+        final body = await readJsonBody(request);
+        if (body == null || body['session'] is! String) {
+          await writeJson(request, {'error': 'bad_request'}, status: 400);
+          return;
+        }
+        final active = ref.read(screenProvider).active;
+        if (active == null || active.role != ScreenRole.sender) {
+          await writeJson(request, {'error': 'no_session'}, status: 409);
+          return;
+        }
+        final remote = request.connectionInfo?.remoteAddress.address;
+        if (remote != null && _normalizedIp(remote) != _normalizedIp(active.peerIp)) {
+          await writeJson(request, {'error': 'forbidden'}, status: 403);
+          return;
+        }
+        await ref.redux(screenProvider).dispatchAsync(IncomingScreenKeyframeAction(sessionId: body['session'] as String));
+        await writeJson(request, {'ok': true});
+      } catch (e, st) {
+        _logger.warning('screen/keyframe failed: $e\n$st');
+        await writeJson(request, {'error': 'internal'}, status: 500);
+      }
+      return;
+    }
+
     if (request.method == 'POST' && path == '/api/anyshare/v1/screen/stop') {
       // Either side ends the session (user stop, denial, window closed, ...).
       // Also exempt from the rate limiter (see accept).
@@ -503,4 +533,23 @@ extension ExtensionServerHandler on ExtensionServerService {
     request.response.write(jsonEncode(data));
     await request.response.close();
   }
+}
+
+/// Compares IPs ignoring the IPv6 scope suffix (`fe80::1%3` vs `fe80::1`) and
+/// the IPv4-mapped IPv6 form reported by dual-stack listeners
+/// (`::ffff:127.0.0.1` vs `127.0.0.1`).
+String _normalizedIp(String ip) {
+  var value = ip;
+  final scope = value.indexOf('%');
+  if (scope >= 0) {
+    value = value.substring(0, scope);
+  }
+  const mappedPrefix = '::ffff:';
+  if (value.startsWith(mappedPrefix)) {
+    final tail = value.substring(mappedPrefix.length);
+    if (!tail.contains(':')) {
+      return tail;
+    }
+  }
+  return value;
 }

@@ -55,14 +55,15 @@ extension RsScreenEventPatterns on RsScreenEvent {
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeMap<TResult extends Object?>({TResult Function( RsScreenEvent_Status value)?  status,TResult Function( RsScreenEvent_Stats value)?  stats,TResult Function( RsScreenEvent_Ended value)?  ended,TResult Function( RsScreenEvent_Error value)?  error,required TResult orElse(),}){
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>({TResult Function( RsScreenEvent_Status value)?  status,TResult Function( RsScreenEvent_Stats value)?  stats,TResult Function( RsScreenEvent_Ended value)?  ended,TResult Function( RsScreenEvent_Error value)?  error,TResult Function( RsScreenEvent_RequestKeyframe value)?  requestKeyframe,required TResult orElse(),}){
 final _that = this;
 switch (_that) {
 case RsScreenEvent_Status() when status != null:
 return status(_that);case RsScreenEvent_Stats() when stats != null:
 return stats(_that);case RsScreenEvent_Ended() when ended != null:
 return ended(_that);case RsScreenEvent_Error() when error != null:
-return error(_that);case _:
+return error(_that);case RsScreenEvent_RequestKeyframe() when requestKeyframe != null:
+return requestKeyframe(_that);case _:
   return orElse();
 
 }
@@ -80,14 +81,15 @@ return error(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult map<TResult extends Object?>({required TResult Function( RsScreenEvent_Status value)  status,required TResult Function( RsScreenEvent_Stats value)  stats,required TResult Function( RsScreenEvent_Ended value)  ended,required TResult Function( RsScreenEvent_Error value)  error,}){
+@optionalTypeArgs TResult map<TResult extends Object?>({required TResult Function( RsScreenEvent_Status value)  status,required TResult Function( RsScreenEvent_Stats value)  stats,required TResult Function( RsScreenEvent_Ended value)  ended,required TResult Function( RsScreenEvent_Error value)  error,required TResult Function( RsScreenEvent_RequestKeyframe value)  requestKeyframe,}){
 final _that = this;
 switch (_that) {
 case RsScreenEvent_Status():
 return status(_that);case RsScreenEvent_Stats():
 return stats(_that);case RsScreenEvent_Ended():
 return ended(_that);case RsScreenEvent_Error():
-return error(_that);}
+return error(_that);case RsScreenEvent_RequestKeyframe():
+return requestKeyframe(_that);}
 }
 /// A variant of `map` that fallback to returning `null`.
 ///
@@ -101,14 +103,15 @@ return error(_that);}
 /// }
 /// ```
 
-@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>({TResult? Function( RsScreenEvent_Status value)?  status,TResult? Function( RsScreenEvent_Stats value)?  stats,TResult? Function( RsScreenEvent_Ended value)?  ended,TResult? Function( RsScreenEvent_Error value)?  error,}){
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>({TResult? Function( RsScreenEvent_Status value)?  status,TResult? Function( RsScreenEvent_Stats value)?  stats,TResult? Function( RsScreenEvent_Ended value)?  ended,TResult? Function( RsScreenEvent_Error value)?  error,TResult? Function( RsScreenEvent_RequestKeyframe value)?  requestKeyframe,}){
 final _that = this;
 switch (_that) {
 case RsScreenEvent_Status() when status != null:
 return status(_that);case RsScreenEvent_Stats() when stats != null:
 return stats(_that);case RsScreenEvent_Ended() when ended != null:
 return ended(_that);case RsScreenEvent_Error() when error != null:
-return error(_that);case _:
+return error(_that);case RsScreenEvent_RequestKeyframe() when requestKeyframe != null:
+return requestKeyframe(_that);case _:
   return null;
 
 }
@@ -125,13 +128,14 @@ return error(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>({TResult Function( String state)?  status,TResult Function( BigInt frames,  BigInt keyframes,  double fps,  double mbps,  BigInt packets,  BigInt lost,  BigInt decodeErrors)?  stats,TResult Function( String reason)?  ended,TResult Function( String message)?  error,required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>({TResult Function( String state)?  status,TResult Function( BigInt frames,  BigInt keyframes,  double fps,  double mbps,  BigInt packets,  BigInt lost,  BigInt decodeErrors)?  stats,TResult Function( String reason)?  ended,TResult Function( String message)?  error,TResult Function()?  requestKeyframe,required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case RsScreenEvent_Status() when status != null:
 return status(_that.state);case RsScreenEvent_Stats() when stats != null:
 return stats(_that.frames,_that.keyframes,_that.fps,_that.mbps,_that.packets,_that.lost,_that.decodeErrors);case RsScreenEvent_Ended() when ended != null:
 return ended(_that.reason);case RsScreenEvent_Error() when error != null:
-return error(_that.message);case _:
+return error(_that.message);case RsScreenEvent_RequestKeyframe() when requestKeyframe != null:
+return requestKeyframe();case _:
   return orElse();
 
 }
@@ -149,13 +153,14 @@ return error(_that.message);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>({required TResult Function( String state)  status,required TResult Function( BigInt frames,  BigInt keyframes,  double fps,  double mbps,  BigInt packets,  BigInt lost,  BigInt decodeErrors)  stats,required TResult Function( String reason)  ended,required TResult Function( String message)  error,}) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>({required TResult Function( String state)  status,required TResult Function( BigInt frames,  BigInt keyframes,  double fps,  double mbps,  BigInt packets,  BigInt lost,  BigInt decodeErrors)  stats,required TResult Function( String reason)  ended,required TResult Function( String message)  error,required TResult Function()  requestKeyframe,}) {final _that = this;
 switch (_that) {
 case RsScreenEvent_Status():
 return status(_that.state);case RsScreenEvent_Stats():
 return stats(_that.frames,_that.keyframes,_that.fps,_that.mbps,_that.packets,_that.lost,_that.decodeErrors);case RsScreenEvent_Ended():
 return ended(_that.reason);case RsScreenEvent_Error():
-return error(_that.message);}
+return error(_that.message);case RsScreenEvent_RequestKeyframe():
+return requestKeyframe();}
 }
 /// A variant of `when` that fallback to returning `null`
 ///
@@ -169,13 +174,14 @@ return error(_that.message);}
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>({TResult? Function( String state)?  status,TResult? Function( BigInt frames,  BigInt keyframes,  double fps,  double mbps,  BigInt packets,  BigInt lost,  BigInt decodeErrors)?  stats,TResult? Function( String reason)?  ended,TResult? Function( String message)?  error,}) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>({TResult? Function( String state)?  status,TResult? Function( BigInt frames,  BigInt keyframes,  double fps,  double mbps,  BigInt packets,  BigInt lost,  BigInt decodeErrors)?  stats,TResult? Function( String reason)?  ended,TResult? Function( String message)?  error,TResult? Function()?  requestKeyframe,}) {final _that = this;
 switch (_that) {
 case RsScreenEvent_Status() when status != null:
 return status(_that.state);case RsScreenEvent_Stats() when stats != null:
 return stats(_that.frames,_that.keyframes,_that.fps,_that.mbps,_that.packets,_that.lost,_that.decodeErrors);case RsScreenEvent_Ended() when ended != null:
 return ended(_that.reason);case RsScreenEvent_Error() when error != null:
-return error(_that.message);case _:
+return error(_that.message);case RsScreenEvent_RequestKeyframe() when requestKeyframe != null:
+return requestKeyframe();case _:
   return null;
 
 }
@@ -458,5 +464,37 @@ as String,
 
 
 }
+
+/// @nodoc
+
+
+class RsScreenEvent_RequestKeyframe extends RsScreenEvent {
+  const RsScreenEvent_RequestKeyframe(): super._();
+  
+
+
+
+
+
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is RsScreenEvent_RequestKeyframe);
+}
+
+
+@override
+int get hashCode => runtimeType.hashCode;
+
+@override
+String toString() {
+  return 'RsScreenEvent.requestKeyframe()';
+}
+
+
+}
+
+
+
 
 // dart format on

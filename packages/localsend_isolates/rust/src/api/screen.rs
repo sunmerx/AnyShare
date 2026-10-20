@@ -30,6 +30,9 @@ pub enum RsScreenEvent {
     /// `reason`: stopped / windowclosed / error.
     Ended { reason: String },
     Error { message: String },
+    /// Receiver only: unrecovered loss detected; the app relays this to the
+    /// sender's `/screen/keyframe` endpoint (Rust debounces to 500 ms).
+    RequestKeyframe,
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -131,9 +134,7 @@ pub fn start_screen_receiver(port: u16) -> anyhow::Result<RsScreenReceiver> {
 fn map_event(event: screen_stream::events::StreamEvent) -> Option<RsScreenEvent> {
     use screen_stream::events::StreamEvent;
     match event {
-        // No Dart consumer yet: the HTTP control-plane relay
-        // (/screen/keyframe, 53318) lands in the next step.
-        StreamEvent::RequestKeyframe => None,
+        StreamEvent::RequestKeyframe => Some(RsScreenEvent::RequestKeyframe),
         StreamEvent::Status(state) => Some(RsScreenEvent::Status {
             state: format!("{state:?}").to_lowercase(),
         }),
@@ -216,6 +217,19 @@ impl RsScreenSender {
         #[cfg(not(target_os = "windows"))]
         {
             None
+        }
+    }
+
+    /// Asks the encoder for an IDR on the next frame (the receiver's loss
+    /// recovery request, relayed by the app control plane). Safe to call while
+    /// `listen` is running: it only touches the handle.
+    pub fn request_keyframe(&self) {
+        #[cfg(target_os = "windows")]
+        {
+            let inner = self.inner.lock().unwrap();
+            if let Some(handle) = inner.handle.as_ref() {
+                handle.request_keyframe();
+            }
         }
     }
 }
