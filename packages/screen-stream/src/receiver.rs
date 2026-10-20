@@ -121,33 +121,46 @@ impl Drop for ReceiverHandle {
     }
 }
 
+fn ffmpeg_available(path: &str) -> bool {
+    let candidate = std::path::Path::new(path);
+    if path.contains('/') || path.contains('\\') {
+        return candidate.is_file();
+    }
+    std::env::var_os("PATH")
+        .map(|paths| std::env::split_paths(&paths).any(|dir| dir.join(path).is_file()))
+        .unwrap_or(false)
+}
+
 pub fn start_receiver(config: ReceiverConfig, event_tx: Sender<StreamEvent>) -> Result<ReceiverHandle> {
     let decoder = match &config.decoder {
         ReceiverDecoder::Auto => {
-            // Acceptance/debug escape hatch: ANYSHARE_DECODER=ffmpeg forces
-            // the ffmpeg child pipeline (ANYSHARE_FFMPEG_PATH overrides the
-            // binary). Used while the native VAAPI path is being fixed for
-            // non-1080p stream sizes.
-            if std::env::var("ANYSHARE_DECODER").as_deref() == Ok("ffmpeg") {
-                ReceiverDecoder::Ffmpeg {
+            // Decoder selection: the ffmpeg child pipeline is the default on
+            // every platform; the native VAAPI decoder is opt-in
+            // (ANYSHARE_DECODER=vaapi) until its iHD blank-surface bug is
+            // resolved (reproducible offline with ss-vaapidebug; see the
+            // development log). ANYSHARE_FFMPEG_PATH overrides the binary.
+            match std::env::var("ANYSHARE_DECODER").as_deref() {
+                Ok("vaapi") if cfg!(target_os = "linux") => ReceiverDecoder::Vaapi {
+                    device: "/dev/dri/renderD128".to_string(),
+                },
+                _ => ReceiverDecoder::Ffmpeg {
                     path: std::env::var("ANYSHARE_FFMPEG_PATH").unwrap_or_else(|_| "ffmpeg".to_string()),
                     hwaccel: None,
                     hwaccel_device: None,
-                }
-            } else if cfg!(target_os = "linux") {
-                ReceiverDecoder::Vaapi {
-                    device: "/dev/dri/renderD128".to_string(),
-                }
-            } else {
-                ReceiverDecoder::Ffmpeg {
-                    path: "ffmpeg".to_string(),
-                    hwaccel: None,
-                    hwaccel_device: None,
-                }
+                },
             }
         }
         other => other.clone(),
     };
+
+    // Preflight the ffmpeg child binary: a missing dependency must fail the
+    // start synchronously with a clear message instead of an async session
+    // error (packaging bundles ffmpeg; see the packaging checklist).
+    if let ReceiverDecoder::Ffmpeg { path, .. } = &decoder {
+        if !ffmpeg_available(path) {
+            anyhow::bail!("ffmpeg not found ({path}); install ffmpeg or set ANYSHARE_FFMPEG_PATH to its full path");
+        }
+    }
 
     let socket = {
         let raw = socket2::Socket::new(socket2::Domain::IPV4, socket2::Type::DGRAM, None)?;

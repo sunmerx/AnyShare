@@ -27,6 +27,9 @@ pub struct VaapiDecoder {
     dpb: Vec<(u32, i32, u32)>,
     prev_poc_lsb: u32,
     poc_msb: i32,
+    // POC type 2 state (H.264 8.2.1.3): wraps MaxFrameNum into the offset.
+    prev_frame_num: u32,
+    frame_num_offset: u32,
     width: u32,
     height: u32,
 }
@@ -83,6 +86,8 @@ impl VaapiDecoder {
             pps: None,
             dpb: Vec::new(),
             prev_poc_lsb: 0,
+            prev_frame_num: 0,
+            frame_num_offset: 0,
             poc_msb: 0,
             width: 0,
             height: 0,
@@ -167,6 +172,8 @@ impl VaapiDecoder {
         if slice.idr {
             self.prev_poc_lsb = 0;
             self.poc_msb = 0;
+            self.prev_frame_num = 0;
+            self.frame_num_offset = 0;
             return Ok(0);
         }
         match sps.pic_order_cnt_type {
@@ -179,6 +186,25 @@ impl VaapiDecoder {
                 }
                 self.prev_poc_lsb = slice.poc_lsb;
                 Ok(self.poc_msb + slice.poc_lsb as i32)
+            }
+            // Type 2 (no reordering, frame_num-derived) is what low-latency
+            // encoders emit (no B-frames). H.264 8.2.1.3: FrameNumOffset
+            // accumulates MaxFrameNum on wrap; non-reference pictures use POC
+            // -1. Without the wrap handling, POC goes backwards after a GOP
+            // longer than MaxFrameNum and the reference list order breaks
+            // until the next IDR.
+            2 => {
+                let max_frame_num = 1u32 << sps.log2_max_frame_num();
+                let frame_num = slice.frame_num;
+                if self.prev_frame_num > frame_num {
+                    self.frame_num_offset = self.frame_num_offset.wrapping_add(max_frame_num);
+                }
+                self.prev_frame_num = frame_num;
+                if slice.nal_ref_idc == 0 {
+                    Ok(-1)
+                } else {
+                    Ok(2 * (self.frame_num_offset.wrapping_add(frame_num) as i32))
+                }
             }
             other => bail!("pic_order_cnt_type {other} unsupported"),
         }
@@ -462,6 +488,26 @@ impl VaapiDecoder {
         let uv_pitch = image.pitches[1] as usize;
         let y_offset = image.offsets[0] as usize;
         let uv_offset = image.offsets[1] as usize;
+        if std::env::var("ANYSHARE_VAAPI_TRACE").is_ok() {
+            let base = ptr as *const u8;
+            let mut ys = Vec::new();
+            for i in 0..6 {
+                let row = (crop_y + i * 50).min(image.height as usize - 1);
+                ys.push(unsafe { *base.add(y_offset + row * y_pitch + crop_x) });
+            }
+            eprintln!(
+                "vaapi trace: surface={} planes={} y_pitch={} uv_pitch={} y_off={} uv_off={} size={}x{} y_samples={:?}",
+                surface,
+                image.num_planes,
+                y_pitch,
+                uv_pitch,
+                y_offset,
+                uv_offset,
+                image.width,
+                image.height,
+                ys
+            );
+        }
 
         let mut argb = Vec::with_capacity(width * height);
         unsafe {

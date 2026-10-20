@@ -27,6 +27,11 @@ name = "ss-h264dbg"
 path = "src/bin/ss-h264dbg.rs"
 required-features = ["viewer"]
 
+[[bin]]
+name = "ss-vaapidebug"
+path = "src/bin/ss-vaapidebug.rs"
+required-features = ["viewer"]
+
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.58", features = [
     "Win32_Foundation",
