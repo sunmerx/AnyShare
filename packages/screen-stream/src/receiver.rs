@@ -12,7 +12,7 @@ use std::time::{Duration, Instant};
 use anyhow::Result;
 
 use crate::events::{EndReason, StreamEvent, StreamState, StreamStats};
-use crate::transport::{Delivered, Packet, Reassembler, FLAG_HEADER, FLAG_KEYFRAME};
+use crate::transport::{Delivered, Nack, Packet, Reassembler, FLAG_HEADER, FLAG_KEYFRAME, NACK_ATTEMPTS, NACK_RETRY_INTERVAL};
 
 #[derive(Debug, Clone)]
 pub enum ReceiverDecoder {
@@ -1048,6 +1048,9 @@ fn receive_loop(
     let mut buffer = vec![0u8; 65536];
     let mut last_stats = Instant::now();
     let mut verbose_count = 0u64;
+    let mut peer_addr: Option<std::net::SocketAddr> = None;
+    let mut nack_state: std::collections::HashMap<u32, (u8, Instant)> = std::collections::HashMap::new();
+    let mut last_nack_scan = Instant::now();
     let mut last_lost = 0u64;
     let mut keyframe_request_pending = false;
     let mut last_keyframe_request: Option<Instant> = None;
@@ -1057,8 +1060,13 @@ fn receive_loop(
         }
         let now = Instant::now();
         match socket.recv_from(&mut buffer) {
-            Ok((len, _)) => {
+            Ok((len, from)) => {
                 if let Some(packet) = Packet::decode(&buffer[..len]) {
+                    // Only the current session's peer may redirect NACKs: a
+                    // stray datagram must not turn us into a reflector.
+                    if reassembler.session().is_none_or(|session| session == packet.session) {
+                        peer_addr = Some(from);
+                    }
                     for frame in reassembler.ingest(&packet, now) {
                         if verbose && verbose_count < 15 {
                             verbose_count += 1;
@@ -1091,6 +1099,37 @@ fn receive_loop(
             }
             Err(e) => return Err(anyhow::anyhow!("recv_from failed: {e}")),
         }
+        // Selective retransmission: NACK missing data packets of frames that
+        // stopped making progress (two attempts, 8 ms apart). FEC already
+        // covers single losses; NACKs cover the rest before the 300 ms frame
+        // timeout. The scan itself is gated to 2 ms: building candidates per
+        // received packet would allocate far too much on large frames.
+        if peer_addr.is_some() && now.duration_since(last_nack_scan) >= Duration::from_millis(2) {
+            last_nack_scan = now;
+            if let (Some(peer), Some(session)) = (peer_addr, reassembler.session()) {
+                let candidates = reassembler.missing_candidates(now);
+                for (frame_id, count, missing) in &candidates {
+                    let entry = nack_state.entry(*frame_id).or_insert((0, now));
+                    let due = entry.0 < NACK_ATTEMPTS && (entry.0 == 0 || now.duration_since(entry.1) >= NACK_RETRY_INTERVAL);
+                    if due {
+                        entry.0 += 1;
+                        entry.1 = now;
+                        let nack = Nack {
+                            session,
+                            frame_id: *frame_id,
+                            count: *count,
+                            missing: missing.clone(),
+                        };
+                        let _ = socket.send_to(&nack.encode(), peer);
+                    }
+                }
+                // Drop attempts for frames that completed or timed out.
+                if nack_state.len() > 32 {
+                    nack_state.retain(|frame_id, _| candidates.iter().any(|(candidate, _, _)| candidate == frame_id));
+                }
+            }
+        }
+
         // Loss recovery: an unrecovered frame drop leaves the decoder with a
         // missing reference until the next IDR, visible as smearing/stutter.
         // Report it so the control plane can ask the sender for a keyframe.

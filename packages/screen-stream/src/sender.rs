@@ -97,13 +97,27 @@ mod imp {
     use std::net::UdpSocket;
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    use crate::transport::{packetize, FLAG_DISCONTINUITY, FLAG_HEADER, FLAG_KEYFRAME};
+    use crate::transport::{packetize, Nack, Packet, PacketHistory, FLAG_DISCONTINUITY, FLAG_HEADER, FLAG_KEYFRAME};
     use crate::types::{Acquire, FrameMeta, FramePixels};
     use crate::vfr::{EncodeDecision, VfrConfig, VfrGate};
     use crate::{create_best_encoder, enumerate_outputs, windows_capture, Duplicator};
 
     fn send_event(event_tx: &Sender<StreamEvent>, event: StreamEvent) {
         let _ = event_tx.send(event);
+    }
+
+    /// UDP send with a single WouldBlock retry. Persistent blocking means the
+    /// kernel buffer is full: dropping a datagram is fine (FEC/NACK recover);
+    /// it must never stall the capture loop or kill the stream.
+    fn send_udp(socket: &UdpSocket, bytes: &[u8]) -> Result<()> {
+        for _ in 0..2 {
+            match socket.send(bytes) {
+                Ok(_) => return Ok(()),
+                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => std::thread::sleep(std::time::Duration::from_millis(1)),
+                Err(e) => return Err(e.into()),
+            }
+        }
+        Ok(())
     }
 
     /// True when the Annex-B access unit contains an IDR slice (NAL type 5).
@@ -198,6 +212,9 @@ mod imp {
             raw.set_send_buffer_size(8 * 1024 * 1024)?;
             raw.connect(&config.target.parse::<std::net::SocketAddr>()?.into())?;
             let std_socket: UdpSocket = raw.into();
+            // Non-blocking receive: the same socket doubles as the NACK
+            // feedback channel from the receiver.
+            std_socket.set_nonblocking(true)?;
             std_socket
         };
 
@@ -279,6 +296,10 @@ mod imp {
         let mut bytes_sent: u64 = 0;
         let mut frames_sent: u64 = 0;
         let mut keyframes_sent: u64 = 0;
+        // Selective retransmission: recent data packets for NACK recovery.
+        let mut history = PacketHistory::new(48);
+        let mut retransmitted: u64 = 0;
+        let mut nack_budget: std::collections::HashMap<u32, u8> = std::collections::HashMap::new();
         let mut last_enc_time_100ns: i64 = -1;
         let mut last_rebuild_count = dup.rebuild_count();
         // Drop the first frame of each duplication session (it can be blank).
@@ -289,7 +310,7 @@ mod imp {
         if let Some(header) = &sequence_header {
             let packets = packetize(session, 0, FLAG_HEADER, 0, header);
             for packet in &packets {
-                socket.send(&packet.encode())?;
+                send_udp(&socket, &packet.encode())?;
                 packets_sent += 1;
                 bytes_sent += packet.payload.len() as u64;
             }
@@ -319,6 +340,44 @@ mod imp {
                 if started.elapsed() >= duration {
                     break;
                 }
+            }
+
+            // Selective retransmission: answer receiver NACKs from the
+            // history ring before capturing the next frame. Bounded per loop
+            // (a spoofed/duplicated NACK flood must not stall capture) and
+            // budgeted per frame (2 retransmissions max).
+            let mut nack_buf = [0u8; 1200];
+            let mut nacks_processed = 0;
+            while nacks_processed < 32 && !stop.load(Ordering::Acquire) {
+                let Ok(len) = socket.recv(&mut nack_buf) else { break };
+                nacks_processed += 1;
+                let Some(packet) = Packet::decode(&nack_buf[..len]) else { continue };
+                let Some(nack) = Nack::from_packet(&packet) else { continue };
+                if nack.session != session {
+                    continue;
+                }
+                let budget = nack_budget.entry(nack.frame_id).or_insert(2);
+                if *budget == 0 {
+                    continue;
+                }
+                let Some(frames) = history.get(nack.frame_id) else { continue };
+                for &index in &nack.missing {
+                    let Some(bytes) = frames.get(index) else { continue };
+                    if send_udp(&socket, bytes).is_ok() {
+                        retransmitted += 1;
+                        packets_sent += 1;
+                        window_packets += 1;
+                        bytes_sent += bytes.len() as u64;
+                        window_bytes += bytes.len() as u64;
+                    }
+                    *budget = budget.saturating_sub(1);
+                    if *budget == 0 {
+                        break;
+                    }
+                }
+            }
+            if nack_budget.len() > 64 {
+                nack_budget.retain(|frame_id, budget| *budget > 0 && history.get(*frame_id).is_some());
             }
 
             let iter_started = Instant::now();
@@ -493,7 +552,7 @@ mod imp {
                         if let Some(header) = encoder.take_sequence_header() {
                             let packets = packetize(session, frame_id, FLAG_HEADER, t100 as u64, &header);
                             for packet in &packets {
-                                socket.send(&packet.encode())?;
+                                send_udp(&socket, &packet.encode())?;
                                 packets_sent += 1;
                                 window_packets += 1;
                                 bytes_sent += packet.payload.len() as u64;
@@ -554,13 +613,19 @@ mod imp {
                                 chunk
                             };
                             let packets = packetize(session, frame_id, flags, out_ts, payload);
+                            let mut history_packets = Vec::with_capacity(packets.len());
                             for packet in &packets {
-                                socket.send(&packet.encode())?;
+                                let bytes = packet.encode();
+                                if !packet.is_fec() {
+                                    history_packets.push(bytes.clone());
+                                }
+                                send_udp(&socket, &bytes)?;
                                 packets_sent += 1;
                                 window_packets += 1;
                                 bytes_sent += packet.payload.len() as u64;
                                 window_bytes += packet.payload.len() as u64;
                             }
+                            history.push(frame_id, history_packets);
                             frame_id = frame_id.wrapping_add(1);
                             frames_sent += 1;
                             window_frames += 1;
@@ -573,6 +638,9 @@ mod imp {
                             }
                         }
                         let _ = had_output;
+                        // Retransmissions are counted for diagnostics; the
+                        // packet counter already includes them.
+                        let _ = retransmitted;
                         if last_enc_time_100ns < 0 && started.elapsed() > Duration::from_secs(5) {
                             anyhow::bail!("encoder produced no output within 5s (activating-but-mute MFT?)");
                         }
@@ -656,7 +724,7 @@ mod imp {
         for chunk in encoder.shutdown()? {
             let packets = packetize(session, frame_id, 0, last_send_time_100ns.max(0) as u64, &chunk);
             for packet in &packets {
-                socket.send(&packet.encode())?;
+                send_udp(&socket, &packet.encode())?;
                 packets_sent += 1;
                 bytes_sent += packet.payload.len() as u64;
             }

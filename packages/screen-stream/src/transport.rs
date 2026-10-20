@@ -22,6 +22,18 @@ pub const FLAG_KEYFRAME: u8 = 0x01;
 pub const FLAG_DISCONTINUITY: u8 = 0x02;
 pub const FLAG_HEADER: u8 = 0x04;
 pub const FLAG_FEC: u8 = 0x08;
+/// Receiver -> sender selective retransmission request (same Packet framing,
+/// payload = bitmask over the frame's data-packet indices).
+pub const FLAG_NACK: u8 = 0x10;
+/// Total NACK attempts per frame before giving up and waiting for the 300 ms
+/// frame timeout / keyframe request.
+pub const NACK_ATTEMPTS: u8 = 2;
+/// Minimum spacing between NACK attempts for the same frame.
+pub const NACK_RETRY_INTERVAL: Duration = Duration::from_millis(8);
+/// A frame only becomes a NACK candidate after this much time without packet
+/// progress: packets of one frame arrive over several milliseconds, so empty
+/// slots while packets are still in flight are NOT losses.
+pub const NACK_GRACE: Duration = Duration::from_millis(15);
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Packet {
@@ -87,6 +99,94 @@ impl Packet {
     }
 }
 
+/// A selective retransmission request for one frame.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Nack {
+    pub session: u32,
+    pub frame_id: u32,
+    pub count: u16,
+    pub missing: Vec<usize>,
+}
+
+impl Nack {
+    pub fn encode(&self) -> Vec<u8> {
+        let bytes = (self.count as usize).div_ceil(8).max(1);
+        let mut bitmask = vec![0u8; bytes];
+        for &index in &self.missing {
+            if index < self.count as usize {
+                bitmask[index / 8] |= 1 << (index % 8);
+            }
+        }
+        Packet {
+            session: self.session,
+            frame_id: self.frame_id,
+            seq: 0,
+            count: self.count,
+            flags: FLAG_NACK,
+            timestamp_100ns: 0,
+            payload: bitmask,
+        }
+        .encode()
+    }
+
+    pub fn from_packet(packet: &Packet) -> Option<Nack> {
+        if packet.flags & FLAG_NACK == 0 || packet.count == 0 {
+            return None;
+        }
+        let expected = (packet.count as usize).div_ceil(8).max(1);
+        if packet.payload.len() != expected {
+            return None;
+        }
+        let mut missing = Vec::new();
+        for index in 0..packet.count as usize {
+            if packet.payload[index / 8] & (1 << (index % 8)) != 0 {
+                missing.push(index);
+            }
+        }
+        if missing.is_empty() {
+            return None;
+        }
+        Some(Nack {
+            session: packet.session,
+            frame_id: packet.frame_id,
+            count: packet.count,
+            missing,
+        })
+    }
+}
+
+/// Ring buffer of recently sent frames (encoded data packets only) used to
+/// answer NACKs. Bounded by frame count; ~48 frames is a couple of MB at
+/// typical streaming bitrates.
+pub struct PacketHistory {
+    frames: std::collections::VecDeque<(u32, Vec<Vec<u8>>)>,
+    capacity: usize,
+}
+
+impl PacketHistory {
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            frames: std::collections::VecDeque::new(),
+            capacity: capacity.max(1),
+        }
+    }
+
+    pub fn push(&mut self, frame_id: u32, packets: Vec<Vec<u8>>) {
+        if self.frames.len() == self.capacity {
+            self.frames.pop_front();
+        }
+        self.frames.push_back((frame_id, packets));
+    }
+
+    pub fn get(&self, frame_id: u32) -> Option<&Vec<Vec<u8>>> {
+        self.frames.iter().find(|(id, _)| *id == frame_id).map(|(_, packets)| packets)
+    }
+
+    pub fn len(&self) -> usize {
+        self.frames.len()
+    }
+}
+
 /// Splits one access unit into data packets plus per-block XOR parity packets.
 pub fn packetize(
     session: u32,
@@ -143,6 +243,7 @@ struct FrameBuf {
     timestamp_100ns: u64,
     count: usize,
     first_seen: Instant,
+    last_progress: Instant,
     data: Vec<Option<Vec<u8>>>,
     parity: BTreeMap<usize, Vec<u8>>,
     received: usize,
@@ -156,6 +257,7 @@ impl FrameBuf {
             timestamp_100ns: packet.timestamp_100ns,
             count,
             first_seen: now,
+            last_progress: now,
             data: vec![None; count],
             parity: BTreeMap::new(),
             received: 0,
@@ -273,6 +375,32 @@ impl Reassembler {
         self.stats
     }
 
+    /// Session id learned from the first data packet (for NACK framing).
+    pub fn session(&self) -> Option<u32> {
+        self.session
+    }
+
+    /// Data-packet indices still missing for the oldest pending frames.
+    /// Only frames that stopped making progress ([NACK_GRACE]) are reported:
+    /// empty slots while packets are still in flight are not losses.
+    pub fn missing_candidates(&self, now: Instant) -> Vec<(u32, u16, Vec<usize>)> {
+        self.pending
+            .iter()
+            .take(4)
+            .filter_map(|(&frame_id, frame)| {
+                if now.duration_since(frame.last_progress) < NACK_GRACE {
+                    return None;
+                }
+                let missing: Vec<usize> = (0..frame.count).filter(|&index| frame.data[index].is_none()).collect();
+                if missing.is_empty() {
+                    None
+                } else {
+                    Some((frame_id, frame.count as u16, missing))
+                }
+            })
+            .collect()
+    }
+
     pub fn ingest(&mut self, packet: &Packet, now: Instant) -> Vec<Delivered> {
         if let Some(session) = self.session {
             if session != packet.session {
@@ -320,6 +448,7 @@ impl Reassembler {
             .pending
             .entry(packet.frame_id)
             .or_insert_with(|| FrameBuf::new(packet, now));
+        frame.last_progress = now;
 
         if packet.is_fec() {
             let block_index = packet.seq as usize;
@@ -622,5 +751,69 @@ mod tests {
         let ids: Vec<u32> = delivered.iter().map(|d| d.frame_id).collect();
         assert_eq!(ids, vec![3]);
         assert_eq!(receiver.stats().lost_frames, 1);
+    }
+
+    #[test]
+    fn nack_roundtrip_bits() {
+        let nack = Nack {
+            session: 5,
+            frame_id: 9,
+            count: 11,
+            missing: vec![0, 3, 10],
+        };
+        let bytes = nack.encode();
+        let packet = Packet::decode(&bytes).unwrap();
+        assert_eq!(packet.flags & FLAG_NACK, FLAG_NACK);
+        assert_eq!(Nack::from_packet(&packet).unwrap(), nack);
+        // A NACK without any set bit is rejected.
+        let empty = Nack {
+            session: 5,
+            frame_id: 9,
+            count: 11,
+            missing: vec![],
+        };
+        assert!(Nack::from_packet(&Packet::decode(&empty.encode()).unwrap()).is_none());
+    }
+
+    #[test]
+    fn missing_candidates_reports_gap() {
+        let packets = packetize(3, 7, 0, 0, &vec![0x5A; DEFAULT_PAYLOAD * 3]);
+        let mut receiver = Reassembler::new();
+        let t = now();
+        for packet in packets.iter().filter(|p| !p.is_fec() && p.seq != 1) {
+            let _ = receiver.ingest(packet, t);
+        }
+        // Packets may still be in flight: no candidate before the grace.
+        assert!(receiver.missing_candidates(t + Duration::from_millis(1)).is_empty());
+        let after_grace = t + NACK_GRACE + Duration::from_millis(1);
+        let candidates = receiver.missing_candidates(after_grace);
+        assert_eq!(candidates.len(), 1);
+        assert_eq!(candidates[0].0, 7);
+        assert_eq!(candidates[0].1, packets.iter().filter(|p| !p.is_fec()).count() as u16);
+        assert_eq!(candidates[0].2, vec![1]);
+    }
+
+    #[test]
+    fn missing_candidates_ignores_stalled_frame_prefix() {
+        // Only the first packet of a frame has arrived: every other slot is
+        // empty, but nothing may be NACKed while packets can still arrive.
+        let packets = packetize(4, 2, 0, 0, &vec![0x11; DEFAULT_PAYLOAD * 4]);
+        let mut receiver = Reassembler::new();
+        let t = now();
+        let first = packets.iter().find(|p| !p.is_fec() && p.seq == 0).unwrap();
+        let _ = receiver.ingest(first, t);
+        assert!(receiver.missing_candidates(t + Duration::from_millis(5)).is_empty());
+        assert_eq!(receiver.missing_candidates(t + NACK_GRACE + Duration::from_millis(1)).len(), 1);
+    }
+
+    #[test]
+    fn packet_history_evicts_oldest() {
+        let mut history = PacketHistory::new(2);
+        history.push(1, vec![vec![1]]);
+        history.push(2, vec![vec![2]]);
+        history.push(3, vec![vec![3]]);
+        assert_eq!(history.len(), 2);
+        assert!(history.get(1).is_none());
+        assert_eq!(history.get(3), Some(&vec![vec![3]]));
     }
 }
