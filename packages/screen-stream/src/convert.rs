@@ -154,6 +154,17 @@ pub fn bgra_looks_blank(bgra: &[u8]) -> bool {
     bgra.chunks_exact(4).step_by(4096).all(|px| px[0] < 8 && px[1] < 8 && px[2] < 8)
 }
 
+/// Cheap blank check for an NV12 frame (samples the Y plane).
+pub fn nv12_looks_blank(nv12: &[u8], width: u32, height: u32) -> bool {
+    let y_size = (width * height) as usize;
+    if nv12.len() < y_size {
+        return false;
+    }
+    // BT.601 limited range: black is Y=16 (not 0). Dark UI content sits
+    // above ~20, so this still distinguishes "blank" from "dark screen".
+    nv12[..y_size].chunks(4096).all(|chunk| chunk[0] < 20)
+}
+
 /// Scales (w, h) down so it fits into (max_w, max_h), preserving the aspect
 /// ratio, with even dimensions (NV12/I420 require them).
 pub fn scale_to_fit(w: u32, h: u32, max_w: u32, max_h: u32) -> (u32, u32) {

@@ -8,7 +8,7 @@ use windows::Win32::Foundation::{HINSTANCE, RECT};
 use windows::Win32::Graphics::Direct3D::D3D_DRIVER_TYPE_UNKNOWN;
 use windows::Win32::Graphics::Direct3D11::{
     D3D11CreateDevice, ID3D11Device, ID3D11DeviceContext, ID3D11Texture2D, D3D11_CPU_ACCESS_READ,
-    D3D11_CREATE_DEVICE_BGRA_SUPPORT, D3D11_MAP_READ, D3D11_MAPPED_SUBRESOURCE, D3D11_SDK_VERSION,
+    D3D11_CREATE_DEVICE_BGRA_SUPPORT, D3D11_CREATE_DEVICE_VIDEO_SUPPORT, D3D11_MAP_READ, D3D11_MAPPED_SUBRESOURCE, D3D11_SDK_VERSION,
     D3D11_TEXTURE2D_DESC, D3D11_USAGE_STAGING,
 };
 use windows::Win32::Graphics::Dxgi::Common::{
@@ -49,7 +49,7 @@ fn create_d3d11_device(adapter: &IDXGIAdapter1) -> Result<(ID3D11Device, ID3D11D
             &adapter_base,
             D3D_DRIVER_TYPE_UNKNOWN,
             HINSTANCE::default(),
-            D3D11_CREATE_DEVICE_BGRA_SUPPORT,
+            D3D11_CREATE_DEVICE_BGRA_SUPPORT | D3D11_CREATE_DEVICE_VIDEO_SUPPORT,
             None,
             D3D11_SDK_VERSION,
             Some(&mut device),
@@ -128,6 +128,10 @@ pub struct Duplicator {
     pointer_shape_info: DXGI_OUTDUPL_POINTER_SHAPE_INFO,
     pointer_position: (i32, i32),
     pointer_visible: bool,
+    // Currently acquired (not yet released) duplication frame, for the GPU
+    // conversion path.
+    frame_resource: Option<IDXGIResource>,
+    frame_meta: Option<FrameMeta>,
 }
 
 impl Duplicator {
@@ -156,6 +160,8 @@ impl Duplicator {
             pointer_shape_info: DXGI_OUTDUPL_POINTER_SHAPE_INFO::default(),
             pointer_position: (0, 0),
             pointer_visible: false,
+            frame_resource: None,
+            frame_meta: None,
         })
     }
 
@@ -216,51 +222,7 @@ impl Duplicator {
         match acquired {
             Ok(()) => {
                 self.frame_index += 1;
-                let mut meta = {
-                    let dup = self.duplication.as_ref().context("duplication session missing")?;
-                    let buffer = &mut self.metadata_buffer;
-                    unsafe { read_metadata(dup, buffer, self.frame_index, &info) }
-                };
-
-                // Pointer state: the position fields are only valid when
-                // LastMouseUpdateTime says the mouse actually changed —
-                // overwriting them on desktop-only frames would teleport the
-                // cursor to (0,0) / mark it invisible.
-                if info.LastMouseUpdateTime != 0 {
-                    let new_position = (info.PointerPosition.Position.x, info.PointerPosition.Position.y);
-                    let new_visible = info.PointerPosition.Visible.as_bool();
-                    if let Ok(meta) = meta.as_mut() {
-                        meta.pointer_moved =
-                            new_visible != self.pointer_visible || (new_visible && new_position != self.pointer_position);
-                    }
-                    self.pointer_position = new_position;
-                    self.pointer_visible = new_visible;
-                }
-                if info.PointerShapeBufferSize > 0 {
-                    let size = info.PointerShapeBufferSize as usize;
-                    self.pointer_shape.resize(size, 0);
-                    let mut required = 0u32;
-                    let mut shape_info = DXGI_OUTDUPL_POINTER_SHAPE_INFO::default();
-                    let dup = self.duplication.as_ref().context("duplication session missing")?;
-                    let fetched = unsafe {
-                        dup.GetFramePointerShape(
-                            size as u32,
-                            self.pointer_shape.as_mut_ptr() as *mut _,
-                            &mut required,
-                            &mut shape_info,
-                        )
-                    };
-                    match fetched {
-                        Ok(()) => {
-                            self.pointer_shape.truncate((required as usize).min(size));
-                            self.pointer_shape_info = shape_info;
-                        }
-                        Err(e) => {
-                            eprintln!("windows_capture: GetFramePointerShape failed: {e}");
-                            self.pointer_shape.clear();
-                        }
-                    }
-                }
+                let meta = self.read_frame_meta(&info)?;
 
                 let pixels = if copy_pixels {
                     match resource.as_ref() {
@@ -280,7 +242,7 @@ impl Duplicator {
                     self.rebuild().context("rebuilding after ReleaseFrame failure failed")?;
                     return Ok(None);
                 }
-                Ok(Some((meta?, pixels.transpose()?)))
+                Ok(Some((meta, pixels.transpose()?)))
             }
             Err(e) if e.code() == DXGI_ERROR_WAIT_TIMEOUT => Ok(None),
             Err(e)
@@ -293,6 +255,300 @@ impl Duplicator {
             }
             Err(e) => Err(e).context("AcquireNextFrame failed"),
         }
+    }
+
+    /// Reads frame metadata and updates the cursor state (position fields
+    /// are only valid when LastMouseUpdateTime is set; the shape buffer only
+    /// when the driver announces it).
+    fn read_frame_meta(&mut self, info: &DXGI_OUTDUPL_FRAME_INFO) -> Result<FrameMeta> {
+                    let mut meta = {
+                        let dup = self.duplication.as_ref().context("duplication session missing")?;
+                        let buffer = &mut self.metadata_buffer;
+                        unsafe { read_metadata(dup, buffer, self.frame_index, &info) }
+                    };
+    
+                    // Pointer state: the position fields are only valid when
+                    // LastMouseUpdateTime says the mouse actually changed —
+                    // overwriting them on desktop-only frames would teleport the
+                    // cursor to (0,0) / mark it invisible.
+                    if info.LastMouseUpdateTime != 0 {
+                        let new_position = (info.PointerPosition.Position.x, info.PointerPosition.Position.y);
+                        let new_visible = info.PointerPosition.Visible.as_bool();
+                        if let Ok(meta) = meta.as_mut() {
+                            meta.pointer_moved =
+                                new_visible != self.pointer_visible || (new_visible && new_position != self.pointer_position);
+                        }
+                        self.pointer_position = new_position;
+                        self.pointer_visible = new_visible;
+                    }
+                    if info.PointerShapeBufferSize > 0 {
+                        let size = info.PointerShapeBufferSize as usize;
+                        self.pointer_shape.resize(size, 0);
+                        let mut required = 0u32;
+                        let mut shape_info = DXGI_OUTDUPL_POINTER_SHAPE_INFO::default();
+                        let dup = self.duplication.as_ref().context("duplication session missing")?;
+                        let fetched = unsafe {
+                            dup.GetFramePointerShape(
+                                size as u32,
+                                self.pointer_shape.as_mut_ptr() as *mut _,
+                                &mut required,
+                                &mut shape_info,
+                            )
+                        };
+                        match fetched {
+                            Ok(()) => {
+                                self.pointer_shape.truncate((required as usize).min(size));
+                                self.pointer_shape_info = shape_info;
+                            }
+                            Err(e) => {
+                                eprintln!("windows_capture: GetFramePointerShape failed: {e}");
+                                self.pointer_shape.clear();
+                            }
+                        }
+                    }
+    
+        meta
+    }
+
+    /// Acquires the next frame and KEEPS it acquired so callers can process
+    /// the GPU texture directly; call [Self::release_frame] when done.
+    /// Returns false when nothing changed within the timeout.
+    pub fn acquire_texture(&mut self, timeout_ms: u32) -> Result<bool> {
+        self.release_frame().ok();
+        let mut info = DXGI_OUTDUPL_FRAME_INFO::default();
+        let mut resource: Option<IDXGIResource> = None;
+        let acquired = {
+            let dup = self.duplication.as_ref().context("duplication session missing")?;
+            unsafe { dup.AcquireNextFrame(timeout_ms, &mut info, &mut resource) }
+        };
+        match acquired {
+            Ok(()) => {
+                self.frame_index += 1;
+                let meta = self.read_frame_meta(&info)?;
+                self.frame_resource = resource;
+                self.frame_meta = Some(meta);
+                Ok(true)
+            }
+            Err(e) if e.code() == DXGI_ERROR_WAIT_TIMEOUT => Ok(false),
+            Err(e)
+                if e.code() == DXGI_ERROR_ACCESS_LOST
+                    || e.code() == DXGI_ERROR_INVALID_CALL
+                    || e.code() == DXGI_ERROR_ACCESS_DENIED =>
+            {
+                self.rebuild().context("rebuilding duplication session failed")?;
+                Ok(false)
+            }
+            Err(e) => Err(e).context("AcquireNextFrame failed"),
+        }
+    }
+
+    pub fn frame_meta(&self) -> Option<&FrameMeta> {
+        self.frame_meta.as_ref()
+    }
+
+    pub fn frame_texture(&self) -> Result<ID3D11Texture2D> {
+        let resource = self.frame_resource.as_ref().context("no acquired frame")?;
+        resource.cast().context("frame resource -> ID3D11Texture2D")
+    }
+
+    pub fn release_frame(&mut self) -> Result<()> {
+        self.frame_resource = None;
+        self.frame_meta = None;
+        if let Some(dup) = &self.duplication {
+            unsafe {
+                let _ = dup.ReleaseFrame();
+            }
+        }
+        Ok(())
+    }
+
+    pub fn device(&self) -> &ID3D11Device {
+        &self.device
+    }
+
+    pub fn context(&self) -> &ID3D11DeviceContext {
+        &self.context
+    }
+
+    /// Composites the cursor into an NV12 frame (the GPU conversion path
+    /// cannot blend the BGRA cursor itself). Cursor colors are converted to
+    /// BT.601 limited-range YUV and alpha-blended into the Y and UV planes.
+    pub fn composite_pointer_nv12(&mut self, nv12: &mut [u8], width: u32, height: u32) {
+        if !self.pointer_visible || self.pointer_shape.is_empty() {
+            return;
+        }
+        let info = self.pointer_shape_info;
+        if info.Width == 0 || info.Height == 0 || info.Pitch == 0 {
+            return;
+        }
+        let desktop_w = self.output_info.desktop_rect.width().max(1);
+        let desktop_h = self.output_info.desktop_rect.height().max(1);
+        let px = (self.pointer_position.0 as i64 * width as i64 / desktop_w as i64) as i32;
+        let py = (self.pointer_position.1 as i64 * height as i64 / desktop_h as i64) as i32;
+        // The bitmap must shrink/grow with the frame (GPU path up/downscales).
+        let cursor_w = ((info.Width as u64 * width as u64 + desktop_w as u64 / 2) / desktop_w as u64).max(1) as usize;
+        let cursor_h = ((info.Height as u64 * height as u64 + desktop_h as u64 / 2) / desktop_h as u64).max(1) as usize;
+        let y_size = (width * height) as usize;
+        if nv12.len() < y_size + y_size / 2 {
+            return;
+        }
+        let shape = std::mem::take(&mut self.pointer_shape);
+        {
+            let (y_plane, uv_plane) = nv12.split_at_mut(y_size);
+            let rgb_to_yuv = |r: u32, g: u32, b: u32| -> (u32, u32, u32) {
+                let y = (16.0 + (65.481 * r as f64 + 128.553 * g as f64 + 24.966 * b as f64) / 255.0).round() as u32;
+                let u = (128.0 + (-37.797 * r as f64 - 74.203 * g as f64 + 112.0 * b as f64) / 255.0)
+                    .clamp(0.0, 255.0)
+                    .round() as u32;
+                let v = (128.0 + (112.0 * r as f64 - 93.786 * g as f64 - 18.214 * b as f64) / 255.0)
+                    .clamp(0.0, 255.0)
+                    .round() as u32;
+                (y, u, v)
+            };
+            match info.Type {
+                t if t == DXGI_OUTDUPL_POINTER_SHAPE_TYPE_COLOR.0 as u32 => {
+                    let pitch = info.Pitch as usize;
+                    for row in 0..cursor_h {
+                        let dy = py + row as i32;
+                        if dy < 0 || dy >= height as i32 {
+                            continue;
+                        }
+                        let src_row = (row * info.Height as usize / cursor_h).min(info.Height as usize - 1);
+                        for col in 0..cursor_w {
+                            let dx = px + col as i32;
+                            if dx < 0 || dx >= width as i32 {
+                                continue;
+                            }
+                            let src_col = (col * info.Width as usize / cursor_w).min(info.Width as usize - 1);
+                            let s = src_row * pitch + src_col * 4;
+                            if s + 4 > shape.len() {
+                                continue;
+                            }
+                            let a = shape[s + 3] as u32;
+                            if a == 0 {
+                                continue;
+                            }
+                            let inv = 255 - a;
+                            // COLOR shapes are premultiplied BGRA: un-premultiply.
+                            let (r, g, b) = if a < 255 {
+                                (
+                                    ((shape[s + 2] as u32 * 255 + a / 2) / a).min(255),
+                                    ((shape[s + 1] as u32 * 255 + a / 2) / a).min(255),
+                                    ((shape[s] as u32 * 255 + a / 2) / a).min(255),
+                                )
+                            } else {
+                                (shape[s + 2] as u32, shape[s + 1] as u32, shape[s] as u32)
+                            };
+                            let (y_src, u_src, v_src) = rgb_to_yuv(r, g, b);
+                            let di = dy as usize * width as usize + dx as usize;
+                            y_plane[di] = ((y_src * a + y_plane[di] as u32 * inv) / 255) as u8;
+                            let ui = (dy as usize / 2) * width as usize + (dx as usize / 2) * 2;
+                            if ui + 1 < uv_plane.len() {
+                                uv_plane[ui] = ((u_src * a + uv_plane[ui] as u32 * inv) / 255) as u8;
+                                uv_plane[ui + 1] = ((v_src * a + uv_plane[ui + 1] as u32 * inv) / 255) as u8;
+                            }
+                        }
+                    }
+                }
+                t if t == DXGI_OUTDUPL_POINTER_SHAPE_TYPE_MONOCHROME.0 as u32 => {
+                    let row_bytes = info.Pitch as usize;
+                    let mask_len = row_bytes * info.Height as usize;
+                    for row in 0..cursor_h {
+                        let dy = py + row as i32;
+                        if dy < 0 || dy >= height as i32 {
+                            continue;
+                        }
+                        let src_row = (row * info.Height as usize / cursor_h).min(info.Height as usize - 1);
+                        for col in 0..cursor_w {
+                            let dx = px + col as i32;
+                            if dx < 0 || dx >= width as i32 {
+                                continue;
+                            }
+                            let src_col = (col * info.Width as usize / cursor_w).min(info.Width as usize - 1);
+                            let byte = src_col / 8;
+                            let bit = 7 - (src_col % 8) as u32;
+                            let and_off = src_row * row_bytes + byte;
+                            let xor_off = mask_len + and_off;
+                            if xor_off >= shape.len() {
+                                continue;
+                            }
+                            let and_b = (shape[and_off] >> bit) & 1;
+                            let xor_b = (shape[xor_off] >> bit) & 1;
+                            let di = dy as usize * width as usize + dx as usize;
+                            let ui = (dy as usize / 2) * width as usize + (dx as usize / 2) * 2;
+                            match (and_b, xor_b) {
+                                (0, 0) => {
+                                    y_plane[di] = 16;
+                                    if ui + 1 < uv_plane.len() {
+                                        uv_plane[ui] = 128;
+                                        uv_plane[ui + 1] = 128;
+                                    }
+                                }
+                                (0, 1) => {
+                                    y_plane[di] = 235;
+                                    if ui + 1 < uv_plane.len() {
+                                        uv_plane[ui] = 128;
+                                        uv_plane[ui + 1] = 128;
+                                    }
+                                }
+                                (1, 0) => {}
+                                (1, 1) => {
+                                    y_plane[di] = 255 - y_plane[di];
+                                    if ui + 1 < uv_plane.len() {
+                                        uv_plane[ui] = 255 - uv_plane[ui];
+                                        uv_plane[ui + 1] = 255 - uv_plane[ui + 1];
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                }
+                t if t == 4u32 => {
+                    let pitch = info.Pitch as usize;
+                    for row in 0..cursor_h {
+                        let dy = py + row as i32;
+                        if dy < 0 || dy >= height as i32 {
+                            continue;
+                        }
+                        let src_row = (row * info.Height as usize / cursor_h).min(info.Height as usize - 1);
+                        for col in 0..cursor_w {
+                            let dx = px + col as i32;
+                            if dx < 0 || dx >= width as i32 {
+                                continue;
+                            }
+                            let src_col = (col * info.Width as usize / cursor_w).min(info.Width as usize - 1);
+                            let s = src_row * pitch + src_col * 4;
+                            if s + 4 > shape.len() {
+                                continue;
+                            }
+                            let di = dy as usize * width as usize + dx as usize;
+                            let ui = (dy as usize / 2) * width as usize + (dx as usize / 2) * 2;
+                            match shape[s + 3] {
+                                0 => {
+                                    let (y_src, u_src, v_src) = rgb_to_yuv(shape[s + 2] as u32, shape[s + 1] as u32, shape[s] as u32);
+                                    y_plane[di] = y_src as u8;
+                                    if ui + 1 < uv_plane.len() {
+                                        uv_plane[ui] = u_src as u8;
+                                        uv_plane[ui + 1] = v_src as u8;
+                                    }
+                                }
+                                0xFF => {
+                                    y_plane[di] = 255 - y_plane[di];
+                                    if ui + 1 < uv_plane.len() {
+                                        uv_plane[ui] = 255 - uv_plane[ui];
+                                        uv_plane[ui + 1] = 255 - uv_plane[ui + 1];
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        self.pointer_shape = shape;
     }
 
     unsafe fn copy_pixels(&mut self, resource: &IDXGIResource) -> Result<FramePixels> {

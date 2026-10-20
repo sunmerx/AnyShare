@@ -20,6 +20,9 @@ pub mod receiver;
 pub mod sender;
 
 #[cfg(windows)]
+pub mod gpu_convert;
+
+#[cfg(windows)]
 pub mod windows_capture;
 
 #[cfg(windows)]

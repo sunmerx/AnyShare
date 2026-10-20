@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 
 use crate::events::{EndReason, StreamEvent, StreamState, StreamStats};
 
@@ -91,7 +91,7 @@ mod imp {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use crate::transport::{packetize, FLAG_DISCONTINUITY, FLAG_HEADER, FLAG_KEYFRAME};
-    use crate::types::{Acquire, FrameMeta};
+    use crate::types::{Acquire, FrameMeta, FramePixels};
     use crate::vfr::{EncodeDecision, VfrConfig, VfrGate};
     use crate::{create_best_encoder, enumerate_outputs, windows_capture, Duplicator};
 
@@ -199,7 +199,27 @@ mod imp {
             config.bitrate_bps / 1_000_000
         );
 
-        run_loop(config, socket, session, encoder, dup, stop, stats, event_tx)
+        let gpu = if encoder.input_format() == crate::windows_encoder::InputPixelFormat::Nv12
+            && std::env::var("ANYSHARE_CPU_CONVERT").as_deref() != Ok("1")
+        {
+            match crate::gpu_convert::GpuConverter::new(
+                dup.device(),
+                dup.context(),
+                (capture_width, capture_height),
+                (encode_width, encode_height),
+            ) {
+                Ok(converter) => Some(converter),
+                Err(e) => {
+                    eprintln!("sender: GPU convert unavailable, using CPU path: {e:#}");
+                    None
+                }
+            }
+        } else {
+            None
+        };
+        eprintln!("sender: gpu convert = {}", gpu.is_some());
+
+        run_loop(config, socket, session, encoder, dup, gpu, stop, stats, event_tx)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -209,6 +229,7 @@ mod imp {
         session: u32,
         mut encoder: crate::windows_encoder::H264Encoder,
         mut dup: Duplicator,
+        mut gpu: Option<crate::gpu_convert::GpuConverter>,
         stop: Arc<AtomicBool>,
         stats: Arc<Mutex<StreamStats>>,
         event_tx: &Sender<StreamEvent>,
@@ -267,15 +288,66 @@ mod imp {
             }
 
             let iter_started = Instant::now();
+            let t100 = started.elapsed().as_nanos() as i64 / 100;
             let acquire_started = Instant::now();
-            let acquired = dup.acquire_full(config.timeout_ms)?;
+            let mut nv12_ready: Option<Vec<u8>> = None;
+            let mut rebuild_converter = false;
+            let acquired: Option<(FrameMeta, Option<FramePixels>)> = if gpu.is_some() {
+                if dup.acquire_texture(config.timeout_ms)? {
+                    let meta = dup.frame_meta().cloned().unwrap_or_default();
+                    let converted = (|| -> anyhow::Result<Vec<u8>> {
+                        let converter = gpu.as_mut().context("gpu converter missing")?;
+                        let texture = dup.frame_texture()?;
+                        Ok(converter.convert(&texture, t100, 16_666)?.to_vec())
+                    })();
+                    dup.release_frame().ok();
+                    match converted {
+                        Ok(mut bytes) => {
+                            dup.composite_pointer_nv12(&mut bytes, encode_width, encode_height);
+                            nv12_ready = Some(bytes);
+                            Some((meta, None))
+                        }
+                        Err(e) => {
+                            eprintln!("sender: GPU convert failed ({e:#}); falling back to the CPU path");
+                            gpu = None;
+                            None // drop this frame; the next one uses the CPU path
+                        }
+                    }
+                } else {
+                    None
+                }
+            } else {
+                dup.acquire_full(config.timeout_ms)?.map(|(meta, pixels)| (meta, Some(pixels)))
+            };
             window_acquire_ms += acquire_started.elapsed().as_secs_f64() * 1000.0;
+            if let Some(meta) = acquired.as_ref().map(|(meta, _)| meta) {
+                if dup.rebuild_count() != last_rebuild_count {
+                    let _ = meta;
+                    rebuild_converter = true;
+                }
+            }
+            if rebuild_converter {
+                if let Ok((cap_w, cap_h)) = dup.capture_size() {
+                    match crate::gpu_convert::GpuConverter::new(
+                        dup.device(),
+                        dup.context(),
+                        (cap_w, cap_h),
+                        (encode_width, encode_height),
+                    ) {
+                        Ok(converter) => gpu = Some(converter),
+                        Err(e) => {
+                            eprintln!("sender: GPU converter rebuild failed ({e:#}); CPU path");
+                            gpu = None;
+                        }
+                    }
+                }
+            }
             match acquired {
                 None => {
                     window_none += 1;
                     let _ = gate.decide(&FrameMeta::default(), Instant::now());
                 }
-                Some((meta, pixels)) => {
+                Some((meta, pixels_opt)) => {
                     let rebuild_changed = dup.rebuild_count() != last_rebuild_count;
                     last_rebuild_count = dup.rebuild_count();
                     window_acquires += 1;
@@ -307,15 +379,26 @@ mod imp {
                         // Only drop a BLANK frame; a static desktop may never
                         // produce another frame, and dropping a valid first
                         // frame would leave the receiver black forever.
-                        if crate::convert::bgra_looks_blank(&pixels.bgra) {
-                            dup.recycle_pixels(pixels);
+                        let blank = if let Some(nv12) = &nv12_ready {
+                            crate::convert::nv12_looks_blank(nv12, encode_width, encode_height)
+                        } else if let Some(pixels) = &pixels_opt {
+                            crate::convert::bgra_looks_blank(&pixels.bgra)
+                        } else {
+                            false
+                        };
+                        if blank {
+                            if let Some(pixels) = pixels_opt {
+                                dup.recycle_pixels(pixels);
+                            }
                             continue;
                         }
                     }
 
                     if let EncodeDecision::Encode { keyframe } = gate.decide(&meta, Instant::now()) {
                         let convert_started = Instant::now();
+                        if nv12_ready.is_none() {
                         {
+                            let pixels = pixels_opt.as_ref().expect("cpu pixels missing");
                             use crate::windows_encoder::InputPixelFormat;
                             // E2.0 decision D5: encode at most 1080p. The panel
                             // may be larger (2880x1800); downscale at the
@@ -345,9 +428,9 @@ mod imp {
                             }
                         }
 
+                        }
                         window_convert_ms += convert_started.elapsed().as_secs_f64() * 1000.0;
 
-                        let t100 = started.elapsed().as_nanos() as i64 / 100;
                         let delta = if last_enc_time_100ns >= 0 {
                             t100 - last_enc_time_100ns
                         } else {
@@ -370,7 +453,12 @@ mod imp {
                         }
 
                         let encode_started = Instant::now();
-                        let outputs = encoder.encode(&i420, t100, duration, discontinuity, keyframe)?;
+                        let converted: &[u8] = if let Some(nv12) = &nv12_ready {
+                            nv12
+                        } else {
+                            &i420
+                        };
+                        let outputs = encoder.encode(converted, t100, duration, discontinuity, keyframe)?;
                         window_encode_ms += encode_started.elapsed().as_secs_f64() * 1000.0;
                         window_encode_frames += 1;
                         // With pipelined encoding, outputs belong to EARLIER
@@ -430,7 +518,9 @@ mod imp {
                         last_enc_time_100ns = t100;
                         last_send_time_100ns = t100;
                     }
-                    dup.recycle_pixels(pixels);
+                    if let Some(pixels) = pixels_opt {
+                        dup.recycle_pixels(pixels);
+                    }
                     window_loop_ms += iter_started.elapsed().as_secs_f64() * 1000.0;
                 }
             }
