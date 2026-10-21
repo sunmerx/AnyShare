@@ -131,9 +131,9 @@ class ScreenSenderSession {
 
   ScreenSenderSession._(this._inner);
 
-  static Future<ScreenSenderSession> start({required String host, required int port, int? maxHeight}) async {
+  static Future<ScreenSenderSession> start({required String host, required int port, int? maxWidth, int? maxHeight}) async {
     return ScreenSenderSession._(
-      await rust.startScreenSender(host: host, port: port, maxHeight: maxHeight ?? 0),
+      await rust.startScreenSender(host: host, port: port, maxWidth: maxWidth ?? 0, maxHeight: maxHeight ?? 0),
     );
   }
 

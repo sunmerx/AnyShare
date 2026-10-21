@@ -83,7 +83,11 @@ struct ReceiverInner {
 /// Starts sending this device's screen to `host:port` (the receiver's data
 /// plane). The screen is auto-picked (smallest attached output) until output
 /// selection is exposed; fixed 1080p60/8Mbps per the E2.0 decision.
-pub fn start_screen_sender(host: String, port: u16, max_height: u32) -> anyhow::Result<RsScreenSender> {
+pub fn start_screen_sender(host: String, port: u16, max_width: u32, max_height: u32) -> anyhow::Result<RsScreenSender> {
+    // Clamp peer-reported viewports: 4K targets would force a 2160p software
+    // decode at LAN bitrates. 1600p is the practical ceiling for this stack.
+    let max_width = if max_width >= 640 { max_width.min(2560) } else { 0 };
+    let max_height = if max_height >= 360 { max_height.min(1600) } else { 0 };
     #[cfg(target_os = "windows")]
     {
         let (tx, rx) = std::sync::mpsc::channel();
@@ -91,6 +95,9 @@ pub fn start_screen_sender(host: String, port: u16, max_height: u32) -> anyhow::
             target: format!("{host}:{port}"),
             ..Default::default()
         };
+        if max_width > 0 {
+            config.max_width = max_width;
+        }
         if max_height > 0 {
             config.max_height = max_height;
         }
@@ -104,7 +111,7 @@ pub fn start_screen_sender(host: String, port: u16, max_height: u32) -> anyhow::
     }
     #[cfg(not(target_os = "windows"))]
     {
-        let _ = (host, port, max_height);
+        let _ = (host, port, max_width, max_height);
         anyhow::bail!("screen sending requires Windows (E2.0)")
     }
 }

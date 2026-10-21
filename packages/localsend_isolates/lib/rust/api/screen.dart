@@ -16,8 +16,8 @@ part 'screen.freezed.dart';
 /// Starts sending this device's screen to `host:port` (the receiver's data
 /// plane). The screen is auto-picked (smallest attached output) until output
 /// selection is exposed; fixed 1080p60/8Mbps per the E2.0 decision.
-Future<RsScreenSender> startScreenSender({required String host, required int port, required int maxHeight}) =>
-    RustLib.instance.api.crateApiScreenStartScreenSender(host: host, port: port, maxHeight: maxHeight);
+Future<RsScreenSender> startScreenSender({required String host, required int port, required int maxWidth, required int maxHeight}) =>
+    RustLib.instance.api.crateApiScreenStartScreenSender(host: host, port: port, maxWidth: maxWidth, maxHeight: maxHeight);
 
 /// Starts listening for an incoming screen stream on `port` and shows it in a
 /// dedicated native window. Linux uses the native VAAPI decoder.

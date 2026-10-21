@@ -17,7 +17,7 @@ import 'package:shared_preferences_platform_interface/shared_preferences_platfor
 class FakeScreenSession implements ScreenEngineSession {
   final _controller = StreamController<ScreenSessionEvent>.broadcast();
   bool stopped = false;
-  ScreenSize? monitorSizeValue = const ScreenSize(2048, 1280);
+  ScreenSize? monitorSizeValue;
 
   @override
   Future<ScreenSize?> monitorSize() async => monitorSizeValue;
@@ -52,13 +52,16 @@ class FakeScreenSession implements ScreenEngineSession {
 
 class FakeScreenEngine implements ScreenEngine {
   final List<String> startedSenders = [];
+  final List<int?> senderMaxWidths = [];
   final List<int?> senderMaxHeights = [];
   final List<int> startedReceivers = [];
   final List<FakeScreenSession> sessions = [];
+  ScreenSize? monitorSizeValue = const ScreenSize(2048, 1280);
 
   @override
-  Future<ScreenEngineSession> startSender({required String host, required int port, int? maxHeight}) async {
+  Future<ScreenEngineSession> startSender({required String host, required int port, int? maxWidth, int? maxHeight}) async {
     startedSenders.add('$host:$port');
+    senderMaxWidths.add(maxWidth);
     senderMaxHeights.add(maxHeight);
     final session = FakeScreenSession();
     sessions.add(session);
@@ -68,7 +71,7 @@ class FakeScreenEngine implements ScreenEngine {
   @override
   Future<ScreenEngineSession> startReceiver({required int port}) async {
     startedReceivers.add(port);
-    final session = FakeScreenSession();
+    final session = FakeScreenSession()..monitorSizeValue = monitorSizeValue;
     sessions.add(session);
     return session;
   }
@@ -83,6 +86,8 @@ void main() {
   late HttpServer peerServer;
   late List<String> peerRequests;
   late List<(String, String)> peerBodies;
+  late int peerOfferStatus;
+  late String peerOfferBody;
 
   setUp(() async {
     // SharedPreferences caches its instance statically; without the reset the
@@ -101,14 +106,17 @@ void main() {
     peerServer = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     peerRequests = [];
     peerBodies = [];
+    peerOfferStatus = 200;
+    peerOfferBody = '{"ok":true,"width":2048,"height":1280}';
     unawaited(
       peerServer.listen((request) async {
         final body = await utf8.decoder.bind(request).join();
         peerRequests.add(request.uri.path);
         peerBodies.add((request.uri.path, body));
-        request.response.statusCode = 200;
+        final isOffer = request.uri.path.endsWith('/screen/offer');
+        request.response.statusCode = isOffer ? peerOfferStatus : 200;
         request.response.headers.contentType = ContentType.json;
-        request.response.write('{"ok":true,"width":2048,"height":1280}');
+        request.response.write(isOffer ? peerOfferBody : '{"ok":true}');
         await request.response.close();
       }).asFuture<void>(),
     );
@@ -362,6 +370,7 @@ void main() {
 
     // The stub peer answers the offer with width/height 2048x1280.
     expect(engine.startedSenders, ['127.0.0.1:$kScreenDataPort']);
+    expect(engine.senderMaxWidths, [2048]);
     expect(engine.senderMaxHeights, [1280]);
   });
 
@@ -378,6 +387,29 @@ void main() {
     expect(acceptBody['height'], 1280);
     expect(acceptBody['width'], 2048);
   });
+  test('auto-accept without a reported viewport still succeeds', () async {
+    engine.monitorSizeValue = null;
+    await addFavorite(fingerprint: 'FPPEER01', trustLevel: TrustLevel.full);
+    final (status, body) = await offer();
+
+    expect(status, 200);
+    expect(body.containsKey('width'), false);
+    expect(body.containsKey('height'), false);
+  });
+
+  test('accept endpoint forwards the viewport to the sender engine', () async {
+    peerOfferStatus = 409;
+    peerOfferBody = '{"pending":true,"session":"S1"}';
+    await container.redux(screenProvider).dispatchAsync(StartScreenShareAction(peerIp: '127.0.0.1', peerAlias: 'Peer'));
+    expect(container.read(screenProvider).waiting, isNotNull);
+
+    final (status, _) = await post('screen/accept', {'session': 'S1', 'port': kScreenDataPort, 'width': 1440, 'height': 900});
+
+    expect(status, 200);
+    expect(engine.senderMaxWidths.last, 1440);
+    expect(engine.senderMaxHeights.last, 900);
+  });
+
   test('offer is rejected when the platform cannot receive', () async {
     await container.set(screenReceiveSupportedProvider.overrideWithValue(false));
     final (status, body) = await offer();

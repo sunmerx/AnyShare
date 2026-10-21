@@ -325,7 +325,7 @@ abstract class RustLibApi extends BaseApi {
 
   Future<RsScreenReceiver> crateApiScreenStartScreenReceiver({required int port});
 
-  Future<RsScreenSender> crateApiScreenStartScreenSender({required String host, required int port, required int maxHeight});
+  Future<RsScreenSender> crateApiScreenStartScreenSender({required String host, required int port, required int maxWidth, required int maxHeight});
 
   Future<RsHttpServer> crateApiServerStartServer({
     required int port,
@@ -2445,13 +2445,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   );
 
   @override
-  Future<RsScreenSender> crateApiScreenStartScreenSender({required String host, required int port, required int maxHeight}) {
+  Future<RsScreenSender> crateApiScreenStartScreenSender({required String host, required int port, required int maxWidth, required int maxHeight}) {
     return handler.executeNormal(
       NormalTask(
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(host, serializer);
           sse_encode_u_16(port, serializer);
+          sse_encode_u_32(maxWidth, serializer);
           sse_encode_u_32(maxHeight, serializer);
           pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 69, port: port_);
         },
@@ -2460,7 +2461,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_AnyhowException,
         ),
         constMeta: kCrateApiScreenStartScreenSenderConstMeta,
-        argValues: [host, port, maxHeight],
+        argValues: [host, port, maxWidth, maxHeight],
         apiImpl: this,
       ),
     );
@@ -2468,7 +2469,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
   TaskConstMeta get kCrateApiScreenStartScreenSenderConstMeta => const TaskConstMeta(
     debugName: 'start_screen_sender',
-    argNames: ['host', 'port', 'maxHeight'],
+    argNames: ['host', 'port', 'maxWidth', 'maxHeight'],
   );
 
   @override

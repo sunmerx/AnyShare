@@ -47,6 +47,11 @@ fn run() -> anyhow::Result<()> {
         match args[i].as_str() {
             "--output" => config.output = Some(next_value(&args, &mut i, "--output")?),
             "--target" => config.target = next_value(&args, &mut i, "--target")?,
+            "--max-width" => {
+                config.max_width = next_value(&args, &mut i, "--max-width")?
+                    .parse()
+                    .map_err(|_| anyhow::anyhow!("invalid --max-width"))?;
+            }
             "--max-height" => {
                 config.max_height = next_value(&args, &mut i, "--max-height")?
                     .parse()

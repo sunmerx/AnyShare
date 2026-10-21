@@ -423,6 +423,10 @@ impl ViewerHost {
             .unwrap_or(if ended_by_stop { EndReason::Stopped } else { EndReason::WindowClosed });
         let _ = active.event_tx.send(StreamEvent::Ended(end));
         active.stop.store(true, Ordering::Release);
+        // The window (and its screen) is gone: report no monitor size so a
+        // late poll cannot hand out a stale viewport.
+        active.shared.monitor_width.store(0, Ordering::Release);
+        active.shared.monitor_height.store(0, Ordering::Release);
         let _ = active.done.send(());
         self.window = None;
         self.surface = None;
@@ -434,6 +438,8 @@ impl ViewerHost {
         let _ = active.event_tx.send(StreamEvent::Error(message));
         let _ = active.event_tx.send(StreamEvent::Ended(EndReason::Error));
         active.stop.store(true, Ordering::Release);
+        active.shared.monitor_width.store(0, Ordering::Release);
+        active.shared.monitor_height.store(0, Ordering::Release);
         let _ = active.done.send(());
     }
 
@@ -587,16 +593,19 @@ impl ApplicationHandler<ViewerCommand> for ViewerHost {
         };
         // Report the primary monitor's physical size so the sender can encode
         // at a resolution that maps 1:1 in fullscreen (no upscaling blur).
-        if active
-            .shared
-            .monitor_width
-            .load(Ordering::Acquire)
-            == 0
-        {
-            if let Some(monitor) = event_loop.primary_monitor() {
+        // Track the monitor the window is actually on (the user may move it
+        // or toggle fullscreen): encoding must match that screen, not the
+        // primary one. Refreshed while a session is active.
+        if let Some(window) = &self.window {
+            let monitor = window.current_monitor().or_else(|| event_loop.primary_monitor());
+            if let Some(monitor) = monitor {
                 let size = monitor.size();
-                active.shared.monitor_width.store(size.width, Ordering::Release);
-                active.shared.monitor_height.store(size.height, Ordering::Release);
+                if active.shared.monitor_width.load(Ordering::Acquire) != size.width {
+                    active.shared.monitor_width.store(size.width, Ordering::Release);
+                }
+                if active.shared.monitor_height.load(Ordering::Acquire) != size.height {
+                    active.shared.monitor_height.store(size.height, Ordering::Release);
+                }
             }
         }
         if active.stop.load(Ordering::Acquire) {

@@ -3885,6 +3885,7 @@ fn wire__crate__api__screen__start_screen_sender_impl(
                 flutter_rust_bridge::for_generated::SseDeserializer::new(message);
             let api_host = <String>::sse_decode(&mut deserializer);
             let api_port = <u16>::sse_decode(&mut deserializer);
+            let api_max_width = <u32>::sse_decode(&mut deserializer);
             let api_max_height = <u32>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
@@ -3893,6 +3894,7 @@ fn wire__crate__api__screen__start_screen_sender_impl(
                         let output_ok = crate::api::screen::start_screen_sender(
                             api_host,
                             api_port,
+                            api_max_width,
                             api_max_height,
                         )?;
                         Ok(output_ok)
