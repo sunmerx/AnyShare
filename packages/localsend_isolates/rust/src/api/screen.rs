@@ -36,6 +36,12 @@ pub enum RsScreenEvent {
 }
 
 #[derive(Debug, Clone, Copy, Default)]
+pub struct RsScreenSize {
+    pub width: u32,
+    pub height: u32,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
 pub struct RsScreenStats {
     pub frames: u64,
     pub keyframes: u64,
@@ -77,14 +83,17 @@ struct ReceiverInner {
 /// Starts sending this device's screen to `host:port` (the receiver's data
 /// plane). The screen is auto-picked (smallest attached output) until output
 /// selection is exposed; fixed 1080p60/8Mbps per the E2.0 decision.
-pub fn start_screen_sender(host: String, port: u16) -> anyhow::Result<RsScreenSender> {
+pub fn start_screen_sender(host: String, port: u16, max_height: u32) -> anyhow::Result<RsScreenSender> {
     #[cfg(target_os = "windows")]
     {
         let (tx, rx) = std::sync::mpsc::channel();
-        let config = screen_stream::sender::SenderConfig {
+        let mut config = screen_stream::sender::SenderConfig {
             target: format!("{host}:{port}"),
             ..Default::default()
         };
+        if max_height > 0 {
+            config.max_height = max_height;
+        }
         let handle = screen_stream::sender::start_sender(config, tx)?;
         Ok(RsScreenSender {
             inner: Mutex::new(SenderInner {
@@ -95,7 +104,7 @@ pub fn start_screen_sender(host: String, port: u16) -> anyhow::Result<RsScreenSe
     }
     #[cfg(not(target_os = "windows"))]
     {
-        let _ = (host, port);
+        let _ = (host, port, max_height);
         anyhow::bail!("screen sending requires Windows (E2.0)")
     }
 }
@@ -252,6 +261,22 @@ impl RsScreenSender {
 }
 
 impl RsScreenReceiver {
+    /// Physical size of the local monitor (None until the viewer window is
+    /// created). The sender uses it to pick a 1:1 encode resolution.
+    pub fn monitor_size(&self) -> Option<RsScreenSize> {
+        #[cfg(desktop)]
+        {
+            let inner = self.inner.lock().unwrap();
+            return inner.handle.as_ref().and_then(|handle| handle.monitor_size()).map(|(width, height)| {
+                RsScreenSize { width, height }
+            });
+        }
+        #[cfg(not(desktop))]
+        {
+            None
+        }
+    }
+
     /// Emits session events until the session ends (window closed, stopped or
     /// failed). Can only be listened to once.
     ///

@@ -11,13 +11,13 @@ part 'screen.freezed.dart';
 
 // These functions are ignored because they are not marked as `pub`: `map_event`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `ReceiverInner`, `SenderInner`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `fmt`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`
 
 /// Starts sending this device's screen to `host:port` (the receiver's data
 /// plane). The screen is auto-picked (smallest attached output) until output
 /// selection is exposed; fixed 1080p60/8Mbps per the E2.0 decision.
-Future<RsScreenSender> startScreenSender({required String host, required int port}) =>
-    RustLib.instance.api.crateApiScreenStartScreenSender(host: host, port: port);
+Future<RsScreenSender> startScreenSender({required String host, required int port, required int maxHeight}) =>
+    RustLib.instance.api.crateApiScreenStartScreenSender(host: host, port: port, maxHeight: maxHeight);
 
 /// Starts listening for an incoming screen stream on `port` and shows it in a
 /// dedicated native window. Linux uses the native VAAPI decoder.
@@ -32,6 +32,10 @@ abstract class RsScreenReceiver implements RustOpaqueInterface {
   /// do not add `&mut self` methods to this type (they would deadlock until
   /// the session ends).
   Stream<RsScreenEvent> listen();
+
+  /// Physical size of the local monitor (None until the viewer window is
+  /// created). The sender uses it to pick a 1:1 encode resolution.
+  Future<RsScreenSize?> monitorSize();
 
   Future<RsScreenStats?> stats();
 
@@ -98,6 +102,25 @@ sealed class RsScreenEvent with _$RsScreenEvent {
   /// Receiver only: unrecovered loss detected; the app relays this to the
   /// sender's `/screen/keyframe` endpoint (Rust debounces to 500 ms).
   const factory RsScreenEvent.requestKeyframe() = RsScreenEvent_RequestKeyframe;
+}
+
+class RsScreenSize {
+  final int width;
+  final int height;
+
+  const RsScreenSize({
+    required this.width,
+    required this.height,
+  });
+
+  static Future<RsScreenSize> default_() => RustLib.instance.api.crateApiScreenRsScreenSizeDefault();
+
+  @override
+  int get hashCode => width.hashCode ^ height.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) || other is RsScreenSize && runtimeType == other.runtimeType && width == other.width && height == other.height;
 }
 
 class RsScreenStats {

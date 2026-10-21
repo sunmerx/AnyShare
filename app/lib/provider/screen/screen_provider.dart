@@ -39,13 +39,17 @@ const Duration kScreenOfferTtl = Duration(seconds: 60);
 
 /// Session abstraction so tests can run without the Rust engine.
 abstract class ScreenEngine {
-  Future<ScreenEngineSession> startSender({required String host, required int port});
+  Future<ScreenEngineSession> startSender({required String host, required int port, int? maxHeight});
 
   Future<ScreenEngineSession> startReceiver({required int port});
 }
 
 abstract class ScreenEngineSession {
   Stream<ScreenSessionEvent> get events;
+
+  /// Receiver sessions: physical monitor size once the window exists;
+  /// sender sessions and test doubles return null.
+  Future<ScreenSize?> monitorSize() async => null;
 
   Future<ScreenSessionStats?> stats();
 
@@ -65,8 +69,8 @@ class FrbScreenEngine implements ScreenEngine {
   const FrbScreenEngine();
 
   @override
-  Future<ScreenEngineSession> startSender({required String host, required int port}) async {
-    return _SenderAdapter(await ScreenSenderSession.start(host: host, port: port));
+  Future<ScreenEngineSession> startSender({required String host, required int port, int? maxHeight}) async {
+    return _SenderAdapter(await ScreenSenderSession.start(host: host, port: port, maxHeight: maxHeight));
   }
 
   @override
@@ -85,6 +89,9 @@ class _SenderAdapter implements ScreenEngineSession {
 
   @override
   Future<ScreenSessionStats?> stats() => _session.stats();
+
+  @override
+  Future<ScreenSize?> monitorSize() async => null;
 
   @override
   Future<void> requestKeyframe() => _session.requestKeyframe();
@@ -106,6 +113,9 @@ class _ReceiverAdapter implements ScreenEngineSession {
 
   @override
   Future<ScreenSessionStats?> stats() => _session.stats();
+
+  @override
+  Future<ScreenSize?> monitorSize() => _session.monitorSize();
 
   @override
   Future<void> requestKeyframe() async {
@@ -420,6 +430,23 @@ class ScreenService extends ReduxNotifier<ScreenState> {
     }
   }
 
+  /// Polls the receiver engine for the monitor size (the native window is
+  /// created asynchronously). Returns null when it does not appear in ~1 s.
+  Future<ScreenSize?> receiverMonitorSize() async {
+    final session = _engineSession;
+    if (session == null) {
+      return null;
+    }
+    for (var attempt = 0; attempt < 20; attempt++) {
+      final size = await session.monitorSize();
+      if (size != null && size.width > 0 && size.height > 0) {
+        return size;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    }
+    return null;
+  }
+
   void startTimer(Duration duration, void Function() onFire) {
     _timer?.cancel();
     _timer = Timer(duration, onFire);
@@ -439,9 +466,10 @@ class ScreenService extends ReduxNotifier<ScreenState> {
     int port,
     ScreenState current, {
     String? sessionId,
+    int? maxHeight,
   }) async {
     try {
-      final session = await ref.read(screenEngineProvider).startSender(host: peerIp, port: port);
+      final session = await ref.read(screenEngineProvider).startSender(host: peerIp, port: port, maxHeight: maxHeight);
       final id = sessionId ?? const Uuid().v4();
       cancelTimer();
       await attach(id, session);
@@ -549,7 +577,17 @@ class StartScreenShareAction extends AsyncReduxAction<ScreenService, ScreenState
       if (status == 200 && body?['ok'] == true) {
         final port = (body?['port'] as num?)?.toInt() ?? kScreenDataPort;
         final sessionId = body?['session'] as String?;
-        return await notifier.startSenderSession(peerIp, peerAlias, port, state.copyWith(clearError: true), sessionId: sessionId) ?? state;
+        // The receiver reports its monitor size so the encoder can map 1:1.
+        final maxHeight = (body?['height'] as num?)?.toInt();
+        return await notifier.startSenderSession(
+              peerIp,
+              peerAlias,
+              port,
+              state.copyWith(clearError: true),
+              sessionId: sessionId,
+              maxHeight: maxHeight,
+            ) ??
+            state;
       }
       if (status == 409 && body?['pending'] == true) {
         final sessionId = (body?['session'] as String?) ?? const Uuid().v4();
@@ -630,8 +668,18 @@ class HandleScreenOfferAction extends AsyncReduxActionWithResult<ScreenService, 
         notifier.startingOffer = true;
         try {
           final started = await notifier.startReceiverSession(peerIp, peerAlias, sessionId);
+          final viewport = started != null ? await notifier.receiverMonitorSize() : null;
           return started != null
-              ? (started, ScreenOfferResult(200, {'ok': true, 'port': kScreenDataPort, 'session': sessionId}))
+              ? (
+                  started,
+                  ScreenOfferResult(200, {
+                    'ok': true,
+                    'port': kScreenDataPort,
+                    'session': sessionId,
+                    if (viewport != null) 'width': viewport.width,
+                    if (viewport != null) 'height': viewport.height,
+                  }),
+                )
               : (state, const ScreenOfferResult(500, {'error': 'engine_failed'}));
         } finally {
           notifier.startingOffer = false;
@@ -668,16 +716,18 @@ class AcceptPendingScreenOfferAction extends AsyncReduxAction<ScreenService, Scr
         return notifier.state;
       }
       // The sender must learn that we are listening; retry once, then give up.
-      var (status, _) = await postScreenControl(pending.peerIp, notifier.controlPort, 'screen/accept', {
+      // Include our monitor size so it can encode at a 1:1 resolution.
+      final viewport = await notifier.receiverMonitorSize();
+      final acceptBody = {
         'session': pending.sessionId,
         'port': kScreenDataPort,
-      });
+        if (viewport != null) 'width': viewport.width,
+        if (viewport != null) 'height': viewport.height,
+      };
+      var (status, _) = await postScreenControl(pending.peerIp, notifier.controlPort, 'screen/accept', acceptBody);
       if (status == null) {
         await Future<void>.delayed(const Duration(milliseconds: 300));
-        (status, _) = await postScreenControl(pending.peerIp, notifier.controlPort, 'screen/accept', {
-          'session': pending.sessionId,
-          'port': kScreenDataPort,
-        });
+        (status, _) = await postScreenControl(pending.peerIp, notifier.controlPort, 'screen/accept', acceptBody);
       }
       if (status == null) {
         await notifier.stopEngine();
@@ -762,7 +812,10 @@ class IncomingScreenAcceptAction extends AsyncReduxAction<ScreenService, ScreenS
   final String sessionId;
   final int port;
 
-  IncomingScreenAcceptAction({required this.sessionId, required this.port});
+  /// Receiver monitor height (0/unknown = engine default).
+  final int? maxHeight;
+
+  IncomingScreenAcceptAction({required this.sessionId, required this.port, this.maxHeight});
 
   @override
   Future<ScreenState> reduce() async {
@@ -775,6 +828,7 @@ class IncomingScreenAcceptAction extends AsyncReduxAction<ScreenService, ScreenS
       waiting.peerAlias,
       port,
       state.copyWith(clearWaiting: true, clearError: true),
+      maxHeight: maxHeight,
     );
     if (started == null) {
       return state;

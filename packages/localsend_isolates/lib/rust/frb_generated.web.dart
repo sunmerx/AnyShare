@@ -305,6 +305,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   RsHttpClientError dco_decode_box_autoadd_rs_http_client_error(dynamic raw);
 
   @protected
+  RsScreenSize dco_decode_box_autoadd_rs_screen_size(dynamic raw);
+
+  @protected
   RsScreenStats dco_decode_box_autoadd_rs_screen_stats(dynamic raw);
 
   @protected
@@ -411,6 +414,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PrepareUploadResponseDto? dco_decode_opt_box_autoadd_prepare_upload_response_dto(dynamic raw);
 
   @protected
+  RsScreenSize? dco_decode_opt_box_autoadd_rs_screen_size(dynamic raw);
+
+  @protected
   RsScreenStats? dco_decode_opt_box_autoadd_rs_screen_stats(dynamic raw);
 
   @protected
@@ -484,6 +490,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   RsScreenEvent dco_decode_rs_screen_event(dynamic raw);
+
+  @protected
+  RsScreenSize dco_decode_rs_screen_size(dynamic raw);
 
   @protected
   RsScreenStats dco_decode_rs_screen_stats(dynamic raw);
@@ -802,6 +811,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   RsHttpClientError sse_decode_box_autoadd_rs_http_client_error(SseDeserializer deserializer);
 
   @protected
+  RsScreenSize sse_decode_box_autoadd_rs_screen_size(SseDeserializer deserializer);
+
+  @protected
   RsScreenStats sse_decode_box_autoadd_rs_screen_stats(SseDeserializer deserializer);
 
   @protected
@@ -910,6 +922,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PrepareUploadResponseDto? sse_decode_opt_box_autoadd_prepare_upload_response_dto(SseDeserializer deserializer);
 
   @protected
+  RsScreenSize? sse_decode_opt_box_autoadd_rs_screen_size(SseDeserializer deserializer);
+
+  @protected
   RsScreenStats? sse_decode_opt_box_autoadd_rs_screen_stats(SseDeserializer deserializer);
 
   @protected
@@ -983,6 +998,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   RsScreenEvent sse_decode_rs_screen_event(SseDeserializer deserializer);
+
+  @protected
+  RsScreenSize sse_decode_rs_screen_size(SseDeserializer deserializer);
 
   @protected
   RsScreenStats sse_decode_rs_screen_stats(SseDeserializer deserializer);
@@ -1358,6 +1376,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_box_autoadd_rs_http_client_error(RsHttpClientError self, SseSerializer serializer);
 
   @protected
+  void sse_encode_box_autoadd_rs_screen_size(RsScreenSize self, SseSerializer serializer);
+
+  @protected
   void sse_encode_box_autoadd_rs_screen_stats(RsScreenStats self, SseSerializer serializer);
 
   @protected
@@ -1466,6 +1487,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_opt_box_autoadd_prepare_upload_response_dto(PrepareUploadResponseDto? self, SseSerializer serializer);
 
   @protected
+  void sse_encode_opt_box_autoadd_rs_screen_size(RsScreenSize? self, SseSerializer serializer);
+
+  @protected
   void sse_encode_opt_box_autoadd_rs_screen_stats(RsScreenStats? self, SseSerializer serializer);
 
   @protected
@@ -1540,6 +1564,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_rs_screen_event(RsScreenEvent self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_rs_screen_size(RsScreenSize self, SseSerializer serializer);
 
   @protected
   void sse_encode_rs_screen_stats(RsScreenStats self, SseSerializer serializer);

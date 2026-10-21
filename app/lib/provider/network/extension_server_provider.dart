@@ -233,6 +233,7 @@ extension ExtensionServerHandler on ExtensionServerService {
               IncomingScreenAcceptAction(
                 sessionId: body['session'] as String,
                 port: (body['port'] as num?)?.toInt() ?? kScreenDataPort,
+                maxHeight: (body['height'] as num?)?.toInt(),
               ),
             );
         await writeJson(request, {'ok': true});

@@ -3,7 +3,7 @@
 //! feature; the window is opened on a dedicated thread so the caller's main
 //! thread (e.g. the Flutter engine) is never blocked.
 
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
@@ -66,6 +66,8 @@ struct Shared {
     displayed: AtomicU64,
     delivered: AtomicU64,
     lost: AtomicU64,
+    monitor_width: AtomicU32,
+    monitor_height: AtomicU32,
 }
 
 impl Shared {
@@ -78,6 +80,8 @@ impl Shared {
             displayed: AtomicU64::new(0),
             delivered: AtomicU64::new(0),
             lost: AtomicU64::new(0),
+            monitor_width: AtomicU32::new(0),
+            monitor_height: AtomicU32::new(0),
         }
     }
 }
@@ -90,12 +94,20 @@ fn publish(shared: &Shared, frame: Frame) {
 pub struct ReceiverHandle {
     stop: Arc<AtomicBool>,
     stats: Arc<Mutex<StreamStats>>,
+    shared: Arc<Shared>,
     joins: Vec<JoinHandle<()>>,
 }
 
 impl ReceiverHandle {
     pub fn stop(&self) {
         self.stop.store(true, Ordering::Release);
+    }
+
+    /// Physical size of the primary monitor (0 timeout: not created yet).
+    pub fn monitor_size(&self) -> Option<(u32, u32)> {
+        let width = self.shared.monitor_width.load(Ordering::Acquire);
+        let height = self.shared.monitor_height.load(Ordering::Acquire);
+        (width > 0 && height > 0).then_some((width, height))
     }
 
     pub fn stats(&self) -> StreamStats {
@@ -239,7 +251,7 @@ pub fn start_receiver(config: ReceiverConfig, event_tx: Sender<StreamEvent>) -> 
         }));
     }
 
-    Ok(ReceiverHandle { stop, stats, joins })
+    Ok(ReceiverHandle { stop, stats, shared, joins })
 }
 
 fn media_loop(
@@ -573,6 +585,20 @@ impl ApplicationHandler<ViewerCommand> for ViewerHost {
         let Some(mut active) = self.active.take() else {
             return;
         };
+        // Report the primary monitor's physical size so the sender can encode
+        // at a resolution that maps 1:1 in fullscreen (no upscaling blur).
+        if active
+            .shared
+            .monitor_width
+            .load(Ordering::Acquire)
+            == 0
+        {
+            if let Some(monitor) = event_loop.primary_monitor() {
+                let size = monitor.size();
+                active.shared.monitor_width.store(size.width, Ordering::Release);
+                active.shared.monitor_height.store(size.height, Ordering::Release);
+            }
+        }
         if active.stop.load(Ordering::Acquire) {
             self.finish(event_loop, active, true);
             return;

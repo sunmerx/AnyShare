@@ -42,6 +42,17 @@ class ScreenSessionStats {
   });
 }
 
+/// Physical size of the local monitor (receiver side).
+class ScreenSize {
+  final int width;
+  final int height;
+
+  const ScreenSize(this.width, this.height);
+
+  @override
+  String toString() => "${width}x$height";
+}
+
 sealed class ScreenSessionEvent {
   const ScreenSessionEvent();
 }
@@ -120,8 +131,10 @@ class ScreenSenderSession {
 
   ScreenSenderSession._(this._inner);
 
-  static Future<ScreenSenderSession> start({required String host, required int port}) async {
-    return ScreenSenderSession._(await rust.startScreenSender(host: host, port: port));
+  static Future<ScreenSenderSession> start({required String host, required int port, int? maxHeight}) async {
+    return ScreenSenderSession._(
+      await rust.startScreenSender(host: host, port: port, maxHeight: maxHeight ?? 0),
+    );
   }
 
   /// Emits events until the session ends (can only be listened to once).
@@ -154,6 +167,13 @@ class ScreenReceiverSession {
   Stream<ScreenSessionEvent> get events => _inner.listen().map(_convert);
 
   Future<ScreenSessionStats?> stats() async => _convertStats(await _inner.stats());
+
+  /// Physical size of the local monitor, once the window exists. The app
+  /// reports it to the sender so the encode resolution can match 1:1.
+  Future<ScreenSize?> monitorSize() async {
+    final size = await _inner.monitorSize();
+    return size == null ? null : ScreenSize(size.width.toInt(), size.height.toInt());
+  }
 
   Future<void> stop() => _inner.stop();
 }
