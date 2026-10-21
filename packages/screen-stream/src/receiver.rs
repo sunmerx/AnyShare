@@ -1052,6 +1052,8 @@ fn receive_loop(
     let mut nack_state: std::collections::HashMap<u32, (u8, Instant)> = std::collections::HashMap::new();
     let mut last_nack_scan = Instant::now();
     let mut last_counter_publish = Instant::now();
+    let nack_enabled = std::env::var("ANYSHARE_NACK").map(|value| value != "0").unwrap_or(true);
+    let mut nacks_sent: u64 = 0;
     let mut last_lost = 0u64;
     let mut keyframe_request_pending = false;
     let mut last_keyframe_request: Option<Instant> = None;
@@ -1105,7 +1107,7 @@ fn receive_loop(
         // covers single losses; NACKs cover the rest before the 300 ms frame
         // timeout. The scan itself is gated to 2 ms: building candidates per
         // received packet would allocate far too much on large frames.
-        if peer_addr.is_some() && now.duration_since(last_nack_scan) >= Duration::from_millis(2) {
+        if nack_enabled && peer_addr.is_some() && now.duration_since(last_nack_scan) >= Duration::from_millis(2) {
             last_nack_scan = now;
             if let (Some(peer), Some(session)) = (peer_addr, reassembler.session()) {
                 let candidates = reassembler.missing_candidates(now);
@@ -1121,7 +1123,9 @@ fn receive_loop(
                             count: *count,
                             missing: missing.clone(),
                         };
-                        let _ = socket.send_to(&nack.encode(), peer);
+                        if socket.send_to(&nack.encode(), peer).is_ok() {
+                            nacks_sent += 1;
+                        }
                     }
                 }
                 // Drop attempts for frames that completed or timed out.
@@ -1161,8 +1165,13 @@ fn receive_loop(
         if last_stats.elapsed() >= Duration::from_secs(5) {
             let stats = reassembler.stats();
             eprintln!(
-                "recv: delivered={} lost={} recovered={} dup={} stale={}",
-                stats.delivered, stats.lost_frames, stats.recovered_frames, stats.duplicate_packets, stats.stale_packets
+                "recv: delivered={} lost={} recovered={} dup={} stale={} nacks={}",
+                stats.delivered,
+                stats.lost_frames,
+                stats.recovered_frames,
+                stats.duplicate_packets,
+                stats.stale_packets,
+                nacks_sent
             );
             last_stats = Instant::now();
         }

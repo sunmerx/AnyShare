@@ -33,7 +33,7 @@ pub const NACK_RETRY_INTERVAL: Duration = Duration::from_millis(8);
 /// A frame only becomes a NACK candidate after this much time without packet
 /// progress: packets of one frame arrive over several milliseconds, so empty
 /// slots while packets are still in flight are NOT losses.
-pub const NACK_GRACE: Duration = Duration::from_millis(15);
+pub const NACK_GRACE: Duration = Duration::from_millis(40);
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Packet {
@@ -431,6 +431,9 @@ impl Reassembler {
         self.last_ingest = Some(now);
 
         if index_before(packet.frame_id, self.next_expected) {
+            // Late FEC parity packets of already-delivered frames land here by
+            // design (delivery completes on data packets); data-packet dupes
+            // after a NACK race are counted the same way.
             self.stats.stale_packets += 1;
             return Vec::new();
         }

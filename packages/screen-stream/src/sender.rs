@@ -129,6 +129,141 @@ mod imp {
         Ok(())
     }
 
+    /// One encoded frame handed to the network thread.
+    struct NetJob {
+        frame_id: u32,
+        /// All encoded packets in send order: (is parity, bytes, payload len).
+        packets: Vec<(bool, Vec<u8>, usize)>,
+    }
+
+    #[derive(Default)]
+    struct NetCounters {
+        packets: std::sync::atomic::AtomicU64,
+        bytes: std::sync::atomic::AtomicU64,
+    }
+
+    fn encode_packets(packets: &[Packet]) -> Vec<(bool, Vec<u8>, usize)> {
+        packets
+            .iter()
+            .map(|packet| (packet.is_fec(), packet.encode(), packet.payload.len()))
+            .collect()
+    }
+
+    /// Applies a NACK to the history under the per-frame retransmission
+    /// budget. Returns the number of packets resent.
+    fn apply_nack<F>(
+        history: &PacketHistory,
+        nack: &Nack,
+        budget: &mut std::collections::HashMap<u32, u8>,
+        mut send: F,
+    ) -> u32
+    where
+        F: FnMut(&[u8]) -> bool,
+    {
+        let remaining = budget.entry(nack.frame_id).or_insert(2);
+        if *remaining == 0 {
+            return 0;
+        }
+        let Some(frames) = history.get(nack.frame_id) else {
+            return 0;
+        };
+        let mut resent = 0;
+        for &index in &nack.missing {
+            let Some(bytes) = frames.get(index) else { continue };
+            if send(bytes) {
+                resent += 1;
+            }
+            *remaining = remaining.saturating_sub(1);
+            if *remaining == 0 {
+                break;
+            }
+        }
+        resent
+    }
+
+    /// Dedicated network thread: sending, NACK-retransmission and the packet
+    /// history run off the capture/encode thread so a busy socket or a NACK
+    /// burst can never delay frame acquisition. Fatal send errors are reported
+    /// through `error` and stop the session instead of being swallowed.
+    fn spawn_net_thread(
+        socket: UdpSocket,
+        session: u32,
+        stop: Arc<AtomicBool>,
+        counters: Arc<NetCounters>,
+        error: Arc<std::sync::Mutex<Option<String>>>,
+    ) -> (std::sync::mpsc::SyncSender<NetJob>, JoinHandle<()>) {
+        let (tx, rx) = std::sync::mpsc::sync_channel::<NetJob>(8);
+        let join = std::thread::spawn(move || {
+            let mut history = PacketHistory::new(48);
+            let mut nack_budget: std::collections::HashMap<u32, u8> = std::collections::HashMap::new();
+            let mut nack_buf = [0u8; 1200];
+            'outer: loop {
+                match rx.recv_timeout(std::time::Duration::from_millis(1)) {
+                    Ok(job) => {
+                        let mut history_packets = Vec::new();
+                        for (is_fec, bytes, payload_len) in job.packets {
+                            if stop.load(Ordering::Acquire) {
+                                break 'outer;
+                            }
+                            match send_udp(&socket, &bytes) {
+                                Ok(()) => {
+                                    counters.packets.fetch_add(1, Ordering::Relaxed);
+                                    counters.bytes.fetch_add(payload_len as u64, Ordering::Relaxed);
+                                }
+                                Err(e) => {
+                                    *error.lock().unwrap() = Some(format!("UDP send failed: {e:#}"));
+                                    stop.store(true, Ordering::Release);
+                                    break 'outer;
+                                }
+                            }
+                            if !is_fec {
+                                history_packets.push(bytes);
+                            }
+                        }
+                        history.push(job.frame_id, history_packets);
+                    }
+                    Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
+                    Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
+                }
+                if stop.load(Ordering::Acquire) {
+                    break;
+                }
+                // Bounded NACK drain: a spoofed/duplicated flood must never
+                // starve the send queue. Two retransmissions per frame max.
+                let mut processed = 0;
+                while processed < 32 {
+                    if stop.load(Ordering::Acquire) {
+                        break 'outer;
+                    }
+                    let Ok(len) = socket.recv(&mut nack_buf) else { break };
+                    processed += 1;
+                    let Some(packet) = Packet::decode(&nack_buf[..len]) else { continue };
+                    let Some(nack) = Nack::from_packet(&packet) else { continue };
+                    if nack.session != session {
+                        continue;
+                    }
+                    let resent = apply_nack(&history, &nack, &mut nack_budget, |bytes| {
+                        if send_udp(&socket, bytes).is_ok() {
+                            counters.packets.fetch_add(1, Ordering::Relaxed);
+                            counters.bytes.fetch_add(
+                                bytes.len().saturating_sub(crate::transport::HEADER_LEN) as u64,
+                                Ordering::Relaxed,
+                            );
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                    let _ = resent;
+                }
+                if nack_budget.len() > 64 {
+                    nack_budget.retain(|frame_id, budget| *budget > 0 && history.get(*frame_id).is_some());
+                }
+            }
+        });
+        (tx, join)
+    }
+
     /// True when the Annex-B access unit contains an IDR slice (NAL type 5).
     fn au_has_idr(payload: &[u8]) -> bool {
         let mut i = 0;
@@ -145,6 +280,66 @@ mod imp {
         false
     }
 
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        fn sample_history() -> PacketHistory {
+            let mut history = PacketHistory::new(4);
+            history.push(7, vec![vec![1], vec![2], vec![3]]);
+            history
+        }
+
+        #[test]
+        fn nack_budget_is_shared_per_frame() {
+            let history = sample_history();
+            let mut budget = std::collections::HashMap::new();
+            let first = Nack {
+                session: 1,
+                frame_id: 7,
+                count: 3,
+                missing: vec![0, 1],
+            };
+            let mut sent = 0;
+            let resent = apply_nack(&history, &first, &mut budget, |_| {
+                sent += 1;
+                true
+            });
+            assert_eq!((resent, sent), (2, 2));
+            let second = Nack {
+                session: 1,
+                frame_id: 7,
+                count: 3,
+                missing: vec![2],
+            };
+            let resent = apply_nack(&history, &second, &mut budget, |_| {
+                sent += 1;
+                true
+            });
+            assert_eq!(resent, 0, "the two-retransmission budget is exhausted");
+            assert_eq!(sent, 2);
+        }
+
+        #[test]
+        fn nack_ignores_evicted_frames_and_out_of_range_indices() {
+            let history = sample_history();
+            let mut budget = std::collections::HashMap::new();
+            let missing = Nack {
+                session: 1,
+                frame_id: 7,
+                count: 3,
+                missing: vec![2, 9],
+            };
+            assert_eq!(apply_nack(&history, &missing, &mut budget, |_| true), 1);
+            let evicted = Nack {
+                session: 1,
+                frame_id: 99,
+                count: 3,
+                missing: vec![0],
+            };
+            assert_eq!(apply_nack(&history, &evicted, &mut budget, |_| true), 0);
+        }
+    }
     pub fn start(config: SenderConfig, event_tx: Sender<StreamEvent>) -> Result<SenderHandle> {
         let stop = Arc::new(AtomicBool::new(false));
         let force_keyframe = Arc::new(AtomicBool::new(false));
@@ -311,14 +506,21 @@ mod imp {
         let (encode_width, encode_height) = encoder.dimensions();
 
         let mut frame_id: u32 = 1;
-        let mut packets_sent: u64 = 0;
-        let mut bytes_sent: u64 = 0;
         let mut frames_sent: u64 = 0;
         let mut keyframes_sent: u64 = 0;
-        // Selective retransmission: recent data packets for NACK recovery.
-        let mut history = PacketHistory::new(48);
-        let mut retransmitted: u64 = 0;
-        let mut nack_budget: std::collections::HashMap<u32, u8> = std::collections::HashMap::new();
+        // Network worker: sending/retransmission off the capture thread.
+        let net_counters = Arc::new(NetCounters::default());
+        let net_error: Arc<std::sync::Mutex<Option<String>>> = Arc::new(std::sync::Mutex::new(None));
+        let (net_tx, net_join) = spawn_net_thread(
+            socket.try_clone()?,
+            session,
+            Arc::clone(&stop),
+            Arc::clone(&net_counters),
+            Arc::clone(&net_error),
+        );
+        let mut last_net_packets: u64 = 0;
+        let mut last_net_bytes: u64 = 0;
+        let mut dropped_jobs: u64 = 0;
         let mut last_enc_time_100ns: i64 = -1;
         let mut last_rebuild_count = dup.rebuild_count();
         // Drop the first frame of each duplication session (it can be blank).
@@ -328,17 +530,16 @@ mod imp {
         let mut sequence_header: Option<Vec<u8>> = encoder.take_sequence_header();
         if let Some(header) = &sequence_header {
             let packets = packetize(session, 0, FLAG_HEADER, 0, header);
-            for packet in &packets {
-                send_udp(&socket, &packet.encode())?;
-                packets_sent += 1;
-                bytes_sent += packet.payload.len() as u64;
-            }
+            // Header packets join the same queue as frames so the single
+            // network writer keeps everything in FIFO order.
+            let _ = net_tx.try_send(NetJob {
+                frame_id: 0,
+                packets: encode_packets(&packets),
+            });
         }
 
         let started = Instant::now();
         let mut last_stats = Instant::now();
-        let mut window_packets: u64 = 0;
-        let mut window_bytes: u64 = 0;
         let mut window_frames: u64 = 0;
         let mut window_encode_ms: f64 = 0.0;
         let mut window_acquires: u64 = 0;
@@ -355,48 +556,13 @@ mod imp {
         let mut window_keyframes: u64 = 0;
 
         while !stop.load(Ordering::Acquire) {
+            if let Some(message) = net_error.lock().unwrap().clone() {
+                anyhow::bail!("network worker: {message}");
+            }
             if let Some(duration) = config.duration {
                 if started.elapsed() >= duration {
                     break;
                 }
-            }
-
-            // Selective retransmission: answer receiver NACKs from the
-            // history ring before capturing the next frame. Bounded per loop
-            // (a spoofed/duplicated NACK flood must not stall capture) and
-            // budgeted per frame (2 retransmissions max).
-            let mut nack_buf = [0u8; 1200];
-            let mut nacks_processed = 0;
-            while nacks_processed < 32 && !stop.load(Ordering::Acquire) {
-                let Ok(len) = socket.recv(&mut nack_buf) else { break };
-                nacks_processed += 1;
-                let Some(packet) = Packet::decode(&nack_buf[..len]) else { continue };
-                let Some(nack) = Nack::from_packet(&packet) else { continue };
-                if nack.session != session {
-                    continue;
-                }
-                let budget = nack_budget.entry(nack.frame_id).or_insert(2);
-                if *budget == 0 {
-                    continue;
-                }
-                let Some(frames) = history.get(nack.frame_id) else { continue };
-                for &index in &nack.missing {
-                    let Some(bytes) = frames.get(index) else { continue };
-                    if send_udp(&socket, bytes).is_ok() {
-                        retransmitted += 1;
-                        packets_sent += 1;
-                        window_packets += 1;
-                        bytes_sent += bytes.len() as u64;
-                        window_bytes += bytes.len() as u64;
-                    }
-                    *budget = budget.saturating_sub(1);
-                    if *budget == 0 {
-                        break;
-                    }
-                }
-            }
-            if nack_budget.len() > 64 {
-                nack_budget.retain(|frame_id, budget| *budget > 0 && history.get(*frame_id).is_some());
             }
 
             // Adaptive bitrate: apply the latest receiver feedback request.
@@ -596,12 +762,14 @@ mod imp {
 
                         if let Some(header) = encoder.take_sequence_header() {
                             let packets = packetize(session, frame_id, FLAG_HEADER, t100 as u64, &header);
-                            for packet in &packets {
-                                send_udp(&socket, &packet.encode())?;
-                                packets_sent += 1;
-                                window_packets += 1;
-                                bytes_sent += packet.payload.len() as u64;
-                                window_bytes += packet.payload.len() as u64;
+                            let queued = net_tx
+                                .try_send(NetJob {
+                                    frame_id,
+                                    packets: encode_packets(&packets),
+                                })
+                                .is_ok();
+                            if !queued {
+                                dropped_jobs += 1;
                             }
                             frame_id = frame_id.wrapping_add(1);
                             sequence_header = Some(header);
@@ -659,34 +827,32 @@ mod imp {
                                 chunk
                             };
                             let packets = packetize(session, frame_id, flags, out_ts, payload);
-                            let mut history_packets = Vec::with_capacity(packets.len());
-                            for packet in &packets {
-                                let bytes = packet.encode();
-                                if !packet.is_fec() {
-                                    history_packets.push(bytes.clone());
+                            let job = NetJob {
+                                frame_id,
+                                packets: encode_packets(&packets),
+                            };
+                            let queued = net_tx.try_send(job).is_ok();
+                            if queued {
+                                frames_sent += 1;
+                                window_frames += 1;
+                                if out_keyframe {
+                                    keyframes_sent += 1;
+                                    window_keyframes += 1;
                                 }
-                                send_udp(&socket, &bytes)?;
-                                packets_sent += 1;
-                                window_packets += 1;
-                                bytes_sent += packet.payload.len() as u64;
-                                window_bytes += packet.payload.len() as u64;
+                            } else {
+                                dropped_jobs += 1;
+                                // A dropped keyframe would leave the peer
+                                // without a sync point: ask for a new one.
+                                if out_keyframe {
+                                    force_keyframe.store(true, Ordering::Release);
+                                }
                             }
-                            history.push(frame_id, history_packets);
                             frame_id = frame_id.wrapping_add(1);
-                            frames_sent += 1;
-                            window_frames += 1;
-                            if out_keyframe {
-                                keyframes_sent += 1;
-                                window_keyframes += 1;
-                            }
-                            if frames_sent == 1 {
+                            if frames_sent == 1 && queued {
                                 send_event(event_tx, StreamEvent::Status(StreamState::Streaming));
                             }
                         }
                         let _ = had_output;
-                        // Retransmissions are counted for diagnostics; the
-                        // packet counter already includes them.
-                        let _ = retransmitted;
                         if last_enc_time_100ns < 0 && started.elapsed() > Duration::from_secs(5) {
                             anyhow::bail!("encoder produced no output within 5s (activating-but-mute MFT?)");
                         }
@@ -701,6 +867,14 @@ mod imp {
             }
 
             if last_stats.elapsed() >= Duration::from_secs(1) {
+                // Sending happens on the network thread: derive the window
+                // counters from its totals (includes retransmissions).
+                let total_net_packets = net_counters.packets.load(Ordering::Relaxed);
+                let total_net_bytes = net_counters.bytes.load(Ordering::Relaxed);
+                let window_packets = total_net_packets - last_net_packets;
+                let window_bytes = total_net_bytes - last_net_bytes;
+                last_net_packets = total_net_packets;
+                last_net_bytes = total_net_bytes;
                 let mbps = window_bytes as f64 * 8.0 / 1_000_000.0;
                 eprintln!(
                     "sender: t={:.0}s fps={} kf={} mbps={:.2} enc_ms={:.1}",
@@ -711,7 +885,7 @@ mod imp {
                     if window_encode_frames > 0 { window_encode_ms / window_encode_frames as f64 } else { 0.0 }
                 );
                 eprintln!(
-                    "sender meta: acq={} none={} dirty={} moved={} pm={} ps={} zp={} rebuilds={}",
+                    "sender meta: acq={} none={} dirty={} moved={} pm={} ps={} zp={} rebuilds={} dropped={}",
                     window_acquires,
                     window_none,
                     window_dirty,
@@ -719,7 +893,8 @@ mod imp {
                     window_pointer_moved,
                     window_pointer_shape,
                     window_zero_present,
-                    last_rebuild_count
+                    last_rebuild_count,
+                    dropped_jobs
                 );
                 eprintln!(
                     "sender timing: acq_ms={:.1} conv_ms={:.1} loop_ms={:.1} (per frame with data)",
@@ -746,8 +921,6 @@ mod imp {
                         ..Default::default()
                     }),
                 );
-                window_packets = 0;
-                window_bytes = 0;
                 window_frames = 0;
                 window_keyframes = 0;
                 window_encode_ms = 0.0;
@@ -766,20 +939,25 @@ mod imp {
             }
         }
 
+        drop(net_tx);
+        let _ = net_join.join();
         send_event(event_tx, StreamEvent::Status(StreamState::Stopping));
         for chunk in encoder.shutdown()? {
             let packets = packetize(session, frame_id, 0, last_send_time_100ns.max(0) as u64, &chunk);
             for packet in &packets {
-                send_udp(&socket, &packet.encode())?;
-                packets_sent += 1;
-                bytes_sent += packet.payload.len() as u64;
+                if send_udp(&socket, &packet.encode()).is_ok() {
+                    net_counters.packets.fetch_add(1, Ordering::Relaxed);
+                    net_counters.bytes.fetch_add(packet.payload.len() as u64, Ordering::Relaxed);
+                }
             }
             frame_id = frame_id.wrapping_add(1);
         }
 
+        let total_packets = net_counters.packets.load(Ordering::Relaxed);
+        let total_bytes = net_counters.bytes.load(Ordering::Relaxed);
         eprintln!(
-            "sender: frames={frames_sent} keyframes={keyframes_sent} packets={packets_sent} sent={:.2} MiB in {}s",
-            bytes_sent as f64 / 1048576.0,
+            "sender: frames={frames_sent} keyframes={keyframes_sent} packets={total_packets} sent={:.2} MiB in {}s",
+            total_bytes as f64 / 1048576.0,
             started.elapsed().as_secs()
         );
         let _ = Acquire::Idle;
