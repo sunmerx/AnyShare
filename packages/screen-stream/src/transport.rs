@@ -331,6 +331,8 @@ pub struct Delivered {
     pub payload: Vec<u8>,
     /// When this completed frame entered the reorder buffer (used for gap timeouts).
     pub ready_since: Instant,
+    /// When the frame's packets were fully received (latency diagnostics).
+    pub received_at: Instant,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -486,6 +488,7 @@ impl Reassembler {
                 timestamp_100ns: frame.timestamp_100ns,
                 payload: frame.assemble(),
                 ready_since: now,
+                received_at: now,
             });
         }
 

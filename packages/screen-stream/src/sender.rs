@@ -271,6 +271,18 @@ mod imp {
         (tx, join)
     }
 
+    /// QPC tick count + frequency, for converting DXGI present times.
+    fn qpc_now() -> Option<(i64, i64)> {
+        use windows::Win32::System::Performance::{QueryPerformanceCounter, QueryPerformanceFrequency};
+        let mut frequency = 0i64;
+        let mut counter = 0i64;
+        unsafe {
+            QueryPerformanceFrequency(&mut frequency).ok()?;
+            QueryPerformanceCounter(&mut counter).ok()?;
+        }
+        Some((counter, frequency))
+    }
+
     /// True when the Annex-B access unit contains an IDR slice (NAL type 5).
     fn au_has_idr(payload: &[u8]) -> bool {
         let mut i = 0;
@@ -566,6 +578,8 @@ mod imp {
         let mut window_loop_ms: f64 = 0.0;
         let mut window_encode_frames: u64 = 0;
         let mut window_keyframes: u64 = 0;
+        let mut window_present_age_ms = 0.0f64;
+        let mut window_pipeline_age_ms = 0.0f64;
 
         while !stop.load(Ordering::Acquire) {
             if let Some(message) = net_error.lock().unwrap().clone() {
@@ -604,7 +618,12 @@ mod imp {
             }
 
             let iter_started = Instant::now();
-            let t100 = started.elapsed().as_nanos() as i64 / 100;
+            // Epoch-based timestamps: lets the pipeline age (capture -> send)
+            // be measured and keeps the encoder PTS monotonic.
+            let t100 = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|value| value.as_nanos() as i64 / 100)
+                .unwrap_or_else(|_| started.elapsed().as_nanos() as i64 / 100);
             let acquire_started = Instant::now();
             let mut nv12_ready: Option<Vec<u8>> = None;
             let mut rebuild_converter = false;
@@ -664,6 +683,14 @@ mod imp {
                     let _ = gate.decide(&FrameMeta::default(), Instant::now());
                 }
                 Some((meta, pixels_opt)) => {
+                    if let Some((now_qpc, frequency)) = qpc_now().filter(|(_, frequency)| *frequency > 0) {
+                        if meta.last_present_time > 0 {
+                            let age_ms = (now_qpc - meta.last_present_time) as f64 * 1000.0 / frequency as f64;
+                            if age_ms > window_present_age_ms {
+                                window_present_age_ms = age_ms;
+                            }
+                        }
+                    }
                     let rebuild_changed = dup.rebuild_count() != last_rebuild_count;
                     last_rebuild_count = dup.rebuild_count();
                     window_acquires += 1;
@@ -843,6 +870,13 @@ mod imp {
                                 frame_id,
                                 packets: encode_packets(&packets),
                             };
+                            let pipeline_age_ms = std::time::SystemTime::now()
+                                .duration_since(std::time::UNIX_EPOCH)
+                                .map(|value| (value.as_nanos() as i64 / 100 - t100) as f64 / 10_000.0)
+                                .unwrap_or(0.0);
+                            if pipeline_age_ms > window_pipeline_age_ms {
+                                window_pipeline_age_ms = pipeline_age_ms;
+                            }
                             let queued = net_tx.try_send(job).is_ok();
                             if queued {
                                 frames_sent += 1;
@@ -909,11 +943,15 @@ mod imp {
                     dropped_jobs
                 );
                 eprintln!(
-                    "sender timing: acq_ms={:.1} conv_ms={:.1} loop_ms={:.1} (per frame with data)",
+                    "sender timing: acq_ms={:.1} conv_ms={:.1} loop_ms={:.1} present_age_ms={:.1} pipeline_age_ms={:.1} (per frame with data)",
                     if window_acquires > 0 { window_acquire_ms / window_acquires as f64 } else { 0.0 },
                     if window_encode_frames > 0 { window_convert_ms / window_encode_frames as f64 } else { 0.0 },
-                    if window_acquires > 0 { window_loop_ms / window_acquires as f64 } else { 0.0 }
+                    if window_acquires > 0 { window_loop_ms / window_acquires as f64 } else { 0.0 },
+                    window_present_age_ms,
+                    window_pipeline_age_ms
                 );
+                window_present_age_ms = 0.0;
+                window_pipeline_age_ms = 0.0;
                 {
                     let mut shared = stats.lock().unwrap();
                     shared.frames = window_frames;

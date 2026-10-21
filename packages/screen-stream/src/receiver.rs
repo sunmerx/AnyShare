@@ -192,9 +192,9 @@ pub fn start_receiver(config: ReceiverConfig, event_tx: Sender<StreamEvent>) -> 
     let reason: Arc<Mutex<Option<EndReason>>> = Arc::new(Mutex::new(None));
 
     // Bounded decode queue: a slow decoder/presenter must NEVER add latency.
-    // The old depth (128) allowed ~4 s of backlog; 8 frames caps the added
-    // latency near 260 ms and overflowing frames are dropped deliberately.
-    let (tx, rx) = std::sync::mpsc::sync_channel::<Delivered>(8);
+    // The old depth (128) allowed ~4 s of backlog; 4 frames caps the added
+    // latency near 130 ms and overflowing frames are dropped deliberately.
+    let (tx, rx) = std::sync::mpsc::sync_channel::<Delivered>(4);
 
     let mut joins = Vec::new();
 
@@ -711,9 +711,50 @@ fn ffmpeg_loop(
     });
 
     let mut pipe_error: Option<anyhow::Error> = None;
+    let mut e2e_sum_ms = 0.0f64;
+    let mut e2e_max_ms = 0.0f64;
+    let mut e2e_count = 0u64;
+    let mut queue_ms_sum = 0.0f64;
+    let mut queue_ms_max = 0.0f64;
+    let mut queue_frames = 0u64;
+    let mut last_pipe_stats = Instant::now();
     while !stop.load(Ordering::Acquire) {
         match rx.recv_timeout(Duration::from_secs(1)) {
             Ok(frame) => {
+                let queue_ms = frame.received_at.elapsed().as_secs_f64() * 1000.0;
+                let now_epoch_ms = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|value| value.as_secs_f64() * 1000.0)
+                    .unwrap_or(0.0);
+                let au_epoch_ms = frame.timestamp_100ns as f64 / 10_000.0;
+                if au_epoch_ms > 1.0e12 {
+                    let e2e_ms = now_epoch_ms - au_epoch_ms;
+                    if e2e_ms > e2e_max_ms {
+                        e2e_max_ms = e2e_ms;
+                    }
+                    e2e_sum_ms += e2e_ms;
+                    e2e_count += 1;
+                }
+                queue_ms_sum += queue_ms;
+                queue_ms_max = queue_ms_max.max(queue_ms);
+                queue_frames += 1;
+                if last_pipe_stats.elapsed() >= Duration::from_secs(1) {
+                    eprintln!(
+                        "decode queue: avg={:.1}ms max={:.1}ms frames={} e2e(pipe) avg={:.1}ms max={:.1}ms",
+                        if queue_frames > 0 { queue_ms_sum / queue_frames as f64 } else { 0.0 },
+                        queue_ms_max,
+                        queue_frames,
+                        if e2e_count > 0 { e2e_sum_ms / e2e_count as f64 } else { 0.0 },
+                        e2e_max_ms
+                    );
+                    e2e_sum_ms = 0.0;
+                    e2e_max_ms = 0.0;
+                    e2e_count = 0;
+                    queue_ms_sum = 0.0;
+                    queue_ms_max = 0.0;
+                    queue_frames = 0;
+                    last_pipe_stats = Instant::now();
+                }
                 if dimensions.lock().unwrap().is_none() {
                     if let Some(size) = h264_dimensions(&frame.payload) {
                         *dimensions.lock().unwrap() = Some(size);
@@ -756,6 +797,13 @@ fn raw_nv12_reader(
     let mut frames: u64 = 0;
     let mut decode_ms_sum: f64 = 0.0;
     let mut last_stats = Instant::now();
+    let dump_path = std::env::var("ANYSHARE_FRAME_DUMP").ok();
+    let dump_at: f64 = std::env::var("ANYSHARE_FRAME_DUMP_AT")
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .unwrap_or(0.0);
+    let dump_started = Instant::now();
+    let mut dumped = false;
     loop {
         let Some((width, height)) = *dimensions.lock().unwrap() else {
             std::thread::sleep(Duration::from_millis(2));
@@ -773,6 +821,30 @@ fn raw_nv12_reader(
             Err(e) => return Err(anyhow::anyhow!("reading NV12 frame failed: {e}")),
         }
         nv12_to_argb(&frame_bytes, width, height, &mut argb);
+        if !dumped && dump_path.is_some() && dump_started.elapsed().as_secs_f64() >= dump_at {
+            dumped = true;
+            if let Some(path) = &dump_path {
+                let stamp = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|value| value.as_secs_f64())
+                    .unwrap_or_default();
+                eprintln!("receiver: frame dumped at {stamp:.3}");
+                if let Ok(mut file) = std::fs::File::create(path) {
+                    use std::io::Write;
+                    let _ = write!(&mut file, "P6
+{width} {height}
+255
+");
+                    let mut rgb = Vec::with_capacity(width * height * 3);
+                    for pixel in &argb {
+                        rgb.push((pixel >> 16) as u8);
+                        rgb.push((pixel >> 8) as u8);
+                        rgb.push(*pixel as u8);
+                    }
+                    let _ = file.write_all(&rgb);
+                }
+            }
+        }
         publish(
             &shared,
             Frame {
