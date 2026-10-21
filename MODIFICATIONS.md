@@ -53,6 +53,13 @@
 - `pubspec.lock`:8 个 build 工具链传递依赖小版本再解析(archive/build_config/build_daemon 等,仅 codegen 使用;官方源解析,运行时依赖零漂移)
 - `app/pubspec.yaml`:description 重写、homepage → github.com/sunmerx/AnyShare
 
+### 投屏网络线程批次(2026-10-21)
+
+- `packages/screen-stream/src/sender.rs`:NetJob/NetCounters/spawn_net_thread(有界队列、包级 stop、致命错误传播、丢帧策略与关键帧补发、payload 口径统计);header 入队保证单写者 FIFO;apply_nack 纯函数 + 2 单测
+- `packages/screen-stream/src/transport.rs`:NACK_GRACE 40ms;stale 注释(FEC 校验包属正常)
+- `packages/screen-stream/src/receiver.rs`:nacks 计数日志;ANYSHARE_NACK=0 诊断开关
+- 审查 1 blocker + 6 major 全修;29 Rust 测试;CLI 双机冒烟 0 lost/0 dropped
+
 ### 投屏 intra-refresh 批次(2026-10-21)
 
 - `packages/screen-stream/src/windows_encoder.rs`:`configure_intra_refresh()`(SetValue + GetValue 回读校验;不设 MaxKeyframeDistance)、`gradual_intra_refresh()` getter
