@@ -53,6 +53,12 @@
 - `pubspec.lock`:8 个 build 工具链传递依赖小版本再解析(archive/build_config/build_daemon 等,仅 codegen 使用;官方源解析,运行时依赖零漂移)
 - `app/pubspec.yaml`:description 重写、homepage → github.com/sunmerx/AnyShare
 
+### 投屏延迟修复批次(2026-10-21)
+
+- `packages/screen-stream/src/receiver.rs`:Delivered 队列 128→8;`deliver_frame` 用 try_send 永不阻塞,满则丢帧并置关键帧请求;recv 日志新增 dropped
+- 背景:用户实测 5-6 秒延迟;根因为解码/呈现跟不上时队列积压约 4 秒,并阻塞 UDP 接收
+- 验证:38 Rust 测试;Ubuntu release 重建重启
+
 ### 投屏分辨率自适应修复批次(2026-10-21)
 
 - FRB 侧夹紧对端上报(宽 ≤2560、高 ≤1600);sender 新增 `max_width`(默认 3840)双上限;ss-send `--max-width`
