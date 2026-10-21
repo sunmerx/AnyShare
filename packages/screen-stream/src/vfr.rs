@@ -35,6 +35,20 @@ impl Default for VfrConfig {
     }
 }
 
+impl VfrConfig {
+    /// Gradual intra refresh keeps the picture fresh without full-IDR spikes,
+    /// so periodic keyframes can be rarer. They are never removed: a receiver
+    /// that joins mid-stream / loses the SPS-PPS still needs a full IDR, and
+    /// loss detection alone would leave it black for the whole cadence.
+    pub fn with_intra_refresh(enabled: bool) -> Self {
+        let mut config = Self::default();
+        if enabled {
+            config.force_keyframe_interval = Duration::from_secs(4);
+        }
+        config
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EncodeDecision {
     Encode { keyframe: bool },
@@ -246,5 +260,25 @@ mod tests {
         );
         assert_eq!(gate.stats().encoded, 1);
         assert_eq!(gate.stats().skipped, 1);
+    }
+
+    #[test]
+    fn intra_refresh_relaxes_keyframe_cadence() {
+        assert_eq!(VfrConfig::with_intra_refresh(false).force_keyframe_interval, Duration::from_secs(2));
+        assert_eq!(VfrConfig::with_intra_refresh(true).force_keyframe_interval, Duration::from_secs(4));
+        assert_eq!(VfrConfig::with_intra_refresh(true).max_fps, VfrConfig::default().max_fps);
+
+        // Run the gate itself: continuous change for 4.25 s on the relaxed
+        // cadence must still produce exactly one periodic keyframe.
+        let mut gate = VfrGate::new(VfrConfig::with_intra_refresh(true));
+        let t0 = Instant::now();
+        let mut keyframes = 0;
+        for i in 0..=17 {
+            let t = t0 + Duration::from_millis(250) * i;
+            if let EncodeDecision::Encode { keyframe } = gate.decide(&changed(), t) {
+                keyframes += i32::from(keyframe);
+            }
+        }
+        assert_eq!(keyframes, 2, "first frame + one 4 s cadence keyframe");
     }
 }

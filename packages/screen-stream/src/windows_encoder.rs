@@ -11,7 +11,7 @@ use windows::Win32::Media::MediaFoundation::{
     MFT_MESSAGE_NOTIFY_BEGIN_STREAMING, MFT_MESSAGE_NOTIFY_END_OF_STREAM, MFT_MESSAGE_NOTIFY_START_OF_STREAM,
     MFT_OUTPUT_DATA_BUFFER, MF_EVENT_FLAG_NO_WAIT, MF_MT_AVG_BITRATE, MF_MT_FRAME_RATE, MF_MT_FRAME_SIZE,
     MF_MT_INTERLACE_MODE, MF_MT_MAJOR_TYPE, MF_MT_MPEG_SEQUENCE_HEADER, MF_MT_SUBTYPE, MF_TRANSFORM_ASYNC,
-    MF_TRANSFORM_ASYNC_UNLOCK, CODECAPI_AVEncCommonLowLatency, CODECAPI_AVEncCommonMeanBitRate, CODECAPI_AVEncCommonRateControlMode,
+    MF_TRANSFORM_ASYNC_UNLOCK, CODECAPI_AVEncCommonLowLatency, CODECAPI_AVEncCommonMeanBitRate, CODECAPI_AVEncCommonRateControlMode, CODECAPI_AVEncVideoGradualIntraRefresh,
     CODECAPI_AVEncMPVDefaultBPictureCount, CODECAPI_AVEncVideoForceKeyFrame, CODECAPI_AVEncVideoMaxNumRefFrame,
 };
 
@@ -73,6 +73,7 @@ pub struct H264Encoder {
     output_capacity: u32,
     drained: bool,
     keyframe_force_supported: bool,
+    gradual_intra_refresh: bool,
 }
 
 fn configure_input_type(media_type: &IMFMediaType, config: &EncoderConfig) -> Result<()> {
@@ -220,8 +221,10 @@ impl H264Encoder {
         // The default (VBR with lookahead and B-frames) delayed every
         // ProcessOutput by ~30 ms; live screen streaming needs
         // CBR/LowDelayVBR, no B-frames and one reference.
+        let mut gradual_intra_refresh = false;
         if let Some(api) = &codec_api {
             configure_low_latency(api);
+            gradual_intra_refresh = configure_intra_refresh(api);
         }
 
         unsafe {
@@ -249,6 +252,7 @@ impl H264Encoder {
             output_capacity: 8 * 1024 * 1024,
             drained: false,
             keyframe_force_supported: false,
+            gradual_intra_refresh,
         })
     }
 
@@ -533,6 +537,12 @@ impl H264Encoder {
         Ok(())
     }
 
+    /// True when the encoder accepted gradual intra refresh (MB refresh instead
+    /// of full IDRs). The sender relaxes its periodic keyframe cadence then.
+    pub fn gradual_intra_refresh(&self) -> bool {
+        self.gradual_intra_refresh
+    }
+
     /// Requests an IDR at the next encoded frame. Returns false when the
     /// encoder does not expose CODECAPI_AVEncVideoForceKeyFrame. VT_UI4 is
     /// the documented type, but some MFTs (AMD) reject it and accept VT_BOOL.
@@ -653,6 +663,22 @@ fn configure_low_latency(api: &ICodecAPI) {
     let _ = set_u32(api, &CODECAPI_AVEncVideoMaxNumRefFrame, 1);
 }
 
+/// Enables gradual intra refresh (MB refresh) when the encoder supports it:
+/// the picture stays fresh without full-IDR bitrate spikes, so the sender can
+/// relax its periodic keyframe cadence. Forced IDRs still work on demand.
+///
+/// S_OK is not proof: some MFTs accept the property and ignore it, so the
+/// value is read back before the capability is reported.
+fn configure_intra_refresh(api: &ICodecAPI) -> bool {
+    if unsafe { api.SetValue(&CODECAPI_AVEncVideoGradualIntraRefresh, &VARIANT::from(true)) }.is_err() {
+        return false;
+    }
+    match unsafe { api.GetValue(&CODECAPI_AVEncVideoGradualIntraRefresh) } {
+        Ok(value) => bool::try_from(&value).unwrap_or(false),
+        Err(_) => false,
+    }
+}
+
 #[cfg(all(test, windows))]
 mod tests {
     use super::*;
@@ -700,6 +726,11 @@ mod tests {
                 return;
             }
         };
+        eprintln!(
+            "encoder={} gradual_intra_refresh={}",
+            encoder.name(),
+            encoder.gradual_intra_refresh()
+        );
         let frame = mid_gray_frame(encoder.input_format(), config.width, config.height);
         // Baseline: exactly the startup IDR, nothing else. Counted instead of
         // pinning arrival indexes because async/hardware MFTs buffer outputs.

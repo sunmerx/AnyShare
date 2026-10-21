@@ -298,7 +298,10 @@ mod imp {
         stats: Arc<Mutex<StreamStats>>,
         event_tx: &Sender<StreamEvent>,
     ) -> Result<()> {
-        let mut gate = VfrGate::new(VfrConfig::default());
+        let mut gate = VfrGate::new(VfrConfig::with_intra_refresh(encoder.gradual_intra_refresh()));
+        if encoder.gradual_intra_refresh() {
+            eprintln!("sender: gradual intra refresh enabled (periodic keyframes relaxed to 10s)");
+        }
         let mut force_rejected_warned = false;
         let mut bitrate_pending: Option<(u32, Instant)> = None;
         let mut bitrate_warned = false;
@@ -624,9 +627,10 @@ mod imp {
                                 .unwrap_or((keyframe, discontinuity, t100 as u64));
                             // The MF force-keyframe property can be accepted
                             // (S_OK) and silently ignored, so the bitstream is
-                            // the ground truth: only an actual IDR slice (NAL
-                            // type 5) is flagged/keyframe-prefixed here.
-                            let out_keyframe = out_keyframe_requested && au_has_idr(chunk);
+                            // the ground truth. Encoder-spontaneous IDRs are
+                            // flagged too (a receiver needs the SPS/PPS prefix
+                            // and the keyframe flag to resync).
+                            let out_keyframe = au_has_idr(chunk);
                             if out_keyframe_requested && !out_keyframe {
                                 // Ask again on the next frame; the MFT ignored
                                 // the property this time.
