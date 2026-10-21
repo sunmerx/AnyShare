@@ -53,6 +53,15 @@
 - `pubspec.lock`:8 个 build 工具链传递依赖小版本再解析(archive/build_config/build_daemon 等,仅 codegen 使用;官方源解析,运行时依赖零漂移)
 - `app/pubspec.yaml`:description 重写、homepage → github.com/sunmerx/AnyShare
 
+### 投屏端到端计时批次(2026-10-21)
+
+- `packages/screen-stream/src/transport.rs`:Delivered 增加 received_at
+- `packages/screen-stream/src/receiver.rs`:队列 8→4;ffmpeg 媒体循环打印 decode queue 与 e2e(pipe);`ANYSHARE_FRAME_DUMP_AT` 定时落帧+墙钟
+- `packages/screen-stream/src/sender.rs`:epoch 100ns 时间戳;`pipeline_age_ms`/`present_age_ms` 日志
+- `packages/screen-stream/Cargo.toml`:Win32_System_Performance
+- 诊断结论:干净链路 lost=0/nacks=0;此前 3 秒受并发测试流(WiFi 拥塞)污染
+- 38 Rust 测试;双端 release 重建重启
+
 ### 投屏延迟修复批次(2026-10-21)
 
 - `packages/screen-stream/src/receiver.rs`:Delivered 队列 128→8;`deliver_frame` 用 try_send 永不阻塞,满则丢帧并置关键帧请求;recv 日志新增 dropped
