@@ -53,6 +53,15 @@
 - `pubspec.lock`:8 个 build 工具链传递依赖小版本再解析(archive/build_config/build_daemon 等,仅 codegen 使用;官方源解析,运行时依赖零漂移)
 - `app/pubspec.yaml`:description 重写、homepage → github.com/sunmerx/AnyShare
 
+### 投屏分辨率自适应批次(2026-10-21)
+
+- `packages/screen-stream/src/receiver.rs`:Shared 记录主显示器物理尺寸;`ReceiverHandle::monitor_size()`
+- `packages/localsend_isolates/rust/src/api/screen.rs` + FRB codegen:`RsScreenSize`、`RsScreenReceiver::monitor_size()`、`start_screen_sender(max_height)`
+- `packages/localsend_isolates/lib/src/screen/screen_session.dart`:ScreenSize;发送端 maxHeight、接收端 monitorSize
+- `app/lib/provider/screen/screen_provider.dart`:接收端接受前轮询视口并在 offer/accept 中上报;发送端按对端高度启动编码;`receiverMonitorSize()` 轮询
+- `app/lib/provider/network/extension_server_provider.dart`:`/screen/accept` 解析 height
+- 测试 +3;232 Dart + 38 Rust 全绿,analyze 0
+
 ### 投屏清晰度批次二(2026-10-21)
 
 - `packages/screen-stream/src/receiver.rs`:ffmpeg 输出 BMP→raw NV12(管道流量降 2.7x);SPS 解析尺寸 + `raw_nv12_reader`/`nv12_to_argb`;删除 bmp_reader/find_bmp;呈现 tick 8→4ms
