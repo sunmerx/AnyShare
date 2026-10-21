@@ -53,6 +53,14 @@
 - `pubspec.lock`:8 个 build 工具链传递依赖小版本再解析(archive/build_config/build_daemon 等,仅 codegen 使用;官方源解析,运行时依赖零漂移)
 - `app/pubspec.yaml`:description 重写、homepage → github.com/sunmerx/AnyShare
 
+### 投屏 intra-refresh 批次(2026-10-21)
+
+- `packages/screen-stream/src/windows_encoder.rs`:`configure_intra_refresh()`(SetValue + GetValue 回读校验;不设 MaxKeyframeDistance)、`gradual_intra_refresh()` getter
+- `packages/screen-stream/src/sender.rs`:支持时 gate 用 4s 周期;关键帧标记改纯码流判定(编码器自发 IDR 也置 FLAG_KEYFRAME/SPS-PPS)
+- `packages/screen-stream/src/vfr.rs`:`VfrConfig::with_intra_refresh()`(2s→4s)+ 真实节奏单测
+- 实测本机 AMD MFT 拒绝该属性(false);Intel/NVIDIA 可能支持
+- 审查 4 major 修复;27 Rust 测试全绿;Windows release 重建
+
 ### 投屏自适应码率批次(2026-10-21)
 
 - `packages/screen-stream/src/windows_encoder.rs`:`set_bitrate()`(CODECAPI_AVEncCommonMeanBitRate,成功才提交,无流中重协商回退)
