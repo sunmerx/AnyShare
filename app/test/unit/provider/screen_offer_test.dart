@@ -401,9 +401,10 @@ void main() {
     // The endpoint throttles to one sample per 500 ms.
     await Future<void>.delayed(const Duration(milliseconds: 600));
 
-    // 10 lost frames over a 90-frame second ~ 10% loss -> back off 20%.
+    // 10 lost frames over a 90-frame second ~ 10% loss -> back off 20%
+    // from the 12 Mbps initial bitrate.
     await post('screen/bitrate', {'session': active.sessionId, 'lost': 10, 'frames': 90});
-    expect(session.bitrates, [6400000]);
+    expect(session.bitrates, [9600000]);
   });
 
   test('bitrate feedback with a stale session is ignored', () async {

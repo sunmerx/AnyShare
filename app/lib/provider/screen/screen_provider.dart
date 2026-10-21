@@ -352,7 +352,8 @@ class ScreenService extends ReduxNotifier<ScreenState> {
   /// counters ~1/s; AIMD trims the encoder bitrate on loss and cautiously
   /// restores it when the link is clean.
   static const int _minBitrateBps = 2_000_000;
-  static const int _maxBitrateBps = 8_000_000;
+  static const int _initialBitrateBps = 12_000_000;
+  static const int _maxBitrateBps = 16_000_000;
   int? _currentBitrateBps;
   int? _lastFeedbackLost;
   DateTime? _lastBitrateFeedbackAt;
@@ -394,7 +395,7 @@ class ScreenService extends ReduxNotifier<ScreenState> {
       return;
     }
     final lossRate = deltaLost <= 0 ? 0.0 : deltaLost / (frames + deltaLost);
-    final current = _currentBitrateBps ?? _maxBitrateBps;
+    final current = _currentBitrateBps ?? _initialBitrateBps;
     int next;
     if (lossRate > 0.02) {
       next = (current * 0.8).round().clamp(_minBitrateBps, _maxBitrateBps);

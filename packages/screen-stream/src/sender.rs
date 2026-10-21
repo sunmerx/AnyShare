@@ -28,7 +28,7 @@ impl Default for SenderConfig {
         Self {
             target: String::new(),
             output: None,
-            bitrate_bps: 8_000_000,
+            bitrate_bps: 12_000_000,
             fps: 60,
             timeout_ms: 500,
             duration: None,

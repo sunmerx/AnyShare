@@ -456,23 +456,19 @@ impl ViewerHost {
                             let scale = (w as f32 / frame.width as f32).min(h as f32 / frame.height as f32);
                             let dw = ((frame.width as f32 * scale) as u32).clamp(1, w);
                             let dh = ((frame.height as f32 * scale) as u32).clamp(1, h);
-                            let ox = (w - dw) / 2;
-                            let oy = (h - dh) / 2;
-                            let step_x = ((frame.width as u64) << 32) / dw as u64;
-                            let step_y = ((frame.height as u64) << 32) / dh as u64;
-                            let mut sy_acc = 0u64;
-                            for y in 0..dh {
-                                let sy = ((sy_acc >> 32) as usize).min(frame.height - 1);
-                                sy_acc += step_y;
-                                let src_row = sy * frame.width;
-                                let dst_row = (oy + y) as usize * w as usize + ox as usize;
-                                let mut sx_acc = 0u64;
-                                for x in 0..dw {
-                                    let sx = ((sx_acc >> 32) as usize).min(frame.width - 1);
-                                    sx_acc += step_x;
-                                    buffer[dst_row + x as usize] = frame.argb[src_row + sx];
-                                }
-                            }
+                            let ox = ((w - dw) / 2) as usize;
+                            let oy = ((h - dh) / 2) as usize;
+                            scale_bilinear(
+                                &frame.argb,
+                                frame.width,
+                                frame.height,
+                                &mut buffer,
+                                w as usize,
+                                dw as usize,
+                                dh as usize,
+                                ox,
+                                oy,
+                            );
                             active.shared.displayed.fetch_add(1, Ordering::AcqRel);
                         }
                         match buffer.present() {
@@ -1014,8 +1010,89 @@ fn openh264_loop(
     Ok(())
 }
 
-fn yuv_to_argb(yuv: &impl openh264::formats::YUVSource, width: usize, height: usize, out: &mut Vec<u32>) {
-    out.clear();
+/// Bilinear 2x2 sampling. Nearest-neighbour was the source of visible text
+/// aliasing whenever the window is not an exact integer multiple of the
+/// encoded size (e.g. 1728 -> 1920), which is the common case. Downscaling
+/// uses a 2x2 box average instead, so shrinking never skips whole pixels.
+fn scale_bilinear(
+    src: &[u32],
+    src_width: usize,
+    src_height: usize,
+    dst: &mut [u32],
+    dst_stride: usize,
+    dst_width: usize,
+    dst_height: usize,
+    ox: usize,
+    oy: usize,
+) {
+    fn lerp(a: u32, b: u32, w: u32) -> u32 {
+        let a0 = a & 0xff;
+        let b0 = b & 0xff;
+        let a1 = (a >> 8) & 0xff;
+        let b1 = (b >> 8) & 0xff;
+        let a2 = (a >> 16) & 0xff;
+        let b2 = (b >> 16) & 0xff;
+        let r = (a2 * (256 - w) + b2 * w) >> 8;
+        let g = (a1 * (256 - w) + b1 * w) >> 8;
+        let bl = (a0 * (256 - w) + b0 * w) >> 8;
+        (r << 16) | (g << 8) | bl
+    }
+
+    fn avg4(pixels: [u32; 4]) -> u32 {
+        let mut r = 0u32;
+        let mut g = 0u32;
+        let mut b = 0u32;
+        for pixel in pixels {
+            r += pixel >> 16 & 0xff;
+            g += pixel >> 8 & 0xff;
+            b += pixel & 0xff;
+        }
+        ((r / 4) << 16) | ((g / 4) << 8) | (b / 4)
+    }
+
+    if src_width == 0 || src_height == 0 || dst_width == 0 || dst_height == 0 || dst_stride < ox + dst_width {
+        return;
+    }
+    // 1:1 fast path (window resized to exactly the encoded size, or the
+    // integer-scaled case collapses to the same dimensions per row copy).
+    if src_width == dst_width && src_height == dst_height {
+        for y in 0..dst_height {
+            let src_row = y * src_width;
+            let dst_row = (oy + y) * dst_stride + ox;
+            dst[dst_row..dst_row + dst_width].copy_from_slice(&src[src_row..src_row + src_width]);
+        }
+        return;
+    }
+    let step_x = ((src_width as u64) << 32) / dst_width as u64;
+    let step_y = ((src_height as u64) << 32) / dst_height as u64;
+    let downscale = src_width > dst_width || src_height > dst_height;
+    let mut sy_acc = 0u64;
+    for y in 0..dst_height {
+        let sy = (sy_acc >> 32) as usize;
+        let wy = ((sy_acc >> 24) & 0xff) as u32;
+        sy_acc += step_y;
+        let row1 = sy.min(src_height - 1) * src_width;
+        let row2 = (sy + 1).min(src_height - 1) * src_width;
+        let dst_row = (oy + y) * dst_stride + ox;
+        let mut sx_acc = 0u64;
+        for x in 0..dst_width {
+            let sx = (sx_acc >> 32) as usize;
+            let wx = ((sx_acc >> 24) & 0xff) as u32;
+            sx_acc += step_x;
+            let sx1 = sx.min(src_width - 1);
+            let sx2 = (sx + 1).min(src_width - 1);
+            dst[dst_row + x] = if downscale {
+                avg4([src[row1 + sx1], src[row1 + sx2], src[row2 + sx1], src[row2 + sx2]])
+            } else {
+                let top = lerp(src[row1 + sx1], src[row1 + sx2], wx);
+                let bottom = lerp(src[row2 + sx1], src[row2 + sx2], wx);
+                lerp(top, bottom, wy)
+            };
+        }
+    }
+}
+
+fn yuv_to_argb(yuv: &impl openh264::formats::YUVSource, width: usize, height: usize, out: &mut Vec<u32>) {    out.clear();
     out.resize(width * height, 0);
     let (stride_y, stride_u, stride_v) = yuv.strides();
     let (y_plane, u_plane, v_plane) = (yuv.y(), yuv.u(), yuv.v());
@@ -1175,5 +1252,56 @@ fn receive_loop(
             );
             last_stats = Instant::now();
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bilinear_upscale_blends_neighbours() {
+        let src = [0x0000_0000u32, 0x00ff_ffffu32];
+        let mut dst = [0u32; 4];
+        scale_bilinear(&src, 2, 1, &mut dst, 4, 4, 1, 0, 0);
+        // 2 -> 4 samples at source positions 0, 0.5, 1, 1.5 (clamped).
+        assert_eq!(dst[0] & 0xff, 0);
+        assert_eq!(dst[1] & 0xff, 127, "halfway between the two pixels");
+        assert_eq!(dst[2] & 0xff, 0xff);
+        assert_eq!(dst[3] & 0xff, 0xff);
+    }
+
+    #[test]
+    fn downscale_averages_instead_of_skipping() {
+        // Two dark / two bright columns shrink to two mid-grey pixels.
+        let src = [0x0000_0000u32, 0x00ff_ffffu32, 0x0000_0000u32, 0x00ff_ffffu32];
+        let mut dst = [0u32; 2];
+        scale_bilinear(&src, 4, 1, &mut dst, 2, 2, 1, 0, 0);
+        for pixel in dst {
+            let luma = pixel & 0xff;
+            assert!((0x60..=0xa0).contains(&luma), "expected blended grey, got {luma:#x}");
+        }
+    }
+
+    #[test]
+    fn exact_size_copy_and_empty_inputs() {
+        let src = [0x0011_2233u32, 0x0044_5566u32, 0x0077_8899u32, 0x00aa_bbccu32];
+        let mut dst = [0u32; 4];
+        scale_bilinear(&src, 2, 2, &mut dst, 2, 2, 2, 0, 0);
+        assert_eq!(dst, src);
+        // Degenerate inputs must be no-ops, never panics.
+        let mut empty = [0u32; 1];
+        scale_bilinear(&[], 0, 0, &mut empty, 1, 1, 1, 0, 0);
+        scale_bilinear(&src, 2, 2, &mut empty, 1, 1, 1, 5, 5);
+        scale_bilinear(&src, 2, 2, &mut empty, 1, 0, 0, 0, 0);
+        assert_eq!(empty[0], 0);
+    }
+
+    #[test]
+    fn single_pixel_target_does_not_panic() {
+        let src = [0x0012_3456u32; 4];
+        let mut dst = [0u32; 1];
+        scale_bilinear(&src, 2, 2, &mut dst, 1, 1, 1, 0, 0);
+        assert_ne!(dst[0], 0);
     }
 }
