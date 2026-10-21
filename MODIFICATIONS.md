@@ -53,6 +53,15 @@
 - `pubspec.lock`:8 个 build 工具链传递依赖小版本再解析(archive/build_config/build_daemon 等,仅 codegen 使用;官方源解析,运行时依赖零漂移)
 - `app/pubspec.yaml`:description 重写、homepage → github.com/sunmerx/AnyShare
 
+### 投屏清晰度批次二(2026-10-21)
+
+- `packages/screen-stream/src/receiver.rs`:ffmpeg 输出 BMP→raw NV12(管道流量降 2.7x);SPS 解析尺寸 + `raw_nv12_reader`/`nv12_to_argb`;删除 bmp_reader/find_bmp;呈现 tick 8→4ms
+- `packages/screen-stream/src/h264.rs`(由 vaapi/ 移到 crate 根)、`lib.rs`、`vaapi/mod.rs`:跨平台复用解析器
+- `packages/screen-stream/src/sender.rs`:`max_height`(默认 1280)、默认码率 14Mbps;`bin/ss-send.rs --max-height`
+- `app/lib/provider/screen/screen_provider.dart`:AIMD 14M/20M/3M;测试期望 11.2M
+- 实测 2048x1280:发送 34-35fps/18Mbps,接收无丢帧;38 Rust + 229 Dart 测试
+- 已知:HiDPI 下 winit 物理尺寸与 xrandr 不一致,可能仍有轻微缩放
+
 ### 投屏清晰度批次一(2026-10-21)
 
 - `packages/screen-stream/src/receiver.rs`:呈现缩放由最近邻改为 `scale_bilinear`(2x2 双线性上采样、2x2 box 下采样、同尺寸 memcpy 快路径、letterbox 保持);4 个单测
