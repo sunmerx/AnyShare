@@ -191,7 +191,10 @@ pub fn start_receiver(config: ReceiverConfig, event_tx: Sender<StreamEvent>) -> 
     let stats = Arc::new(Mutex::new(StreamStats::default()));
     let reason: Arc<Mutex<Option<EndReason>>> = Arc::new(Mutex::new(None));
 
-    let (tx, rx) = std::sync::mpsc::sync_channel::<Delivered>(128);
+    // Bounded decode queue: a slow decoder/presenter must NEVER add latency.
+    // The old depth (128) allowed ~4 s of backlog; 8 frames caps the added
+    // latency near 260 ms and overflowing frames are dropped deliberately.
+    let (tx, rx) = std::sync::mpsc::sync_channel::<Delivered>(8);
 
     let mut joins = Vec::new();
 
@@ -1135,6 +1138,21 @@ fn yuv_to_argb(yuv: &impl openh264::formats::YUVSource, width: usize, height: us
     }
 }
 
+enum Delivery {
+    Ok,
+    Dropped,
+    Closed,
+}
+
+/// Never blocks: when the decoder is behind, frames are dropped so the
+/// network/reassembly path cannot accumulate seconds of latency.
+fn deliver_frame(tx: &std::sync::mpsc::SyncSender<Delivered>, frame: Delivered) -> Delivery {
+    match tx.try_send(frame) {
+        Ok(()) => Delivery::Ok,
+        Err(std::sync::mpsc::TrySendError::Full(_)) => Delivery::Dropped,
+        Err(std::sync::mpsc::TrySendError::Disconnected(_)) => Delivery::Closed,
+    }
+}
 fn receive_loop(
     socket: std::net::UdpSocket,
     tx: std::sync::mpsc::SyncSender<Delivered>,
@@ -1153,6 +1171,7 @@ fn receive_loop(
     let mut last_counter_publish = Instant::now();
     let nack_enabled = std::env::var("ANYSHARE_NACK").map(|value| value != "0").unwrap_or(true);
     let mut nacks_sent: u64 = 0;
+    let mut dropped_frames: u64 = 0;
     let mut last_lost = 0u64;
     let mut keyframe_request_pending = false;
     let mut last_keyframe_request: Option<Instant> = None;
@@ -1186,16 +1205,28 @@ fn receive_loop(
                                 frame.payload.len()
                             );
                         }
-                        if tx.send(frame).is_err() {
-                            return Ok(());
+                        match deliver_frame(&tx, frame) {
+                            Delivery::Ok => {}
+                            Delivery::Dropped => {
+                                // The decoder is behind: drop and resync via
+                                // the next keyframe instead of queueing latency.
+                                dropped_frames += 1;
+                                keyframe_request_pending = true;
+                            }
+                            Delivery::Closed => return Ok(()),
                         }
                     }
                 }
             }
             Err(e) if e.kind() == std::io::ErrorKind::WouldBlock || e.kind() == std::io::ErrorKind::TimedOut => {
                 for frame in reassembler.poll(now) {
-                    if tx.send(frame).is_err() {
-                        return Ok(());
+                    match deliver_frame(&tx, frame) {
+                        Delivery::Ok => {}
+                        Delivery::Dropped => {
+                            dropped_frames += 1;
+                            keyframe_request_pending = true;
+                        }
+                        Delivery::Closed => return Ok(()),
                     }
                 }
             }
@@ -1264,13 +1295,14 @@ fn receive_loop(
         if last_stats.elapsed() >= Duration::from_secs(5) {
             let stats = reassembler.stats();
             eprintln!(
-                "recv: delivered={} lost={} recovered={} dup={} stale={} nacks={}",
+                "recv: delivered={} lost={} recovered={} dup={} stale={} nacks={} dropped={}",
                 stats.delivered,
                 stats.lost_frames,
                 stats.recovered_frames,
                 stats.duplicate_packets,
                 stats.stale_packets,
-                nacks_sent
+                nacks_sent,
+                dropped_frames
             );
             last_stats = Instant::now();
         }
