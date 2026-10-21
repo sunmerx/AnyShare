@@ -6,6 +6,8 @@
 
 pub mod convert;
 pub mod events;
+#[cfg(feature = "viewer")]
+pub mod h264;
 pub mod transport;
 pub mod types;
 pub mod vfr;

@@ -541,7 +541,7 @@ impl ApplicationHandler<ViewerCommand> for ViewerHost {
         self.window = Some(window);
         self.present_errors = 0;
         self.active = Some(session);
-        event_loop.set_control_flow(ControlFlow::WaitUntil(Instant::now() + Duration::from_millis(8)));
+        event_loop.set_control_flow(ControlFlow::WaitUntil(Instant::now() + Duration::from_millis(4)));
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
@@ -612,7 +612,7 @@ impl ApplicationHandler<ViewerCommand> for ViewerHost {
         }
         // Tick at ~125 Hz instead of busy-polling: cheap when the screen is
         // static, responsive enough for 60 fps content.
-        event_loop.set_control_flow(ControlFlow::WaitUntil(Instant::now() + Duration::from_millis(8)));
+        event_loop.set_control_flow(ControlFlow::WaitUntil(Instant::now() + Duration::from_millis(4)));
         self.active = Some(active);
     }
 }
@@ -646,7 +646,9 @@ fn ffmpeg_loop(
         }
     }
     args.extend(["-f".into(), "h264".into(), "-i".into(), "-".into()]);
-    args.extend(["-c:v".into(), "bmp".into(), "-f".into(), "image2pipe".into(), "-".into()]);
+    // Raw NV12 keeps the pipe 2.7x smaller than BMP (1.5 vs 4 bytes/px) and
+    // removes the image2pipe/BMP parsing on the hot path.
+    args.extend(["-pix_fmt".into(), "nv12".into(), "-f".into(), "rawvideo".into(), "-".into()]);
 
     let mut child = std::process::Command::new(ffmpeg_path)
         .args(&args)
@@ -658,10 +660,14 @@ fn ffmpeg_loop(
 
     let mut stdin = child.stdin.take().ok_or_else(|| anyhow::anyhow!("ffmpeg stdin missing"))?;
     let stdout = child.stdout.take().ok_or_else(|| anyhow::anyhow!("ffmpeg stdout missing"))?;
+    // The raw pipe carries no frame headers: dimensions come from the SPS in
+    // the stream (set by the writer before the first frame is piped).
+    let dimensions = Arc::new(std::sync::Mutex::new(None::<(usize, usize)>));
+    let reader_dimensions = Arc::clone(&dimensions);
 
     let reader_shared = Arc::clone(&shared);
     let reader = std::thread::spawn(move || {
-        if let Err(e) = bmp_reader(stdout, reader_shared, verbose) {
+        if let Err(e) = raw_nv12_reader(stdout, reader_shared, reader_dimensions, verbose) {
             eprintln!("receiver: ffmpeg reader thread: {e:#}");
         }
     });
@@ -670,6 +676,11 @@ fn ffmpeg_loop(
     while !stop.load(Ordering::Acquire) {
         match rx.recv_timeout(Duration::from_secs(1)) {
             Ok(frame) => {
+                if dimensions.lock().unwrap().is_none() {
+                    if let Some(size) = h264_dimensions(&frame.payload) {
+                        *dimensions.lock().unwrap() = Some(size);
+                    }
+                }
                 if let Err(e) = stdin.write_all(&frame.payload).and_then(|_| stdin.flush()) {
                     pipe_error = Some(anyhow::anyhow!("piping to ffmpeg failed: {e}"));
                     break;
@@ -694,97 +705,50 @@ fn ffmpeg_loop(
     }
 }
 
-fn bmp_reader(mut stdout: std::process::ChildStdout, shared: Arc<Shared>, _verbose: bool) -> Result<()> {
+fn raw_nv12_reader(
+    mut stdout: std::process::ChildStdout,
+    shared: Arc<Shared>,
+    dimensions: Arc<std::sync::Mutex<Option<(usize, usize)>>>,
+    _verbose: bool,
+) -> Result<()> {
     use std::io::Read;
 
-    let mut buffer: Vec<u8> = Vec::with_capacity(4 * 1024 * 1024);
-    let mut chunk = vec![0u8; 1024 * 1024];
+    let mut frame_bytes: Vec<u8> = Vec::new();
+    let mut argb: Vec<u32> = Vec::new();
     let mut frames: u64 = 0;
     let mut decode_ms_sum: f64 = 0.0;
     let mut last_stats = Instant::now();
-
     loop {
-        let read = stdout.read(&mut chunk)?;
-        if read == 0 {
-            break;
+        let Some((width, height)) = *dimensions.lock().unwrap() else {
+            std::thread::sleep(Duration::from_millis(2));
+            continue;
+        };
+        let expected = width * height * 3 / 2;
+        if width == 0 || height == 0 || expected > 64 * 1024 * 1024 {
+            anyhow::bail!("implausible video dimensions {width}x{height}");
         }
-        buffer.extend_from_slice(&chunk[..read]);
-        if buffer.len() > 256 * 1024 * 1024 {
-            eprintln!("receiver: bmp buffer exceeded 256 MiB, resetting");
-            buffer.clear();
+        frame_bytes.resize(expected, 0);
+        let started = Instant::now();
+        match stdout.read_exact(&mut frame_bytes) {
+            Ok(()) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => break,
+            Err(e) => return Err(anyhow::anyhow!("reading NV12 frame failed: {e}")),
         }
-
-        loop {
-            let Some(start) = find_bmp(&buffer) else {
-                if buffer.len() > 2 {
-                    let keep = buffer.len() - 2;
-                    buffer.drain(..keep);
-                }
-                break;
-            };
-            if start > 0 {
-                buffer.drain(..start);
-            }
-            if buffer.len() < 54 {
-                break;
-            }
-            let total = u32::from_le_bytes(buffer[2..6].try_into().unwrap()) as usize;
-            if !(54..=64 * 1024 * 1024).contains(&total) {
-                buffer.drain(..2);
-                continue;
-            }
-            if buffer.len() < total {
-                break;
-            }
-            let pixel_offset = u32::from_le_bytes(buffer[10..14].try_into().unwrap()) as usize;
-            let width = i32::from_le_bytes(buffer[18..22].try_into().unwrap());
-            let height = i32::from_le_bytes(buffer[22..26].try_into().unwrap());
-            let bpp = u16::from_le_bytes(buffer[28..30].try_into().unwrap());
-            let (width, height, bottom_up) = (width as usize, height.unsigned_abs() as usize, height > 0);
-            let row_bytes = width * (bpp as usize / 8);
-            let row_stride = (row_bytes + 3) & !3;
-            let data_end = pixel_offset.saturating_add(height.saturating_mul(row_stride));
-            if width == 0
-                || height == 0
-                || width > 8192
-                || height > 8192
-                || (bpp != 24 && bpp != 32)
-                || pixel_offset < 54
-                || data_end > total
-            {
-                buffer.drain(..2);
-                continue;
-            }
-
-            let t0 = Instant::now();
-            let mut argb = Vec::with_capacity(width * height);
-            for row in 0..height {
-                let src_row = if bottom_up { height - 1 - row } else { row };
-                let row_start = pixel_offset + src_row * row_stride;
-                let row_slice = &buffer[row_start..row_start + row_bytes];
-                for x in 0..width {
-                    let px = &row_slice[x * (bpp as usize / 8)..];
-                    let (b, g, r) = (px[0], px[1], px[2]);
-                    argb.push((u32::from(r) << 16) | (u32::from(g) << 8) | u32::from(b));
-                }
-            }
-            publish(
-                &shared,
-                Frame {
-                    width,
-                    height,
-                    argb,
-                },
-            );
-            frames += 1;
-            shared.decoded.fetch_add(1, Ordering::AcqRel);
-            decode_ms_sum += t0.elapsed().as_secs_f64() * 1000.0;
-            buffer.drain(..total);
-        }
-
+        nv12_to_argb(&frame_bytes, width, height, &mut argb);
+        publish(
+            &shared,
+            Frame {
+                width,
+                height,
+                argb: std::mem::take(&mut argb),
+            },
+        );
+        frames += 1;
+        shared.decoded.fetch_add(1, Ordering::AcqRel);
+        decode_ms_sum += started.elapsed().as_secs_f64() * 1000.0;
         if last_stats.elapsed() >= Duration::from_secs(1) {
             let avg_ms = if frames == 0 { 0.0 } else { decode_ms_sum / frames as f64 };
-            eprintln!("media: decoded={frames} avg_parse_ms={avg_ms:.1} (ffmpeg bmp pipe)");
+            eprintln!("media: decoded={frames} avg_decode_ms={avg_ms:.1} (ffmpeg/nv12)");
             frames = 0;
             decode_ms_sum = 0.0;
             last_stats = Instant::now();
@@ -793,19 +757,42 @@ fn bmp_reader(mut stdout: std::process::ChildStdout, shared: Arc<Shared>, _verbo
     Ok(())
 }
 
-fn find_bmp(buffer: &[u8]) -> Option<usize> {
-    let mut i = 0;
-    while i + 54 <= buffer.len() {
-        if buffer[i] == b'B' && buffer[i + 1] == b'M' {
-            let total = u32::from_le_bytes(buffer[i + 2..i + 6].try_into().unwrap()) as usize;
-            let dib = u32::from_le_bytes(buffer[i + 14..i + 18].try_into().unwrap());
-            if (54..=64 * 1024 * 1024).contains(&total) && dib >= 40 {
-                return Some(i);
+/// Frame dimensions from the first SPS in an Annex-B access unit.
+fn h264_dimensions(au: &[u8]) -> Option<(usize, usize)> {
+    use crate::h264::{nal_type, parse_sps, split_nals};
+    for nal in split_nals(au) {
+        if nal_type(nal) == 7 {
+            if let Ok(sps) = parse_sps(nal) {
+                if sps.width > 0 && sps.height > 0 {
+                    return Some((sps.width as usize, sps.height as usize));
+                }
             }
         }
-        i += 1;
     }
     None
+}
+
+/// BT.601 limited-range NV12 -> ARGB (matches the ffmpeg decoding matrix the
+/// sender's encoder targets).
+fn nv12_to_argb(nv12: &[u8], width: usize, height: usize, out: &mut Vec<u32>) {
+    out.clear();
+    out.resize(width * height, 0);
+    let y_plane = &nv12[..width * height];
+    let uv_plane = &nv12[width * height..];
+    let uv_width = width / 2;
+    for row in 0..height {
+        let uv_row = (row / 2) * uv_width;
+        for col in 0..width {
+            let y = i32::from(y_plane[row * width + col]) - 16;
+            let u = i32::from(uv_plane[(uv_row + col / 2) * 2]) - 128;
+            let v = i32::from(uv_plane[(uv_row + col / 2) * 2 + 1]) - 128;
+            let y = y.max(0);
+            let r = ((298 * y + 409 * v + 128) >> 8).clamp(0, 255) as u32;
+            let g = ((298 * y - 100 * u - 208 * v + 128) >> 8).clamp(0, 255) as u32;
+            let b = ((298 * y + 516 * u + 128) >> 8).clamp(0, 255) as u32;
+            out[row * width + col] = (r << 16) | (g << 8) | b;
+        }
+    }
 }
 
 #[cfg(target_os = "linux")]

@@ -18,6 +18,10 @@ pub struct SenderConfig {
     pub output: Option<String>,
     pub bitrate_bps: u32,
     pub fps: u32,
+    /// Encode height cap (width follows the source aspect). 1280 matches
+    /// 1280p-class receiver screens 1:1 (no upscaling = sharp text) while
+    /// staying lighter than 1600 for decode and bandwidth.
+    pub max_height: u32,
     pub timeout_ms: u32,
     /// `None` runs until [SenderHandle::stop].
     pub duration: Option<Duration>,
@@ -28,8 +32,9 @@ impl Default for SenderConfig {
         Self {
             target: String::new(),
             output: None,
-            bitrate_bps: 12_000_000,
+            bitrate_bps: 14_000_000,
             fps: 60,
+            max_height: 1280,
             timeout_ms: 500,
             duration: None,
         }
@@ -437,7 +442,7 @@ mod imp {
         // E2.0 decision D5: encode at most 1080p (the capture may be larger,
         // e.g. a 2880x1800 panel). The fixed base bitrate then buys a much
         // sharper picture and every downstream stage gets cheaper.
-        let (encode_width, encode_height) = crate::convert::scale_to_fit(capture_width, capture_height, 1920, 1080);
+        let (encode_width, encode_height) = crate::convert::scale_to_fit(capture_width, capture_height, 3840, config.max_height.max(720));
         let encoder_config = crate::EncoderConfig {
             width: encode_width,
             height: encode_height,

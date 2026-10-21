@@ -351,9 +351,9 @@ class ScreenService extends ReduxNotifier<ScreenState> {
   /// Adaptive bitrate state (sender role). The receiver posts its loss
   /// counters ~1/s; AIMD trims the encoder bitrate on loss and cautiously
   /// restores it when the link is clean.
-  static const int _minBitrateBps = 2_000_000;
-  static const int _initialBitrateBps = 12_000_000;
-  static const int _maxBitrateBps = 16_000_000;
+  static const int _minBitrateBps = 3_000_000;
+  static const int _initialBitrateBps = 14_000_000;
+  static const int _maxBitrateBps = 20_000_000;
   int? _currentBitrateBps;
   int? _lastFeedbackLost;
   DateTime? _lastBitrateFeedbackAt;

@@ -2,7 +2,10 @@
 //! subprocess. Scope: streams produced by this project (Main/High, I/P only).
 
 pub mod ffi;
-pub mod h264;
+
+/// Shared H.264 parsing lives at the crate root (used by the cross-platform
+/// receiver too); re-exported here for the decoder's local imports.
+pub use crate::h264;
 
 use std::os::fd::AsRawFd;
 use std::path::Path;
