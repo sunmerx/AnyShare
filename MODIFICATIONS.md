@@ -53,6 +53,13 @@
 - `pubspec.lock`:8 个 build 工具链传递依赖小版本再解析(archive/build_config/build_daemon 等,仅 codegen 使用;官方源解析,运行时依赖零漂移)
 - `app/pubspec.yaml`:description 重写、homepage → github.com/sunmerx/AnyShare
 
+### 投屏分辨率自适应修复批次(2026-10-21)
+
+- FRB 侧夹紧对端上报(宽 ≤2560、高 ≤1600);sender 新增 `max_width`(默认 3840)双上限;ss-send `--max-width`
+- `receiver.rs`:当前显示器窗口上报(`current_monitor`,随移动/全屏刷新),关闭时清零 monitor 原子
+- `screen_provider.dart`:发送端使用对端 width+height;`_engineEnded` 竞态保护(轮询期间引擎结束→500);accept 动作携带宽高
+- 测试 +2;234 Dart + 38 Rust、analyze 0
+
 ### 投屏分辨率自适应批次(2026-10-21)
 
 - `packages/screen-stream/src/receiver.rs`:Shared 记录主显示器物理尺寸;`ReceiverHandle::monitor_size()`
