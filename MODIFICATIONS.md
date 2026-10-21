@@ -53,6 +53,14 @@
 - `pubspec.lock`:8 个 build 工具链传递依赖小版本再解析(archive/build_config/build_daemon 等,仅 codegen 使用;官方源解析,运行时依赖零漂移)
 - `app/pubspec.yaml`:description 重写、homepage → github.com/sunmerx/AnyShare
 
+### 投屏清晰度批次一(2026-10-21)
+
+- `packages/screen-stream/src/receiver.rs`:呈现缩放由最近邻改为 `scale_bilinear`(2x2 双线性上采样、2x2 box 下采样、同尺寸 memcpy 快路径、letterbox 保持);4 个单测
+- `packages/screen-stream/src/sender.rs`:默认码率 8M→12Mbps
+- `app/lib/provider/screen/screen_provider.dart`:AIMD 初始 12M/上限 16Mbps(下限 2M 不变);测试期望同步
+- 实测 1920x1080 窗口 27-29fps 跟满;33 Rust + 229 Dart 测试
+- 审查:外部审查端点不可用,已自审(补快路径/退化输入测试);已知限制:窗口缩到 <0.5x 时 2x2 box 会跳像素
+
 ### 投屏网络线程批次(2026-10-21)
 
 - `packages/screen-stream/src/sender.rs`:NetJob/NetCounters/spawn_net_thread(有界队列、包级 stop、致命错误传播、丢帧策略与关键帧补发、payload 口径统计);header 入队保证单写者 FIFO;apply_nack 纯函数 + 2 单测
