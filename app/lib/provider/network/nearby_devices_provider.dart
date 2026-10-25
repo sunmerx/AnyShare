@@ -5,6 +5,7 @@ import 'package:localsend_app/model/persistence/favorite_device.dart';
 import 'package:localsend_app/model/state/nearby_devices_state.dart';
 import 'package:localsend_app/provider/favorites_provider.dart';
 import 'package:localsend_app/provider/logging/discovery_logs_provider.dart';
+import 'package:localsend_app/util/device_groups.dart';
 import 'package:localsend_isolates/isolate.dart';
 import 'package:localsend_isolates/model/device.dart';
 import 'package:refena_flutter/refena_flutter.dart';
@@ -87,9 +88,22 @@ class RegisterDeviceAction extends AsyncReduxAction<NearbyDevicesService, Nearby
     assert(device.ip?.isNotEmpty ?? false, 'IP must not be empty');
 
     final favoriteDevice = notifier._favoriteService.state.firstWhereOrNull((e) => e.fingerprint == device.fingerprint);
-    if (favoriteDevice != null && !favoriteDevice.customAlias) {
-      // Update existing favorite with new alias
-      await external(notifier._favoriteService).dispatchAsync(UpdateFavoriteAction(favoriteDevice.copyWith(alias: device.alias)));
+    if (favoriteDevice != null) {
+      // Refresh the stored address: a paired device that changes IP (DHCP,
+      // WiFi instead of Ethernet) must stay reachable, otherwise the UI keeps
+      // showing the stale address and connections fail.
+      final refreshed = favoriteWithRefreshedAddress(favoriteDevice, device);
+      if (refreshed != null) {
+        await external(notifier._favoriteService).dispatchAsync(UpdateFavoriteAction(refreshed));
+        notifier._discoveryLogger.addLog(
+          '[DISCOVER] ${device.alias} address updated: ${favoriteDevice.ip} -> ${device.ip}',
+        );
+      } else if (!favoriteDevice.customAlias) {
+        // Update existing favorite with new alias
+        await external(notifier._favoriteService).dispatchAsync(UpdateFavoriteAction(favoriteDevice.copyWith(alias: device.alias)));
+      } else {
+        await Future.microtask(() {});
+      }
     } else {
       await Future.microtask(() {});
     }

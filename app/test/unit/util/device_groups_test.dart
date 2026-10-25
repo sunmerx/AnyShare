@@ -34,6 +34,35 @@ void main() {
     ).copyWith(ownerId: ownerId, blocked: blocked);
   }
 
+  test('a paired device that changed its IP gets the new address', () {
+    final favorite = fav(fingerprint: 'A');
+    final discovered = dev(fingerprint: 'A', ip: '192.168.1.5');
+
+    final refreshed = favoriteWithRefreshedAddress(favorite, discovered);
+
+    expect(refreshed, isNotNull);
+    expect(refreshed!.ip, '192.168.1.5');
+    expect(refreshed.port, 53317);
+    expect(refreshed.alias, discovered.alias, reason: 'alias follows the device when it is not customized');
+  });
+
+  test('an unchanged address leaves the favorite untouched', () {
+    final favorite = fav(fingerprint: 'A');
+    final discovered = dev(fingerprint: 'A');
+
+    expect(favoriteWithRefreshedAddress(favorite, discovered), isNull);
+  });
+
+  test('a custom alias survives an address refresh', () {
+    final favorite = fav(fingerprint: 'A').copyWith(customAlias: true, alias: 'My name');
+    final discovered = dev(fingerprint: 'A', ip: '192.168.1.5');
+
+    final refreshed = favoriteWithRefreshedAddress(favorite, discovered);
+
+    expect(refreshed!.ip, '192.168.1.5');
+    expect(refreshed.alias, 'My name');
+  });
+
   test('same-owner favorites go to myDevices', () {
     final groups = groupDevices(
       discovered: const [],

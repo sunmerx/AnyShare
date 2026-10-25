@@ -2,6 +2,23 @@ import 'package:localsend_app/model/persistence/favorite_device.dart';
 import 'package:localsend_app/util/favorites.dart';
 import 'package:localsend_isolates/model/device.dart';
 
+/// Returns the favorite updated to the address the device was just
+/// discovered on, or null when the address is unchanged.
+///
+/// A paired device that changes its IP (DHCP lease, WiFi instead of Ethernet)
+/// must stay reachable: keeping the stale address in the favorite leaves the
+/// UI showing the old IP and every connection to that device fails.
+FavoriteDevice? favoriteWithRefreshedAddress(FavoriteDevice favorite, Device device) {
+  if (favorite.ip == device.ip && favorite.port == device.port) {
+    return null;
+  }
+  return favorite.copyWith(
+    ip: device.ip,
+    port: device.port,
+    alias: favorite.customAlias ? favorite.alias : device.alias,
+  );
+}
+
 /// AnyShare modification (2026-10-18): home redesign (UI-1) device grouping.
 ///
 /// - [myDevices]: paired devices belonging to the local owner (same ownerId).
