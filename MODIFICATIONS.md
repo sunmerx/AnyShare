@@ -53,6 +53,13 @@
 - `pubspec.lock`:8 个 build 工具链传递依赖小版本再解析(archive/build_config/build_daemon 等,仅 codegen 使用;官方源解析,运行时依赖零漂移)
 - `app/pubspec.yaml`:description 重写、homepage → github.com/sunmerx/AnyShare
 
+### 配对设备换 IP 修复批次(2026-10-25)
+
+- `app/lib/util/device_groups.dart`:新增纯函数 `favoriteWithRefreshedAddress`(地址变化时刷新收藏的 ip/port,保留 customAlias)
+- `app/lib/provider/network/nearby_devices_provider.dart`:发现设备时指纹匹配即刷新收藏地址并记日志
+- `app/test/unit/util/device_groups_test.dart`:+3 用例;237 Dart 测试全绿
+- 背景:Ubuntu 由有线切无线,IP 192.168.1.225→192.168.1.5,列表显示旧地址导致共享失败
+
 ### 投屏端到端计时批次(2026-10-21)
 
 - `packages/screen-stream/src/transport.rs`:Delivered 增加 received_at
