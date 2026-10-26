@@ -349,6 +349,9 @@ pub struct ReassemblerStats {
 pub struct Reassembler {
     session: Option<u32>,
     next_expected: u32,
+    /// Highest frame id seen; a pending frame older than this is provably not
+    /// in flight anymore (fast-retransmit rule, like TCP's triple-ACK).
+    max_frame_seen: u32,
     pending: BTreeMap<u32, FrameBuf>,
     ready: Vec<Delivered>,
     last_ingest: Option<Instant>,
@@ -366,6 +369,7 @@ impl Reassembler {
         Self {
             session: None,
             next_expected: 0,
+            max_frame_seen: 0,
             pending: BTreeMap::new(),
             ready: Vec::new(),
             last_ingest: None,
@@ -383,14 +387,21 @@ impl Reassembler {
     }
 
     /// Data-packet indices still missing for the oldest pending frames.
-    /// Only frames that stopped making progress ([NACK_GRACE]) are reported:
-    /// empty slots while packets are still in flight are not losses.
+    ///
+    /// A frame is reported when either
+    /// - it stopped making progress for [NACK_GRACE] (safe fallback), or
+    /// - a NEWER frame has already been seen (fast retransmit): packets of the
+    ///   older frame are no longer in flight, so waiting is pure latency.
     pub fn missing_candidates(&self, now: Instant) -> Vec<(u32, u16, Vec<usize>)> {
         self.pending
             .iter()
-            .take(4)
             .filter_map(|(&frame_id, frame)| {
-                if now.duration_since(frame.last_progress) < NACK_GRACE {
+                // Fast retransmit with a triple-ACK-like margin: only when the
+                // sender demonstrably moved 2+ frames ahead. One frame ahead can
+                // simply mean reordered packets still in flight.
+                let ahead = self.max_frame_seen.wrapping_sub(frame_id);
+                let overtaken = ahead >= 2 && ahead < u32::MAX / 2;
+                if !overtaken && now.duration_since(frame.last_progress) < NACK_GRACE {
                     return None;
                 }
                 let missing: Vec<usize> = (0..frame.count).filter(|&index| frame.data[index].is_none()).collect();
@@ -423,6 +434,10 @@ impl Reassembler {
         if self.session.is_none() && packet.flags & FLAG_FEC == 0 && packet.count > 0 {
             self.session = Some(packet.session);
             self.next_expected = packet.frame_id;
+            // A new session restarts frame ids: the old high-water mark must not
+            // mark every fresh frame as overtaken (that would disable the grace
+            // window right after a sender restart).
+            self.max_frame_seen = packet.frame_id;
         }
         let Some(session) = self.session else {
             return Vec::new();
@@ -449,6 +464,11 @@ impl Reassembler {
             return Vec::new();
         }
 
+        // Advancing the high-water mark only after the sanity checks prevents
+        // a single corrupted/forged frame id from marking everything as lost.
+        if !packet.is_fec() && frame_id_is_ahead(self.max_frame_seen, packet.frame_id) {
+            self.max_frame_seen = packet.frame_id;
+        }
         let frame = self
             .pending
             .entry(packet.frame_id)
@@ -555,6 +575,10 @@ impl Reassembler {
     }
 }
 
+/// True when `candidate` is strictly ahead of `reference` (wrap-safe).
+fn frame_id_is_ahead(reference: u32, candidate: u32) -> bool {
+    candidate != reference && candidate.wrapping_sub(reference) < u32::MAX / 2
+}
 fn index_before(a: u32, b: u32) -> bool {
     b.wrapping_sub(a) < u32::MAX / 2 && a != b
 }
@@ -799,6 +823,57 @@ mod tests {
         assert_eq!(candidates[0].2, vec![1]);
     }
 
+    #[test]
+    fn fast_retransmit_needs_two_frames_ahead() {
+        // Frame 7 is missing one packet. One newer frame (8) may just be
+        // reordered packets, so nothing is requested before the grace window.
+        // Once the sender demonstrably moved two frames ahead (9), frame 7's
+        // missing packet is no longer in flight and must be reported at once.
+        let frame7 = packetize(3, 7, 0, 0, &vec![0x5A; DEFAULT_PAYLOAD * 3]);
+        let frame8 = packetize(3, 8, 0, 0, &vec![0x33; DEFAULT_PAYLOAD]);
+        let frame9 = packetize(3, 9, 0, 0, &vec![0x44; DEFAULT_PAYLOAD]);
+        let mut receiver = Reassembler::new();
+        let t = now();
+        for packet in frame7.iter().filter(|p| !p.is_fec() && p.seq != 1) {
+            let _ = receiver.ingest(packet, t);
+        }
+        assert!(receiver.missing_candidates(t + Duration::from_millis(1)).is_empty());
+
+        let one_ahead = frame8.iter().find(|p| !p.is_fec()).unwrap();
+        let _ = receiver.ingest(one_ahead, t + Duration::from_millis(2));
+        assert!(
+            receiver.missing_candidates(t + Duration::from_millis(2)).is_empty(),
+            "a single newer frame could still be reordering"
+        );
+
+        let two_ahead = frame9.iter().find(|p| !p.is_fec()).unwrap();
+        let _ = receiver.ingest(two_ahead, t + Duration::from_millis(3));
+        let candidates = receiver.missing_candidates(t + Duration::from_millis(3));
+        assert_eq!(candidates.len(), 1, "two frames ahead -> fast retransmit");
+        assert_eq!(candidates[0].0, 7);
+        assert_eq!(candidates[0].2, vec![1]);
+    }
+
+    #[test]
+    fn session_restart_resets_the_frame_high_water_mark() {
+        // Session 1 reaches frame 50, so the high-water mark is 50. A new
+        // session starts at frame 0 again: its frames must NOT be treated as
+        // "overtaken" (that would disable the NACK grace window entirely).
+        let mut receiver = Reassembler::new();
+        let t = now();
+        for packet in packetize(1, 50, 0, 0, &vec![0x01; DEFAULT_PAYLOAD]) {
+            let _ = receiver.ingest(&packet, t);
+        }
+        let restart = t + SESSION_IDLE_RESET + Duration::from_millis(1);
+        let frame0 = packetize(2, 0, 0, 0, &vec![0x02; DEFAULT_PAYLOAD * 2]);
+        for packet in frame0.iter().filter(|p| !p.is_fec() && p.seq != 1) {
+            let _ = receiver.ingest(packet, restart);
+        }
+        assert!(
+            receiver.missing_candidates(restart + Duration::from_millis(1)).is_empty(),
+            "fresh session must respect the grace window"
+        );
+    }
     #[test]
     fn missing_candidates_ignores_stalled_frame_prefix() {
         // Only the first packet of a frame has arrived: every other slot is
