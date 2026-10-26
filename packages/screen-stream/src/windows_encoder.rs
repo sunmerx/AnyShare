@@ -367,6 +367,21 @@ impl H264Encoder {
         Ok(outputs)
     }
 
+    /// Drains pending encoder outputs without submitting a new frame.
+    ///
+    /// A static screen encodes rarely (VFR), so without an idle pump the last
+    /// frame's output would only be collected on the next `encode` call — up
+    /// to the periodic keyframe interval, i.e. seconds of latency.
+    pub fn pump(&mut self) -> Result<Vec<Vec<u8>>> {
+        let mut outputs: Vec<Vec<u8>> = Vec::new();
+        let deadline = std::time::Instant::now() + std::time::Duration::from_millis(2);
+        if self.event_driven {
+            self.pump_events(&mut outputs, EventPumpMode::NonBlocking, deadline)?;
+        } else {
+            self.drain_sync(&mut outputs)?;
+        }
+        Ok(outputs)
+    }
     fn drain_sync(&mut self, outputs: &mut Vec<Vec<u8>>) -> Result<()> {
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
         loop {

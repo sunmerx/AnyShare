@@ -23,6 +23,8 @@ pub struct SenderConfig {
     /// portrait/4:3 peers cannot force an oversized frame.
     pub max_width: u32,
     pub max_height: u32,
+    /// Capture wait per loop iteration. Short enough that the idle encoder
+    /// pump runs frequently on static screens (long waits delayed outputs).
     pub timeout_ms: u32,
     /// `None` runs until [SenderHandle::stop].
     pub duration: Option<Duration>,
@@ -37,7 +39,7 @@ impl Default for SenderConfig {
             fps: 60,
             max_width: 3840,
             max_height: 1280,
-            timeout_ms: 500,
+            timeout_ms: 16,
             duration: None,
         }
     }
@@ -271,6 +273,16 @@ mod imp {
         (tx, join)
     }
 
+    /// Optional persisted capture-output choice (index or device-name
+    /// substring), so a virtual-display setup survives app restarts:
+    /// `%APPDATA%\AnyShare\stream_output.txt`.
+    fn persisted_output_spec() -> Option<String> {
+        let base = std::env::var_os("APPDATA")?;
+        let path = std::path::PathBuf::from(base).join("AnyShare").join("stream_output.txt");
+        let text = std::fs::read_to_string(path).ok()?;
+        let value = text.trim().to_string();
+        (!value.is_empty()).then_some(value)
+    }
     /// QPC tick count + frequency, for converting DXGI present times.
     fn qpc_now() -> Option<(i64, i64)> {
         use windows::Win32::System::Performance::{QueryPerformanceCounter, QueryPerformanceFrequency};
@@ -400,8 +412,27 @@ mod imp {
         event_tx: &Sender<StreamEvent>,
     ) -> Result<()> {
         let outputs = enumerate_outputs()?;
+        for output in &outputs {
+            eprintln!(
+                "sender: output #{} {} ({}x{} at {},{}) attached={}",
+                output.index,
+                output.device_name,
+                output.desktop_rect.width(),
+                output.desktop_rect.height(),
+                output.desktop_rect.left,
+                output.desktop_rect.top,
+                output.attached
+            );
+        }
         let attached: Vec<_> = outputs.iter().filter(|o| o.attached).cloned().collect();
-        let target_output = match &config.output {
+        // Pin the captured output without UI: ANYSHARE_OUTPUT takes an index or
+        // a case-insensitive device-name substring (e.g. a virtual display).
+        let output_spec = config
+            .output
+            .clone()
+            .or_else(|| std::env::var("ANYSHARE_OUTPUT").ok().filter(|value| !value.is_empty()))
+            .or_else(persisted_output_spec);
+        let target_output = match &output_spec {
             Some(spec) => {
                 if let Ok(idx) = spec.parse::<usize>() {
                     outputs
@@ -754,6 +785,7 @@ mod imp {
                             eprintln!("sender: encoder rejected the keyframe request (unsupported CodecAPI)");
                         }
                     }
+                    let frame_outputs: Vec<Vec<u8>>;
                     if let EncodeDecision::Encode { keyframe } = decision {
                         let convert_started = Instant::now();
                         if nv12_ready.is_none() {
@@ -820,18 +852,49 @@ mod imp {
                         } else {
                             &i420
                         };
-                        let outputs = encoder.encode(converted, t100, duration, discontinuity, keyframe)?;
+                        // Bound the encoder's internal input queue: an async
+                        // MFT happily buffers many submissions, which showed up
+                        // as hundreds of ms between capture and the encoded AU
+                        // (pipeline_age). Keep at most two frames in flight and
+                        // drain the oldest output before submitting more.
+                        let mut pre_outputs: Vec<Vec<u8>> = Vec::new();
+                        if pending_meta.len() >= 2 {
+                            // Hard wait: giving up early let the encoder's
+                            // internal queue grow to ~30 frames (1.1 s of
+                            // latency); 500 ms only guards against a mute MFT.
+                            let deadline = Instant::now() + Duration::from_millis(500);
+                            while pending_meta.len().saturating_sub(pre_outputs.len()) >= 2 && Instant::now() < deadline {
+                                let pumped = encoder.pump()?;
+                                if pumped.is_empty() {
+                                    std::thread::sleep(Duration::from_millis(1));
+                                } else {
+                                    pre_outputs.extend(pumped);
+                                }
+                            }
+                        }
+                        let mut encoded = encoder.encode(converted, t100, duration, discontinuity, keyframe)?;
+                        pre_outputs.append(&mut encoded);
+                        frame_outputs = pre_outputs;
                         window_encode_ms += encode_started.elapsed().as_secs_f64() * 1000.0;
                         window_encode_frames += 1;
                         // With pipelined encoding, outputs belong to EARLIER
                         // submissions: queue the per-request flags and pair them
                         // in order instead of using the current gate decision.
                         pending_meta.push_back((keyframe, discontinuity, t100 as u64));
-                        let had_output = !outputs.is_empty();
-                        for chunk in &outputs {
+                        last_enc_time_100ns = t100;
+                        last_send_time_100ns = t100;
+                    } else {
+                        // Idle pump: a static screen rarely encodes, and waiting
+                        // for the next encode call delayed the last frame by up
+                        // to the keyframe interval (seconds of latency).
+                        frame_outputs = encoder.pump()?;
+                    }
+                    {
+                        let had_output = !frame_outputs.is_empty();
+                        for chunk in &frame_outputs {
                             let (out_keyframe_requested, out_discontinuity, out_ts) = pending_meta
                                 .pop_front()
-                                .unwrap_or((keyframe, discontinuity, t100 as u64));
+                                .unwrap_or((false, false, 0));
                             // The MF force-keyframe property can be accepted
                             // (S_OK) and silently ignored, so the bitstream is
                             // the ground truth. Encoder-spontaneous IDRs are
@@ -872,7 +935,7 @@ mod imp {
                             };
                             let pipeline_age_ms = std::time::SystemTime::now()
                                 .duration_since(std::time::UNIX_EPOCH)
-                                .map(|value| (value.as_nanos() as i64 / 100 - t100) as f64 / 10_000.0)
+                                .map(|value| (value.as_nanos() as i64 / 100 - out_ts as i64) as f64 / 10_000.0)
                                 .unwrap_or(0.0);
                             if pipeline_age_ms > window_pipeline_age_ms {
                                 window_pipeline_age_ms = pipeline_age_ms;
@@ -899,11 +962,9 @@ mod imp {
                             }
                         }
                         let _ = had_output;
-                        if last_enc_time_100ns < 0 && started.elapsed() > Duration::from_secs(5) {
-                            anyhow::bail!("encoder produced no output within 5s (activating-but-mute MFT?)");
-                        }
-                        last_enc_time_100ns = t100;
-                        last_send_time_100ns = t100;
+                    }
+                    if last_enc_time_100ns < 0 && started.elapsed() > Duration::from_secs(5) {
+                        anyhow::bail!("encoder produced no output within 5s (activating-but-mute MFT?)");
                     }
                     if let Some(pixels) = pixels_opt {
                         dup.recycle_pixels(pixels);
