@@ -53,6 +53,12 @@
 - `pubspec.lock`:8 个 build 工具链传递依赖小版本再解析(archive/build_config/build_daemon 等,仅 codegen 使用;官方源解析,运行时依赖零漂移)
 - `app/pubspec.yaml`:description 重写、homepage → github.com/sunmerx/AnyShare
 
+### A1 呈现即时唤醒批次(2026-10-27)
+
+- packages/screen-stream/src/receiver.rs:ViewerCommand::Frame;publish 经 EventLoopProxy 立即唤醒重绘;兜底 tick 4→16ms;会话结束清空 proxy;Start 主动重绘首帧
+- 审查无 blocker/major;38 Rust 测试全绿
+- 验收文档:docs/E2-S0/串流优化验收报告-A组.md §A1
+
 ### 编码器积压与采集目标批次(2026-10-27)
 
 - `packages/screen-stream/src/windows_encoder.rs`:`pump()` 空闲泵输出(静态画面不再等下一次 encode)
