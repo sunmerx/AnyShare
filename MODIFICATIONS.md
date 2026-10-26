@@ -53,6 +53,19 @@
 - `pubspec.lock`:8 个 build 工具链传递依赖小版本再解析(archive/build_config/build_daemon 等,仅 codegen 使用;官方源解析,运行时依赖零漂移)
 - `app/pubspec.yaml`:description 重写、homepage → github.com/sunmerx/AnyShare
 
+### A6 发送端 pacing 批次(2026-10-27)
+
+- `packages/screen-stream/src/sender.rs`:新增 `Pacer`(线路字节计费、8ms 批量 sleep、33ms 帧预算、catch-up、码率变化 >20% 重置);`spawn_net_thread` 增加 `current_bitrate`;发包前登记 history;批次间 `drain_nacks`;`ANYSHARE_PACE=0` 开关;1 个单测
+- 审查 3 blocker + 3 major 全修;41 Rust 测试全绿
+- 实测:299 帧/12s(25fps),dropped=0,nacks=0,lost=0
+- 验收文档:`docs/E2-S0/串流优化验收报告-A组.md` §A6
+
+### A5 快速重传批次(2026-10-27)
+
+- `packages/screen-stream/src/transport.rs`:`Reassembler.max_frame_seen`(会话建立时重置、合法性校验后仅数据包推进);`missing_candidates` 支持「高水位超前 ≥2 帧」快速重传;候选先过滤后取 4;新增 3 个单测
+- 审查 1 blocker + 5 major 全修;40 Rust 测试全绿
+- 验收文档:`docs/E2-S0/串流优化验收报告-A组.md` §A5(自动/人工测试项、已知限制)
+
 ### A1 呈现即时唤醒批次(2026-10-27)
 
 - packages/screen-stream/src/receiver.rs:ViewerCommand::Frame;publish 经 EventLoopProxy 立即唤醒重绘;兜底 tick 4→16ms;会话结束清空 proxy;Start 主动重绘首帧

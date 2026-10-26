@@ -200,16 +200,31 @@ mod imp {
         stop: Arc<AtomicBool>,
         counters: Arc<NetCounters>,
         error: Arc<std::sync::Mutex<Option<String>>>,
+        current_bitrate: Arc<std::sync::atomic::AtomicU32>,
     ) -> (std::sync::mpsc::SyncSender<NetJob>, JoinHandle<()>) {
         let (tx, rx) = std::sync::mpsc::sync_channel::<NetJob>(8);
         let join = std::thread::spawn(move || {
             let mut history = PacketHistory::new(48);
             let mut nack_budget: std::collections::HashMap<u32, u8> = std::collections::HashMap::new();
             let mut nack_buf = [0u8; 1200];
+            let pace_enabled = std::env::var("ANYSHARE_PACE").map(|value| value != "0").unwrap_or(true);
+            let mut pacer = Pacer::new();
+            let mut pacer_rate: u64 = 0;
             'outer: loop {
                 match rx.recv_timeout(std::time::Duration::from_millis(1)) {
                     Ok(job) => {
-                        let mut history_packets = Vec::new();
+                        // Register the frame BEFORE sending so a fast-retransmit
+                        // NACK arriving during pacing finds it in the history.
+                        let history_packets: Vec<Vec<u8>> = job
+                            .packets
+                            .iter()
+                            .filter(|(is_fec, _, _)| !is_fec)
+                            .map(|(_, bytes, _)| bytes.clone())
+                            .collect();
+                        history.push(job.frame_id, history_packets);
+                        pacer.begin_frame(Instant::now());
+                        let mut batch_bytes = 0usize;
+                        let mut batch_packets = 0usize;
                         for (is_fec, bytes, payload_len) in job.packets {
                             if stop.load(Ordering::Acquire) {
                                 break 'outer;
@@ -225,11 +240,33 @@ mod imp {
                                     break 'outer;
                                 }
                             }
-                            if !is_fec {
-                                history_packets.push(bytes);
+                            let _ = is_fec;
+                            batch_bytes += bytes.len();
+                            batch_packets += 1;
+                            // Batch the pacing sleeps (>=1 ms granularity is the
+                            // only reliable unit on Windows) and answer NACKs in
+                            // between so fast retransmit is not delayed.
+                            if batch_packets >= 8 {
+                                if pace_enabled {
+                                    let rate = u64::from(current_bitrate.load(Ordering::Relaxed));
+                                    pacer.pace_with_rate(batch_bytes, rate, &mut pacer_rate, Instant::now());
+                                }
+                                batch_bytes = 0;
+                                batch_packets = 0;
+                                drain_nacks(
+                                    &socket,
+                                    session,
+                                    &mut nack_buf,
+                                    &history,
+                                    &mut nack_budget,
+                                    &counters,
+                                );
                             }
                         }
-                        history.push(job.frame_id, history_packets);
+                        if pace_enabled && batch_packets > 0 {
+                            let rate = u64::from(current_bitrate.load(Ordering::Relaxed));
+                            pacer.pace_with_rate(batch_bytes, rate, &mut pacer_rate, Instant::now());
+                        }
                     }
                     Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
                     Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
@@ -239,40 +276,124 @@ mod imp {
                 }
                 // Bounded NACK drain: a spoofed/duplicated flood must never
                 // starve the send queue. Two retransmissions per frame max.
-                let mut processed = 0;
-                while processed < 32 {
-                    if stop.load(Ordering::Acquire) {
-                        break 'outer;
-                    }
-                    let Ok(len) = socket.recv(&mut nack_buf) else { break };
-                    processed += 1;
-                    let Some(packet) = Packet::decode(&nack_buf[..len]) else { continue };
-                    let Some(nack) = Nack::from_packet(&packet) else { continue };
-                    if nack.session != session {
-                        continue;
-                    }
-                    let resent = apply_nack(&history, &nack, &mut nack_budget, |bytes| {
-                        if send_udp(&socket, bytes).is_ok() {
-                            counters.packets.fetch_add(1, Ordering::Relaxed);
-                            counters.bytes.fetch_add(
-                                bytes.len().saturating_sub(crate::transport::HEADER_LEN) as u64,
-                                Ordering::Relaxed,
-                            );
-                            true
-                        } else {
-                            false
-                        }
-                    });
-                    let _ = resent;
-                }
-                if nack_budget.len() > 64 {
-                    nack_budget.retain(|frame_id, budget| *budget > 0 && history.get(*frame_id).is_some());
-                }
+                drain_nacks(
+                    &socket,
+                    session,
+                    &mut nack_buf,
+                    &history,
+                    &mut nack_budget,
+                    &counters,
+                );
             }
         });
         (tx, join)
     }
 
+    /// Answers pending NACKs (bounded) and retransmits from the history under
+    /// a per-frame budget. Shared by the inter-job drain and the pacing loop
+    /// so fast retransmit is never delayed by pacing.
+    fn drain_nacks(
+        socket: &UdpSocket,
+        session: u32,
+        nack_buf: &mut [u8; 1200],
+        history: &PacketHistory,
+        nack_budget: &mut std::collections::HashMap<u32, u8>,
+        counters: &NetCounters,
+    ) {
+        let mut processed = 0;
+        while processed < 32 {
+            let Ok(len) = socket.recv(nack_buf) else { break };
+            processed += 1;
+            let Some(packet) = Packet::decode(&nack_buf[..len]) else { continue };
+            let Some(nack) = Nack::from_packet(&packet) else { continue };
+            if nack.session != session {
+                continue;
+            }
+            let resent = apply_nack(history, &nack, nack_budget, |bytes| {
+                if send_udp(socket, bytes).is_ok() {
+                    counters.packets.fetch_add(1, Ordering::Relaxed);
+                    counters.bytes.fetch_add(
+                        bytes.len().saturating_sub(crate::transport::HEADER_LEN) as u64,
+                        Ordering::Relaxed,
+                    );
+                    true
+                } else {
+                    false
+                }
+            });
+            let _ = resent;
+        }
+        if nack_budget.len() > 64 {
+            nack_budget.retain(|frame_id, budget| *budget > 0 && history.get(*frame_id).is_some());
+        }
+    }
+    /// Rate-based pacer: spreads a frame's packets over time instead of
+    /// dumping the whole burst into the kernel at once. Bursts make Wi-Fi
+    /// aggregate and buffer (jitter/latency spikes); pacing at the encoded
+    /// bitrate keeps the queue small at negligible cost.
+    struct Pacer {
+        next: Instant,
+        /// Sleeps are batched (>=1 ms) because Windows thread sleeps below a
+        /// millisecond are unreliable (Sleep(0) or a ~15.6 ms timer tick).
+        max_batch_sleep: Duration,
+        /// Total pacing sleep allowed per frame; protects the capture loop
+        /// from a keyframe-sized burst eating many frame intervals.
+        frame_budget: Duration,
+        frame_started: Option<Instant>,
+    }
+
+    impl Pacer {
+        fn new() -> Self {
+            Self {
+                next: Instant::now(),
+                max_batch_sleep: Duration::from_millis(8),
+                frame_budget: Duration::from_millis(33),
+                frame_started: None,
+            }
+        }
+
+        fn begin_frame(&mut self, now: Instant) {
+            self.frame_started = Some(now);
+        }
+
+        /// Applies a bitrate change: a >20% jump invalidates the pending
+        /// schedule (a stale deadline would otherwise add latency exactly when
+        /// the bitrate had to be lowered).
+        fn pace_with_rate(&mut self, bytes: usize, rate: u64, last_rate: &mut u64, now: Instant) {
+            if *last_rate != 0 && (rate as i64 - *last_rate as i64).unsigned_abs() * 5 > *last_rate {
+                self.next = now;
+            }
+            *last_rate = rate;
+            self.pace(bytes, rate, now);
+        }
+
+        /// Accounts `bytes` of wire traffic at `rate_bps` and sleeps if the
+        /// schedule is behind. Catch-up is deliberate: when we are late, the
+        /// deadline resets to now instead of accumulating debt (debt plus a
+        /// per-packet cap would silently throttle the stream).
+        fn pace(&mut self, bytes: usize, rate_bps: u64, now: Instant) {
+            if rate_bps == 0 {
+                return;
+            }
+            let cost = Duration::from_secs_f64((bytes as f64 * 8.0) / rate_bps as f64);
+            if self.next < now {
+                self.next = now;
+            }
+            self.next = self.next.checked_add(cost).unwrap_or(now);
+            let frame_left = self
+                .frame_started
+                .map(|started| self.frame_budget.saturating_sub(started.elapsed()))
+                .unwrap_or(self.frame_budget);
+            let wait = self
+                .next
+                .saturating_duration_since(now)
+                .min(self.max_batch_sleep)
+                .min(frame_left);
+            if wait >= Duration::from_millis(1) {
+                std::thread::sleep(wait);
+            }
+        }
+    }
     /// Optional persisted capture-output choice (index or device-name
     /// substring), so a virtual-display setup survives app restarts:
     /// `%APPDATA%\AnyShare\stream_output.txt`.
@@ -314,6 +435,36 @@ mod imp {
     #[cfg(test)]
     mod tests {
         use super::*;
+
+        #[test]
+        fn pacer_accumulates_wire_time_and_catches_up() {
+            // 1200 bytes at 12 Mbps occupies ~0.8 ms of wire time. Pacing is
+            // virtual (no sleeps here): the deadline advances by the cost.
+            let mut pacer = Pacer::new();
+            let now = std::time::Instant::now();
+            pacer.begin_frame(now);
+            pacer.pace(1200, 12_000_000, now);
+            let after_one = pacer.next.saturating_duration_since(now);
+            assert!(
+                (after_one.as_micros() as i64 - 800).abs() <= 80,
+                "one packet-time expected, got {after_one:?}"
+            );
+            // A zero rate (unknown) must never schedule anything.
+            let mut idle = Pacer::new();
+            let idle_before = idle.next;
+            idle.pace(1200, 0, now);
+            assert_eq!(idle.next, idle_before);
+
+            // Catch-up: a stale deadline must not accumulate debt. Simulate a
+            // very late call; the deadline resets to "now" first.
+            let late = now + std::time::Duration::from_millis(500);
+            pacer.pace(1200, 12_000_000, late);
+            let after_late = pacer.next.saturating_duration_since(late);
+            assert!(
+                after_late <= std::time::Duration::from_millis(2),
+                "late pacing must catch up instead of sleeping the backlog, got {after_late:?}"
+            );
+        }
 
         fn sample_history() -> PacketHistory {
             let mut history = PacketHistory::new(4);
@@ -566,12 +717,14 @@ mod imp {
         // Network worker: sending/retransmission off the capture thread.
         let net_counters = Arc::new(NetCounters::default());
         let net_error: Arc<std::sync::Mutex<Option<String>>> = Arc::new(std::sync::Mutex::new(None));
+        let current_bitrate = Arc::new(std::sync::atomic::AtomicU32::new(config.bitrate_bps));
         let (net_tx, net_join) = spawn_net_thread(
             socket.try_clone()?,
             session,
             Arc::clone(&stop),
             Arc::clone(&net_counters),
             Arc::clone(&net_error),
+            Arc::clone(&current_bitrate),
         );
         let mut last_net_packets: u64 = 0;
         let mut last_net_bytes: u64 = 0;
@@ -636,6 +789,7 @@ mod imp {
                         Ok(()) => {
                             bitrate_pending = None;
                             bitrate_warned = false;
+                            current_bitrate.store(target, Ordering::Relaxed);
                         }
                         Err(e) => {
                             if !bitrate_warned {
