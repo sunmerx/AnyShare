@@ -83,7 +83,13 @@ struct ReceiverInner {
 /// Starts sending this device's screen to `host:port` (the receiver's data
 /// plane). The screen is auto-picked (smallest attached output) until output
 /// selection is exposed; fixed 1080p60/8Mbps per the E2.0 decision.
-pub fn start_screen_sender(host: String, port: u16, max_width: u32, max_height: u32) -> anyhow::Result<RsScreenSender> {
+pub fn start_screen_sender(
+    host: String,
+    port: u16,
+    max_width: u32,
+    max_height: u32,
+    key_hex: String,
+) -> anyhow::Result<RsScreenSender> {
     // Clamp peer-reported viewports: 4K targets would force a 2160p software
     // decode at LAN bitrates. 1600p is the practical ceiling for this stack.
     let max_width = if max_width >= 640 { max_width.min(2560) } else { 0 };
@@ -101,6 +107,7 @@ pub fn start_screen_sender(host: String, port: u16, max_width: u32, max_height: 
         if max_height > 0 {
             config.max_height = max_height;
         }
+        config.session_key = parse_session_key(&key_hex)?;
         let handle = screen_stream::sender::start_sender(config, tx)?;
         Ok(RsScreenSender {
             inner: Mutex::new(SenderInner {
@@ -111,14 +118,14 @@ pub fn start_screen_sender(host: String, port: u16, max_width: u32, max_height: 
     }
     #[cfg(not(target_os = "windows"))]
     {
-        let _ = (host, port, max_width, max_height);
+        let _ = (host, port, max_width, max_height, key_hex);
         anyhow::bail!("screen sending requires Windows (E2.0)")
     }
 }
 
 /// Starts listening for an incoming screen stream on `port` and shows it in a
 /// dedicated native window. Linux uses the native VAAPI decoder.
-pub fn start_screen_receiver(port: u16) -> anyhow::Result<RsScreenReceiver> {
+pub fn start_screen_receiver(port: u16, key_hex: String) -> anyhow::Result<RsScreenReceiver> {
     #[cfg(desktop)]
     {
         // The minifb window is created on a worker thread; that is validated
@@ -129,6 +136,7 @@ pub fn start_screen_receiver(port: u16) -> anyhow::Result<RsScreenReceiver> {
         let (tx, rx) = std::sync::mpsc::channel();
         let config = screen_stream::receiver::ReceiverConfig {
             port,
+            session_key: parse_session_key(&key_hex)?,
             ..Default::default()
         };
         let handle = screen_stream::receiver::start_receiver(config, tx)?;
@@ -141,11 +149,28 @@ pub fn start_screen_receiver(port: u16) -> anyhow::Result<RsScreenReceiver> {
     }
     #[cfg(not(desktop))]
     {
-        let _ = port;
+        let _ = (port, key_hex);
         anyhow::bail!("screen receiving is not supported on this platform yet")
     }
 }
 
+/// Parses the 64-character hex session key used by the data plane. An empty
+/// string means "no encryption" (older peers / local debugging only).
+#[cfg(desktop)]
+fn parse_session_key(raw: &str) -> anyhow::Result<Option<[u8; 32]>> {
+    if raw.is_empty() {
+        return Ok(None);
+    }
+    if raw.len() != 64 {
+        anyhow::bail!("session key must be 64 hexadecimal characters");
+    }
+    let mut out = [0u8; 32];
+    for (index, byte) in out.iter_mut().enumerate() {
+        *byte = u8::from_str_radix(&raw[index * 2..index * 2 + 2], 16)
+            .map_err(|_| anyhow::anyhow!("session key is not valid hexadecimal"))?;
+    }
+    Ok(Some(out))
+}
 #[cfg(desktop)]
 fn map_event(event: screen_stream::events::StreamEvent) -> Option<RsScreenEvent> {
     use screen_stream::events::StreamEvent;

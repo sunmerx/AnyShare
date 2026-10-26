@@ -2,6 +2,18 @@
 //! Usage: ss-send [--output <index|name>] [--target IP:PORT] [--bitrate BPS]
 //!                [--seconds N] [--timeout-ms N]
 
+/// Parses a 64-character hex session key (AES-256).
+fn parse_key(raw: &str) -> anyhow::Result<[u8; 32]> {
+    if raw.len() != 64 {
+        anyhow::bail!("--key must be 64 hexadecimal characters");
+    }
+    let mut out = [0u8; 32];
+    for (index, byte) in out.iter_mut().enumerate() {
+        *byte = u8::from_str_radix(&raw[index * 2..index * 2 + 2], 16)
+            .map_err(|_| anyhow::anyhow!("--key is not valid hexadecimal"))?;
+    }
+    Ok(out)
+}
 fn main() {
     #[cfg(not(windows))]
     {
@@ -75,6 +87,13 @@ fn run() -> anyhow::Result<()> {
         }
         i += 1;
     }
+    // The key is read from the environment, never from argv: command lines are
+    // visible to other users/process auditors and end up in shell history.
+    config.session_key = std::env::var("ANYSHARE_KEY")
+        .ok()
+        .filter(|value| !value.is_empty())
+        .map(|value| parse_key(&value))
+        .transpose()?;
 
     let (event_tx, event_rx) = std::sync::mpsc::channel::<StreamEvent>();
     // Same semantics as before the refactor: --seconds 0 exits immediately.

@@ -53,6 +53,17 @@
 - `pubspec.lock`:8 个 build 工具链传递依赖小版本再解析(archive/build_config/build_daemon 等,仅 codegen 使用;官方源解析,运行时依赖零漂移)
 - `app/pubspec.yaml`:description 重写、homepage → github.com/sunmerx/AnyShare
 
+### C1 数据面加密批次(2026-10-27,应用侧暂不启用)
+
+- `packages/screen-stream/Cargo.toml`:新增 `aes-gcm`
+- `packages/screen-stream/src/transport.rs`:AES-256-GCM 原地加解密(头部作 AAD、nonce=session||frame_id||kind_seq)、`Packet::header_bytes()`、`packetize` data seq 断言;2 个单测
+- `packages/screen-stream/src/sender.rs`:`SenderConfig.session_key`;统一 `encode_packets(packets, cipher)`(含 SPS/PPS 与 shutdown 尾包);启动日志标注加密状态
+- `packages/screen-stream/src/receiver.rs`:`ReceiverConfig.session_key`;解密失败计 `auth_fail` 并丢包
+- `packages/screen-stream/src/bin/{ss-send,ss-view}.rs`:密钥只从 `ANYSHARE_KEY` 环境变量读取
+- `packages/localsend_isolates/rust/src/api/screen.rs` + FRB:`start_*` 增加 `key_hex`;非法密钥 fail-closed;Dart 侧 `keyHex` 参数已就绪但传 `null`
+- 阻塞项:控制面(/screen/*,53318)为明文 HTTP,密钥无法安全分发;应用保持明文,Rust 能力与 CLI 通道保留
+- 47 Rust + 240 Dart 测试;文档 `docs/E2-S0/串流数据面加密.md`
+
 ### B1 时延校准与帧率闭环批次(2026-10-27)
 
 - `packages/screen-stream/src/transport.rs`:LatPing/LatPong(ANYSLAT1/2)、`clock_offset_us` 纯函数;2 个单测

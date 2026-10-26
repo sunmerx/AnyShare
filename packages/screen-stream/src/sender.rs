@@ -14,6 +14,9 @@ use crate::events::{EndReason, StreamEvent, StreamState, StreamStats};
 pub struct SenderConfig {
     /// `ip:port` of the receiver's data plane.
     pub target: String,
+    /// AES-256-GCM session key for the data plane (None = plaintext, used by
+    /// the CLI/debug path). Exchanged over the authenticated control plane.
+    pub session_key: Option<[u8; 32]>,
     /// Output index (as string) or device-name substring; `None` auto-picks.
     pub output: Option<String>,
     pub bitrate_bps: u32,
@@ -34,6 +37,7 @@ impl Default for SenderConfig {
     fn default() -> Self {
         Self {
             target: String::new(),
+            session_key: None,
             output: None,
             bitrate_bps: 14_000_000,
             fps: 60,
@@ -161,10 +165,19 @@ mod imp {
         bytes: std::sync::atomic::AtomicU64,
     }
 
-    fn encode_packets(packets: &[Packet]) -> Vec<(bool, Vec<u8>, usize)> {
+    /// Encodes packets for the wire, sealing the payload when a session key is
+    /// present. The 30-byte header stays readable (AAD) so the receiver can
+    /// route/sequence before decrypting.
+    fn encode_packets(packets: &[Packet], cipher: Option<&aes_gcm::Aes256Gcm>) -> Vec<(bool, Vec<u8>, usize)> {
         packets
             .iter()
-            .map(|packet| (packet.is_fec(), packet.encode(), packet.payload.len()))
+            .map(|packet| {
+                let mut sealed = packet.clone();
+                if let Some(cipher) = cipher {
+                    let _ = crate::transport::seal_packet(cipher, &mut sealed);
+                }
+                (packet.is_fec(), sealed.encode(), packet.payload.len())
+            })
             .collect()
     }
 
@@ -757,6 +770,11 @@ mod imp {
         stats: Arc<Mutex<StreamStats>>,
         event_tx: &Sender<StreamEvent>,
     ) -> Result<()> {
+        let cipher = config.session_key.as_ref().and_then(|key| crate::transport::cipher_from_key(key));
+        eprintln!(
+            "sender: data plane encryption = {}",
+            if cipher.is_some() { "AES-256-GCM" } else { "OFF (plaintext)" }
+        );
         let mut gate = VfrGate::new(VfrConfig::with_intra_refresh(encoder.gradual_intra_refresh()));
         if encoder.gradual_intra_refresh() {
             eprintln!("sender: gradual intra refresh enabled (periodic keyframes relaxed to 10s)");
@@ -800,7 +818,7 @@ mod imp {
             // network writer keeps everything in FIFO order.
             let _ = net_tx.try_send(NetJob {
                 frame_id: 0,
-                packets: encode_packets(&packets),
+                packets: encode_packets(&packets, cipher.as_ref()),
             });
         }
 
@@ -1052,7 +1070,7 @@ mod imp {
                             let queued = net_tx
                                 .try_send(NetJob {
                                     frame_id,
-                                    packets: encode_packets(&packets),
+                                    packets: encode_packets(&packets, cipher.as_ref()),
                                 })
                                 .is_ok();
                             if !queued {
@@ -1147,7 +1165,7 @@ mod imp {
                             let packets = packetize(session, frame_id, flags, out_ts, payload);
                             let job = NetJob {
                                 frame_id,
-                                packets: encode_packets(&packets),
+                                packets: encode_packets(&packets, cipher.as_ref()),
                             };
                             let pipeline_age_ms = std::time::SystemTime::now()
                                 .duration_since(std::time::UNIX_EPOCH)
@@ -1271,10 +1289,12 @@ mod imp {
         send_event(event_tx, StreamEvent::Status(StreamState::Stopping));
         for chunk in encoder.shutdown()? {
             let packets = packetize(session, frame_id, 0, last_send_time_100ns.max(0) as u64, &chunk);
-            for packet in &packets {
-                if send_udp(&socket, &packet.encode()).is_ok() {
+            // Same encryption path as live frames: a plaintext tail would both
+            // leak content and be rejected by an encrypted receiver.
+            for (_, bytes, payload_len) in encode_packets(&packets, cipher.as_ref()) {
+                if send_udp(&socket, &bytes).is_ok() {
                     net_counters.packets.fetch_add(1, Ordering::Relaxed);
-                    net_counters.bytes.fetch_add(packet.payload.len() as u64, Ordering::Relaxed);
+                    net_counters.bytes.fetch_add(payload_len as u64, Ordering::Relaxed);
                 }
             }
             frame_id = frame_id.wrapping_add(1);

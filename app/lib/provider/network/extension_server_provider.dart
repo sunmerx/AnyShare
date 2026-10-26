@@ -445,6 +445,7 @@ extension ExtensionServerHandler on ExtensionServerService {
         return;
       }
       final action = HandleScreenOfferAction(
+        keyHex: body['key'] as String?,
         peerIp: request.connectionInfo!.remoteAddress.address.replaceAll('::ffff:', ''),
         peerFingerprint: body['fingerprint'] as String,
         peerAlias: (body['alias'] as String?) ?? '???',

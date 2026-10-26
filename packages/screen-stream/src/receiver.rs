@@ -31,6 +31,9 @@ pub enum ReceiverDecoder {
 
 pub struct ReceiverConfig {
     pub port: u16,
+    /// AES-256-GCM session key for the data plane (None = plaintext). The key
+    /// arrives over the authenticated control plane, never over this socket.
+    pub session_key: Option<[u8; 32]>,
     pub decoder: ReceiverDecoder,
     pub window_title: String,
     pub scale: f32,
@@ -43,6 +46,7 @@ impl Default for ReceiverConfig {
     fn default() -> Self {
         Self {
             port: 53319,
+            session_key: None,
             decoder: ReceiverDecoder::Auto,
             window_title: "AnyShare Viewer".to_string(),
             scale: 1.0,
@@ -232,7 +236,15 @@ pub fn start_receiver(config: ReceiverConfig, event_tx: Sender<StreamEvent>) -> 
         let event_tx = event_tx.clone();
         let verbose = config.verbose;
         joins.push(std::thread::spawn(move || {
-            if let Err(e) = receive_loop(socket, tx, event_tx.clone(), verbose, Arc::clone(&stop), shared) {
+            if let Err(e) = receive_loop(
+                socket,
+                tx,
+                event_tx.clone(),
+                config.session_key,
+                verbose,
+                Arc::clone(&stop),
+                shared,
+            ) {
                 eprintln!("receiver: receive thread: {e:#}");
                 *reason.lock().unwrap() = Some(EndReason::Error);
                 let _ = event_tx.send(StreamEvent::Error(format!("{e:#}")));
@@ -1308,6 +1320,7 @@ fn receive_loop(
     socket: std::net::UdpSocket,
     tx: std::sync::mpsc::SyncSender<Delivered>,
     events: Sender<StreamEvent>,
+    session_key: Option<[u8; 32]>,
     verbose: bool,
     stop: Arc<AtomicBool>,
     shared: Arc<Shared>,
@@ -1326,6 +1339,8 @@ fn receive_loop(
     // Best-of-N clock samples: the minimum-RTT sample is the least biased by
     // asymmetric queueing on either direction.
     let mut latency_samples: std::collections::VecDeque<(i64, u64)> = std::collections::VecDeque::new();
+    let cipher = session_key.as_ref().and_then(|key| crate::transport::cipher_from_key(key));
+    let mut auth_failures: u64 = 0;
     let nack_enabled = std::env::var("ANYSHARE_NACK").map(|value| value != "0").unwrap_or(true);
     let mut nacks_sent: u64 = 0;
     let mut dropped_frames: u64 = 0;
@@ -1367,7 +1382,14 @@ fn receive_loop(
                     }
                     continue;
                 }
-                if let Some(packet) = Packet::decode(&buffer[..len]) {
+                if let Some(mut packet) = Packet::decode(&buffer[..len]) {
+                    if let Some(cipher) = cipher.as_ref() {
+                        if !crate::transport::open_packet(cipher, &mut packet) {
+                            // Tampered or wrong key: drop silently, count it.
+                            auth_failures += 1;
+                            continue;
+                        }
+                    }
                     // Only the current session's peer may redirect NACKs: a
                     // stray datagram must not turn us into a reflector.
                     if reassembler.session().is_none_or(|session| session == packet.session) {
@@ -1496,14 +1518,15 @@ fn receive_loop(
         if last_stats.elapsed() >= Duration::from_secs(5) {
             let stats = reassembler.stats();
             eprintln!(
-                "recv: delivered={} lost={} recovered={} dup={} stale={} nacks={} dropped={}",
+                "recv: delivered={} lost={} recovered={} dup={} stale={} nacks={} dropped={} auth_fail={}",
                 stats.delivered,
                 stats.lost_frames,
                 stats.recovered_frames,
                 stats.duplicate_packets,
                 stats.stale_packets,
                 nacks_sent,
-                dropped_frames
+                dropped_frames,
+                auth_failures
             );
             last_stats = Instant::now();
         }

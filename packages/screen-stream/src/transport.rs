@@ -51,18 +51,25 @@ impl Packet {
         self.flags & FLAG_FEC != 0
     }
 
+    /// The fixed 30-byte header, without the payload.
+    pub fn header_bytes(&self) -> [u8; HEADER_LEN] {
+        let mut out = [0u8; HEADER_LEN];
+        out[0..4].copy_from_slice(&MAGIC.to_le_bytes());
+        out[4..6].copy_from_slice(&VERSION.to_le_bytes());
+        out[6] = self.flags;
+        out[7] = 0;
+        out[8..12].copy_from_slice(&self.session.to_le_bytes());
+        out[12..16].copy_from_slice(&self.frame_id.to_le_bytes());
+        out[16..18].copy_from_slice(&self.seq.to_le_bytes());
+        out[18..20].copy_from_slice(&self.count.to_le_bytes());
+        out[20..28].copy_from_slice(&self.timestamp_100ns.to_le_bytes());
+        out[28..30].copy_from_slice(&(self.payload.len() as u16).to_le_bytes());
+        out
+    }
+
     pub fn encode(&self) -> Vec<u8> {
         let mut out = Vec::with_capacity(HEADER_LEN + self.payload.len());
-        out.extend_from_slice(&MAGIC.to_le_bytes());
-        out.extend_from_slice(&VERSION.to_le_bytes());
-        out.push(self.flags);
-        out.push(0);
-        out.extend_from_slice(&self.session.to_le_bytes());
-        out.extend_from_slice(&self.frame_id.to_le_bytes());
-        out.extend_from_slice(&self.seq.to_le_bytes());
-        out.extend_from_slice(&self.count.to_le_bytes());
-        out.extend_from_slice(&self.timestamp_100ns.to_le_bytes());
-        out.extend_from_slice(&(self.payload.len() as u16).to_le_bytes());
+        out.extend_from_slice(&self.header_bytes());
         out.extend_from_slice(&self.payload);
         out
     }
@@ -97,6 +104,80 @@ impl Packet {
             payload: buffer[HEADER_LEN..HEADER_LEN + payload_len].to_vec(),
         })
     }
+}
+
+// ---------------------------------------------------------------------------
+// Data-plane encryption (AES-256-GCM)
+//
+// Screen content must never travel as plaintext H.264 over a LAN. The session
+// key (32 bytes) is exchanged over the authenticated control plane (the
+// existing HTTPS endpoint with mutual certificates), never over this socket.
+//
+// Only the PAYLOAD is encrypted; the 30-byte header stays readable so packets
+// can be routed/sequenced before decryption, and the header bytes (without the
+// payload-length field) are authenticated as AAD, so an attacker cannot flip
+// session/frame/sequence numbers without the tag check failing.
+//
+// Nonce = session(4 LE) || frame_id(4 LE) || kind/seq(4 LE)
+//   kind/seq = seq                     for data packets
+//            = 0x8000_0000 | seq       for FEC parity packets
+// Retransmissions repeat a nonce with byte-identical plaintext, which is safe
+// for GCM (same nonce + same plaintext = same ciphertext).
+// ---------------------------------------------------------------------------
+
+use aes_gcm::aead::{AeadInPlace, KeyInit};
+use aes_gcm::{Aes256Gcm, Key, Nonce};
+
+pub const SESSION_KEY_LEN: usize = 32;
+pub const AEAD_TAG_LEN: usize = 16;
+/// AAD covers magic..timestamp, excluding the payload-length field.
+const AAD_LEN: usize = 28;
+
+pub fn cipher_from_key(key: &[u8]) -> Option<Aes256Gcm> {
+    if key.len() != SESSION_KEY_LEN {
+        return None;
+    }
+    Some(Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(key)))
+}
+
+fn packet_nonce(packet: &Packet) -> [u8; 12] {
+    let mut nonce = [0u8; 12];
+    nonce[0..4].copy_from_slice(&packet.session.to_le_bytes());
+    nonce[4..8].copy_from_slice(&packet.frame_id.to_le_bytes());
+    let kind_seq = if packet.is_fec() {
+        0x8000_0000u32 | u32::from(packet.seq)
+    } else {
+        u32::from(packet.seq)
+    };
+    nonce[8..12].copy_from_slice(&kind_seq.to_le_bytes());
+    nonce
+}
+
+fn aad_of(packet: &Packet) -> [u8; AAD_LEN] {
+    let header = packet.header_bytes();
+    let mut aad = [0u8; AAD_LEN];
+    aad.copy_from_slice(&header[..AAD_LEN]);
+    aad
+}
+
+/// Encrypts `packet.payload` in place. Returns false when the key is absent.
+pub fn seal_packet(cipher: &Aes256Gcm, packet: &mut Packet) -> bool {
+    let aad = aad_of(packet);
+    let nonce_bytes = packet_nonce(packet);
+    let nonce = Nonce::from_slice(&nonce_bytes);
+    match cipher.encrypt_in_place(nonce, &aad, &mut packet.payload) {
+        Ok(()) => true,
+        Err(_) => false,
+    }
+}
+
+/// Decrypts `packet.payload` in place. `false` means authentication failed:
+/// the caller must drop the packet.
+pub fn open_packet(cipher: &Aes256Gcm, packet: &mut Packet) -> bool {
+    let aad = aad_of(packet);
+    let nonce_bytes = packet_nonce(packet);
+    let nonce = Nonce::from_slice(&nonce_bytes);
+    cipher.decrypt_in_place(nonce, &aad, &mut packet.payload).is_ok()
 }
 
 // ---------------------------------------------------------------------------
@@ -286,6 +367,10 @@ pub fn packetize(
 ) -> Vec<Packet> {
     let chunk_size = DEFAULT_PAYLOAD;
     let data_count = payload.len().max(1).div_ceil(chunk_size);
+    // Nonce domain separation reserves 0x8000_0000 for FEC parity packets; a
+    // data-only payload can never reach 32768 packets (the encoder's output
+    // capacity is 8 MiB ≈ 7000 packets), so this guard only catches bugs.
+    assert!(data_count <= 0x7fff, "access unit too large for the nonce layout");
     let mut packets = Vec::with_capacity(data_count + data_count.div_ceil(FEC_BLOCK));
 
     for index in 0..data_count {
@@ -680,6 +765,66 @@ mod tests {
         Instant::now()
     }
 
+    fn test_key() -> [u8; 32] {
+        [7u8; 32]
+    }
+
+    #[test]
+    fn sealed_payload_roundtrips_and_detects_tampering() {
+        let cipher = cipher_from_key(&test_key()).unwrap();
+        let mut packet = Packet {
+            session: 9,
+            frame_id: 3,
+            seq: 1,
+            count: 2,
+            flags: FLAG_KEYFRAME,
+            timestamp_100ns: 42,
+            payload: b"screen content".to_vec(),
+        };
+        assert!(seal_packet(&cipher, &mut packet), "sealing must succeed");
+        assert_ne!(packet.payload, b"screen content".to_vec(), "payload is encrypted");
+        assert_eq!(packet.payload.len(), 14 + AEAD_TAG_LEN);
+
+        // Wire round trip then decrypt.
+        let mut received = Packet::decode(&packet.encode()).unwrap();
+        assert!(open_packet(&cipher, &mut received));
+        assert_eq!(received.payload, b"screen content".to_vec());
+
+        // Tampered ciphertext must fail authentication.
+        let mut tampered = Packet::decode(&packet.encode()).unwrap();
+        tampered.payload[0] ^= 0xff;
+        assert!(!open_packet(&cipher, &mut tampered));
+
+        // Tampered header (frame id) must also fail: the header is AAD.
+        let mut shifted = Packet::decode(&packet.encode()).unwrap();
+        shifted.frame_id += 1;
+        assert!(!open_packet(&cipher, &mut shifted), "header is authenticated");
+
+        // A different key cannot decrypt.
+        let other = cipher_from_key(&[8u8; 32]).unwrap();
+        let mut foreign = Packet::decode(&packet.encode()).unwrap();
+        assert!(!open_packet(&other, &mut foreign));
+
+        assert!(cipher_from_key(&[0u8; 31]).is_none(), "only 32-byte keys");
+    }
+
+    #[test]
+    fn nonce_differs_for_data_parity_and_frames() {
+        let base = Packet {
+            session: 1,
+            frame_id: 2,
+            seq: 3,
+            count: 4,
+            flags: 0,
+            timestamp_100ns: 0,
+            payload: vec![],
+        };
+        let data = packet_nonce(&base);
+        let parity = packet_nonce(&Packet { flags: FLAG_FEC, ..base.clone() });
+        let other_frame = packet_nonce(&Packet { frame_id: 3, ..base.clone() });
+        assert_ne!(data, parity);
+        assert_ne!(data, other_frame);
+    }
     #[test]
     fn latency_probe_roundtrip() {
         let ping = LatPing {

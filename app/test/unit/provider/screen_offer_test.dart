@@ -61,13 +61,16 @@ class FakeScreenEngine implements ScreenEngine {
   final List<String> startedSenders = [];
   final List<int?> senderMaxWidths = [];
   final List<int?> senderMaxHeights = [];
+  final List<String?> senderKeys = [];
+  final List<String?> receiverKeys = [];
   final List<int> startedReceivers = [];
   final List<FakeScreenSession> sessions = [];
   ScreenSize? monitorSizeValue = const ScreenSize(2048, 1280);
 
   @override
-  Future<ScreenEngineSession> startSender({required String host, required int port, int? maxWidth, int? maxHeight}) async {
+  Future<ScreenEngineSession> startSender({required String host, required int port, int? maxWidth, int? maxHeight, String? keyHex}) async {
     startedSenders.add('$host:$port');
+    senderKeys.add(keyHex);
     senderMaxWidths.add(maxWidth);
     senderMaxHeights.add(maxHeight);
     final session = FakeScreenSession();
@@ -76,8 +79,9 @@ class FakeScreenEngine implements ScreenEngine {
   }
 
   @override
-  Future<ScreenEngineSession> startReceiver({required int port}) async {
+  Future<ScreenEngineSession> startReceiver({required int port, String? keyHex}) async {
     startedReceivers.add(port);
+    receiverKeys.add(keyHex);
     final session = FakeScreenSession()..monitorSizeValue = monitorSizeValue;
     sessions.add(session);
     return session;
@@ -362,6 +366,33 @@ void main() {
     expect(state.waiting, isNull);
   });
 
+  test('the data-plane key is NOT shipped over the plain-HTTP control plane', () async {
+    // Security backlog: AES-256-GCM exists in the Rust engine, but the key may
+    // only travel over an authenticated (TLS) channel. Until the extension
+    // server speaks TLS, the app must stay on the plaintext data path.
+    await container.redux(screenProvider).dispatchAsync(StartScreenShareAction(peerIp: '127.0.0.1', peerAlias: 'Peer'));
+
+    final offerBody =
+        jsonDecode(
+              peerBodies.firstWhere((entry) => entry.$1.endsWith('/screen/offer')).$2,
+            )
+            as Map<String, dynamic>;
+    expect(offerBody.containsKey('key'), isFalse);
+    expect(engine.senderKeys.single, isNull, reason: 'no key -> plaintext, matching the receiver');
+  });
+  test('receiver passes the offered key to its engine', () async {
+    await addFavorite(fingerprint: 'FPPEER01', trustLevel: TrustLevel.full);
+    final (status, _) = await post('screen/offer', {
+      'fingerprint': 'FPPEER01',
+      'ownerId': 'peer-owner',
+      'ownerName': 'Peer Owner',
+      'alias': 'PeerDevice',
+      'key': 'ab' * 32,
+    });
+
+    expect(status, 200);
+    expect(engine.receiverKeys.single, 'ab' * 32);
+  });
   test('auto-accept reports the receiver monitor size to the sender', () async {
     await addFavorite(fingerprint: 'FPPEER01', trustLevel: TrustLevel.full);
     final (status, body) = await offer();

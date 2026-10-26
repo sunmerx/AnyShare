@@ -131,9 +131,21 @@ class ScreenSenderSession {
 
   ScreenSenderSession._(this._inner);
 
-  static Future<ScreenSenderSession> start({required String host, required int port, int? maxWidth, int? maxHeight}) async {
+  static Future<ScreenSenderSession> start({
+    required String host,
+    required int port,
+    int? maxWidth,
+    int? maxHeight,
+    String? keyHex,
+  }) async {
     return ScreenSenderSession._(
-      await rust.startScreenSender(host: host, port: port, maxWidth: maxWidth ?? 0, maxHeight: maxHeight ?? 0),
+      await rust.startScreenSender(
+        host: host,
+        port: port,
+        maxWidth: maxWidth ?? 0,
+        maxHeight: maxHeight ?? 0,
+        keyHex: keyHex ?? '',
+      ),
     );
   }
 
@@ -161,8 +173,8 @@ class ScreenReceiverSession {
 
   ScreenReceiverSession._(this._inner);
 
-  static Future<ScreenReceiverSession> start({required int port}) async {
-    return ScreenReceiverSession._(await rust.startScreenReceiver(port: port));
+  static Future<ScreenReceiverSession> start({required int port, String? keyHex}) async {
+    return ScreenReceiverSession._(await rust.startScreenReceiver(port: port, keyHex: keyHex ?? ''));
   }
 
   /// Emits events until the session ends (window closed, stopped or failed;

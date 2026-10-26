@@ -3901,11 +3901,13 @@ fn wire__crate__api__screen__start_screen_receiver_impl(
             let mut deserializer =
                 flutter_rust_bridge::for_generated::SseDeserializer::new(message);
             let api_port = <u16>::sse_decode(&mut deserializer);
+            let api_key_hex = <String>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
                 transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
                     (move || {
-                        let output_ok = crate::api::screen::start_screen_receiver(api_port)?;
+                        let output_ok =
+                            crate::api::screen::start_screen_receiver(api_port, api_key_hex)?;
                         Ok(output_ok)
                     })(),
                 )
@@ -3939,6 +3941,7 @@ fn wire__crate__api__screen__start_screen_sender_impl(
             let api_port = <u16>::sse_decode(&mut deserializer);
             let api_max_width = <u32>::sse_decode(&mut deserializer);
             let api_max_height = <u32>::sse_decode(&mut deserializer);
+            let api_key_hex = <String>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
                 transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
@@ -3948,6 +3951,7 @@ fn wire__crate__api__screen__start_screen_sender_impl(
                             api_port,
                             api_max_width,
                             api_max_height,
+                            api_key_hex,
                         )?;
                         Ok(output_ok)
                     })(),

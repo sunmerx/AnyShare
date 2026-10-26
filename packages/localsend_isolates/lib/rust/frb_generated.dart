@@ -325,9 +325,15 @@ abstract class RustLibApi extends BaseApi {
     required BigInt timeoutMs,
   });
 
-  Future<RsScreenReceiver> crateApiScreenStartScreenReceiver({required int port});
+  Future<RsScreenReceiver> crateApiScreenStartScreenReceiver({required int port, required String keyHex});
 
-  Future<RsScreenSender> crateApiScreenStartScreenSender({required String host, required int port, required int maxWidth, required int maxHeight});
+  Future<RsScreenSender> crateApiScreenStartScreenSender({
+    required String host,
+    required int port,
+    required int maxWidth,
+    required int maxHeight,
+    required String keyHex,
+  });
 
   Future<RsHttpServer> crateApiServerStartServer({
     required int port,
@@ -2448,12 +2454,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   );
 
   @override
-  Future<RsScreenReceiver> crateApiScreenStartScreenReceiver({required int port}) {
+  Future<RsScreenReceiver> crateApiScreenStartScreenReceiver({required int port, required String keyHex}) {
     return handler.executeNormal(
       NormalTask(
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_u_16(port, serializer);
+          sse_encode_String(keyHex, serializer);
           pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 69, port: port_);
         },
         codec: SseCodec(
@@ -2461,7 +2468,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_AnyhowException,
         ),
         constMeta: kCrateApiScreenStartScreenReceiverConstMeta,
-        argValues: [port],
+        argValues: [port, keyHex],
         apiImpl: this,
       ),
     );
@@ -2469,11 +2476,17 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
   TaskConstMeta get kCrateApiScreenStartScreenReceiverConstMeta => const TaskConstMeta(
     debugName: 'start_screen_receiver',
-    argNames: ['port'],
+    argNames: ['port', 'keyHex'],
   );
 
   @override
-  Future<RsScreenSender> crateApiScreenStartScreenSender({required String host, required int port, required int maxWidth, required int maxHeight}) {
+  Future<RsScreenSender> crateApiScreenStartScreenSender({
+    required String host,
+    required int port,
+    required int maxWidth,
+    required int maxHeight,
+    required String keyHex,
+  }) {
     return handler.executeNormal(
       NormalTask(
         callFfi: (port_) {
@@ -2482,6 +2495,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_u_16(port, serializer);
           sse_encode_u_32(maxWidth, serializer);
           sse_encode_u_32(maxHeight, serializer);
+          sse_encode_String(keyHex, serializer);
           pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 70, port: port_);
         },
         codec: SseCodec(
@@ -2489,7 +2503,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_AnyhowException,
         ),
         constMeta: kCrateApiScreenStartScreenSenderConstMeta,
-        argValues: [host, port, maxWidth, maxHeight],
+        argValues: [host, port, maxWidth, maxHeight, keyHex],
         apiImpl: this,
       ),
     );
@@ -2497,7 +2511,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
   TaskConstMeta get kCrateApiScreenStartScreenSenderConstMeta => const TaskConstMeta(
     debugName: 'start_screen_sender',
-    argNames: ['host', 'port', 'maxWidth', 'maxHeight'],
+    argNames: ['host', 'port', 'maxWidth', 'maxHeight', 'keyHex'],
   );
 
   @override

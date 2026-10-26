@@ -39,9 +39,9 @@ const Duration kScreenOfferTtl = Duration(seconds: 60);
 
 /// Session abstraction so tests can run without the Rust engine.
 abstract class ScreenEngine {
-  Future<ScreenEngineSession> startSender({required String host, required int port, int? maxWidth, int? maxHeight});
+  Future<ScreenEngineSession> startSender({required String host, required int port, int? maxWidth, int? maxHeight, String? keyHex});
 
-  Future<ScreenEngineSession> startReceiver({required int port});
+  Future<ScreenEngineSession> startReceiver({required int port, String? keyHex});
 }
 
 abstract class ScreenEngineSession {
@@ -73,15 +73,15 @@ class FrbScreenEngine implements ScreenEngine {
   const FrbScreenEngine();
 
   @override
-  Future<ScreenEngineSession> startSender({required String host, required int port, int? maxWidth, int? maxHeight}) async {
+  Future<ScreenEngineSession> startSender({required String host, required int port, int? maxWidth, int? maxHeight, String? keyHex}) async {
     return _SenderAdapter(
-      await ScreenSenderSession.start(host: host, port: port, maxWidth: maxWidth, maxHeight: maxHeight),
+      await ScreenSenderSession.start(host: host, port: port, maxWidth: maxWidth, maxHeight: maxHeight, keyHex: keyHex),
     );
   }
 
   @override
-  Future<ScreenEngineSession> startReceiver({required int port}) async {
-    return _ReceiverAdapter(await ScreenReceiverSession.start(port: port));
+  Future<ScreenEngineSession> startReceiver({required int port, String? keyHex}) async {
+    return _ReceiverAdapter(await ScreenReceiverSession.start(port: port, keyHex: keyHex));
   }
 }
 
@@ -194,6 +194,9 @@ class ActiveScreenSession {
 /// Incoming offer waiting for the local user to confirm (D2 limited/unknown).
 class PendingScreenOffer {
   final String sessionId;
+
+  /// AES-256 session key (hex) offered by the sender for the data plane.
+  final String? keyHex;
   final String peerIp;
   final String peerFingerprint;
   final String peerAlias;
@@ -201,6 +204,7 @@ class PendingScreenOffer {
 
   const PendingScreenOffer({
     required this.sessionId,
+    this.keyHex,
     required this.peerIp,
     required this.peerFingerprint,
     required this.peerAlias,
@@ -211,6 +215,10 @@ class PendingScreenOffer {
 /// Outgoing offer answered with `pending`; waiting for the receiver's accept.
 class WaitingScreenAccept {
   final String sessionId;
+
+  /// Session key generated for this offer; the sender engine must use the
+  /// same key the receiver was told about.
+  final String? keyHex;
   final String peerIp;
   final String peerAlias;
 
@@ -218,6 +226,7 @@ class WaitingScreenAccept {
     required this.sessionId,
     required this.peerIp,
     required this.peerAlias,
+    this.keyHex,
   });
 }
 
@@ -543,9 +552,12 @@ class ScreenService extends ReduxNotifier<ScreenState> {
     String? sessionId,
     int? maxHeight,
     int? maxWidth,
+    String? keyHex,
   }) async {
     try {
-      final session = await ref.read(screenEngineProvider).startSender(host: peerIp, port: port, maxWidth: maxWidth, maxHeight: maxHeight);
+      final session = await ref
+          .read(screenEngineProvider)
+          .startSender(host: peerIp, port: port, maxWidth: maxWidth, maxHeight: maxHeight, keyHex: keyHex);
       final id = sessionId ?? const Uuid().v4();
       cancelTimer();
       await attach(id, session);
@@ -569,9 +581,9 @@ class ScreenService extends ReduxNotifier<ScreenState> {
   /// Starts a receiver session; returns the new state or `null` on failure.
   /// Arms a watchdog: a session that never receives frames is torn down
   /// instead of leaving an empty window around.
-  Future<ScreenState?> startReceiverSession(String peerIp, String peerAlias, String sessionId) async {
+  Future<ScreenState?> startReceiverSession(String peerIp, String peerAlias, String sessionId, {String? keyHex}) async {
     try {
-      final session = await ref.read(screenEngineProvider).startReceiver(port: kScreenDataPort);
+      final session = await ref.read(screenEngineProvider).startReceiver(port: kScreenDataPort, keyHex: keyHex);
       cancelTimer();
       await attach(sessionId, session);
       startTimer(const Duration(seconds: 15), () {
@@ -643,11 +655,18 @@ class StartScreenShareAction extends AsyncReduxAction<ScreenService, ScreenState
     }
     notifier.startingShare = true;
     try {
+      // Data-plane encryption is implemented (AES-256-GCM) but DISABLED until
+      // the control plane is TLS: over the current plain-HTTP extension server
+      // the key would travel in clear text (see the security backlog).
       final (status, body) = await postScreenControl(peerIp, notifier.controlPort, 'screen/offer', {
         'fingerprint': notifier.ref.read(securityProvider).certificateHash,
         'ownerId': notifier.ref.read(ownerProvider).id,
         'ownerName': notifier.ref.read(ownerProvider).name,
         'alias': notifier.alias,
+        // TODO(security): ship the session key once the control plane is TLS.
+        // Over the current plain-HTTP extension server the key would travel in
+        // clear text, so the app intentionally stays on the plaintext data path.
+        // 'key': sessionKey,
       });
 
       if (status == 200 && body?['ok'] == true) {
@@ -700,10 +719,14 @@ class HandleScreenOfferAction extends AsyncReduxActionWithResult<ScreenService, 
   final String peerFingerprint;
   final String peerAlias;
 
+  /// AES-256 session key (hex) proposed by the sender, if any.
+  final String? keyHex;
+
   HandleScreenOfferAction({
     required this.peerIp,
     required this.peerFingerprint,
     required this.peerAlias,
+    this.keyHex,
   });
 
   @override
@@ -733,6 +756,7 @@ class HandleScreenOfferAction extends AsyncReduxActionWithResult<ScreenService, 
         final next = state.copyWith(
           pendingOffer: PendingScreenOffer(
             sessionId: sessionId,
+            keyHex: keyHex,
             peerIp: peerIp,
             peerFingerprint: peerFingerprint,
             peerAlias: peerAlias,
@@ -745,7 +769,7 @@ class HandleScreenOfferAction extends AsyncReduxActionWithResult<ScreenService, 
         final sessionId = const Uuid().v4();
         notifier.startingOffer = true;
         try {
-          final started = await notifier.startReceiverSession(peerIp, peerAlias, sessionId);
+          final started = await notifier.startReceiverSession(peerIp, peerAlias, sessionId, keyHex: keyHex);
           final viewport = started != null ? await notifier.receiverMonitorSize() : null;
           if (started != null && notifier._engineEnded) {
             // The viewer died while we polled for its size: fail the offer.
@@ -788,7 +812,7 @@ class AcceptPendingScreenOfferAction extends AsyncReduxAction<ScreenService, Scr
     }
     notifier.acceptingOffer = true;
     try {
-      final started = await notifier.startReceiverSession(pending.peerIp, pending.peerAlias, pending.sessionId);
+      final started = await notifier.startReceiverSession(pending.peerIp, pending.peerAlias, pending.sessionId, keyHex: pending.keyHex);
       if (started == null) {
         return state.copyWith(clearPendingOffer: true, lastError: t.ui2.screen.errStartReceiverFailed);
       }

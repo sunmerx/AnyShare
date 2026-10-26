@@ -9,19 +9,25 @@ import 'package:localsend_isolates/rust/frb_generated.dart';
 
 part 'screen.freezed.dart';
 
-// These functions are ignored because they are not marked as `pub`: `map_event`
+// These functions are ignored because they are not marked as `pub`: `map_event`, `parse_session_key`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `ReceiverInner`, `SenderInner`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`
 
 /// Starts sending this device's screen to `host:port` (the receiver's data
 /// plane). The screen is auto-picked (smallest attached output) until output
 /// selection is exposed; fixed 1080p60/8Mbps per the E2.0 decision.
-Future<RsScreenSender> startScreenSender({required String host, required int port, required int maxWidth, required int maxHeight}) =>
-    RustLib.instance.api.crateApiScreenStartScreenSender(host: host, port: port, maxWidth: maxWidth, maxHeight: maxHeight);
+Future<RsScreenSender> startScreenSender({
+  required String host,
+  required int port,
+  required int maxWidth,
+  required int maxHeight,
+  required String keyHex,
+}) => RustLib.instance.api.crateApiScreenStartScreenSender(host: host, port: port, maxWidth: maxWidth, maxHeight: maxHeight, keyHex: keyHex);
 
 /// Starts listening for an incoming screen stream on `port` and shows it in a
 /// dedicated native window. Linux uses the native VAAPI decoder.
-Future<RsScreenReceiver> startScreenReceiver({required int port}) => RustLib.instance.api.crateApiScreenStartScreenReceiver(port: port);
+Future<RsScreenReceiver> startScreenReceiver({required int port, required String keyHex}) =>
+    RustLib.instance.api.crateApiScreenStartScreenReceiver(port: port, keyHex: keyHex);
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<RsScreenReceiver>>
 abstract class RsScreenReceiver implements RustOpaqueInterface {

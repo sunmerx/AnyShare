@@ -2,6 +2,18 @@
 //! Usage: ss-view [--port N] [--seconds N] [--scale N]
 //! Build: cargo build --release --features viewer --bin ss-view
 
+/// Parses a 64-character hex session key (AES-256).
+fn parse_key(raw: &str) -> anyhow::Result<[u8; 32]> {
+    if raw.len() != 64 {
+        anyhow::bail!("--key must be 64 hexadecimal characters");
+    }
+    let mut out = [0u8; 32];
+    for (index, byte) in out.iter_mut().enumerate() {
+        *byte = u8::from_str_radix(&raw[index * 2..index * 2 + 2], 16)
+            .map_err(|_| anyhow::anyhow!("--key is not valid hexadecimal"))?;
+    }
+    Ok(out)
+}
 fn main() {
     if let Err(e) = run() {
         eprintln!("ss-view: {e:#}");
@@ -31,6 +43,12 @@ fn run() -> anyhow::Result<()> {
     let mut scale: f32 = 1.0;
     let mut verbose = false;
     let mut decoder_kind = "ffmpeg".to_string();
+    // Read from the environment, never from argv (see ss-send).
+    let session_key: Option<[u8; 32]> = std::env::var("ANYSHARE_KEY")
+        .ok()
+        .filter(|value| !value.is_empty())
+        .map(|value| parse_key(&value))
+        .transpose()?;
     let mut ffmpeg_path = "ffmpeg".to_string();
     let mut hwaccel: Option<String> = None;
     let mut hwaccel_device: Option<String> = None;
@@ -75,6 +93,7 @@ fn run() -> anyhow::Result<()> {
 
     let config = ReceiverConfig {
         port,
+        session_key,
         decoder,
         window_title: "AnyShare Viewer".to_string(),
         scale,
