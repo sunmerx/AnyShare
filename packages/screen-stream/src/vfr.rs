@@ -68,6 +68,10 @@ pub struct VfrStats {
 pub struct VfrGate {
     config: VfrConfig,
     last_encoded: Option<Instant>,
+    /// Absolute time the next encode becomes allowed. Accumulated (instead of a
+    /// plain last+interval comparison) so a 25 fps cap on a 60 Hz source really
+    /// yields 25 fps instead of quantizing to 20.
+    next_allowed: Option<Instant>,
     last_keyframe: Option<Instant>,
     static_since: Option<Instant>,
     stats: VfrStats,
@@ -78,6 +82,7 @@ impl VfrGate {
         Self {
             config,
             last_encoded: None,
+            next_allowed: None,
             last_keyframe: None,
             static_since: None,
             stats: VfrStats::default(),
@@ -86,6 +91,14 @@ impl VfrGate {
 
     pub fn stats(&self) -> VfrStats {
         self.stats
+    }
+
+    /// Runtime frame-rate cap. The receiver reports what it can actually
+    /// decode; encoding faster only builds a decode backlog (= latency).
+    pub fn set_max_fps(&mut self, fps: u32) {
+        self.config.max_fps = fps.clamp(1, 120);
+        // Apply the new cap immediately (no stale deadline from the old one).
+        self.next_allowed = None;
     }
 
     fn has_content_change(meta: &FrameMeta) -> bool {
@@ -127,8 +140,8 @@ impl VfrGate {
             return EncodeDecision::Skip;
         }
 
-        if let Some(last) = self.last_encoded {
-            if now.duration_since(last) < self.min_interval() {
+        if let Some(due) = self.next_allowed {
+            if now < due {
                 self.stats.skipped += 1;
                 self.stats.skipped_rate_limited += 1;
                 return EncodeDecision::Skip;
@@ -144,6 +157,15 @@ impl VfrGate {
 
     fn commit(&mut self, keyframe: bool, now: Instant) -> EncodeDecision {
         self.last_encoded = Some(now);
+        let interval = self.min_interval();
+        if interval > Duration::ZERO {
+            let base = self.next_allowed.map(|due| due.max(now)).unwrap_or(now);
+            // Guard against unbounded catch-up bursts after a long stall.
+            let cap = now + interval.saturating_mul(4);
+            self.next_allowed = Some((base + interval).min(cap));
+        } else {
+            self.next_allowed = None;
+        }
         self.static_since = None;
         if keyframe {
             self.last_keyframe = Some(now);
@@ -262,6 +284,25 @@ mod tests {
         assert_eq!(gate.stats().skipped, 1);
     }
 
+    #[test]
+    fn runtime_frame_rate_cap_limits_encodes() {
+        let mut gate = VfrGate::new(VfrConfig::default());
+        gate.set_max_fps(10); // one encode per 100 ms at most
+        let t0 = Instant::now();
+        assert!(matches!(gate.decide(&changed(), t0), EncodeDecision::Encode { .. }));
+        // 30 ms later: rate limited.
+        assert_eq!(gate.decide(&changed(), t0 + Duration::from_millis(30)), EncodeDecision::Skip);
+        // 110 ms later: allowed again.
+        assert!(matches!(
+            gate.decide(&changed(), t0 + Duration::from_millis(110)),
+            EncodeDecision::Encode { .. }
+        ));
+        // Clamping keeps nonsense values sane.
+        gate.set_max_fps(0);
+        assert_eq!(gate.config.max_fps, 1);
+        gate.set_max_fps(1000);
+        assert_eq!(gate.config.max_fps, 120);
+    }
     #[test]
     fn intra_refresh_relaxes_keyframe_cadence() {
         assert_eq!(VfrConfig::with_intra_refresh(false).force_keyframe_interval, Duration::from_secs(2));

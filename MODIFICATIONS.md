@@ -53,6 +53,18 @@
 - `pubspec.lock`:8 个 build 工具链传递依赖小版本再解析(archive/build_config/build_daemon 等,仅 codegen 使用;官方源解析,运行时依赖零漂移)
 - `app/pubspec.yaml`:description 重写、homepage → github.com/sunmerx/AnyShare
 
+### B1 时延校准与帧率闭环批次(2026-10-27)
+
+- `packages/screen-stream/src/transport.rs`:LatPing/LatPong(ANYSLAT1/2)、`clock_offset_us` 纯函数;2 个单测
+- `packages/screen-stream/src/receiver.rs`:每秒 PING、PONG 最小值采样+合理性过滤、Shared offset/rtt、e2e 校正日志;NV12→ARGB 优化(行切片/2 像素复用 UV)+ 单测
+- `packages/screen-stream/src/sender.rs`:SenderHandle::set_max_fps;net 线程回复 PING
+- `packages/screen-stream/src/vfr.rs`:set_max_fps 立即生效;截止时间累加限速(修 60/k 量化)+ 单测
+- `packages/localsend_isolates/rust/src/api/screen.rs` + FRB:`set_max_fps`
+- `app/lib/provider/screen/screen_provider.dart`:帧率闭环控制律(encoded vs decoded,单次 ±2,10–60 夹紧)
+- `app/test/unit/provider/screen_offer_test.dart`:帧率下调用例
+- 45 Rust + 238 Dart;实测 e2e≈100ms、queue<1ms、dropped=0
+- 文档:`docs/E2-S0/串流时延测量与帧率闭环.md`
+
 ### A6 发送端 pacing 批次(2026-10-27)
 
 - `packages/screen-stream/src/sender.rs`:新增 `Pacer`(线路字节计费、8ms 批量 sleep、33ms 帧预算、catch-up、码率变化 >20% 重置);`spawn_net_thread` 增加 `current_bitrate`;发包前登记 history;批次间 `drain_nacks`;`ANYSHARE_PACE=0` 开关;1 个单测

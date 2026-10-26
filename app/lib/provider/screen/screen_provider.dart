@@ -61,6 +61,10 @@ abstract class ScreenEngineSession {
   /// doubles treat this as a no-op.
   Future<void> setBitrate(int bitrateBps) async {}
 
+  /// Sender sessions: cap the encode frame rate. Receivers and test doubles
+  /// treat this as a no-op.
+  Future<void> setMaxFps(int fps) async {}
+
   Future<void> stop();
 }
 
@@ -102,6 +106,9 @@ class _SenderAdapter implements ScreenEngineSession {
   Future<void> setBitrate(int bitrateBps) => _session.setBitrate(bitrateBps);
 
   @override
+  Future<void> setMaxFps(int fps) => _session.setMaxFps(fps);
+
+  @override
   Future<void> stop() => _session.stop();
 }
 
@@ -127,6 +134,11 @@ class _ReceiverAdapter implements ScreenEngineSession {
   @override
   Future<void> setBitrate(int bitrateBps) async {
     // Receivers never serve bitrate changes (sender-side feature only).
+  }
+
+  @override
+  Future<void> setMaxFps(int fps) async {
+    // Receivers never cap the sender frame rate themselves.
   }
 
   @override
@@ -293,6 +305,8 @@ class ScreenService extends ReduxNotifier<ScreenState> {
     }
     // New session: reset adaptive-quality bookkeeping.
     _currentBitrateBps = null;
+    _senderTargetFps = null;
+    _lastSentFpsTarget = null;
     _lastFeedbackLost = null;
     _lastBitrateFeedbackAt = null;
     _lastBitrateAdjustAt = null;
@@ -375,6 +389,10 @@ class ScreenService extends ReduxNotifier<ScreenState> {
   static const int _initialBitrateBps = 14_000_000;
   static const int _maxBitrateBps = 20_000_000;
   int? _currentBitrateBps;
+
+  /// Encode frame-rate cap agreed with the receiver (starts at 30 fps).
+  int? _senderTargetFps;
+  int? _lastSentFpsTarget;
   int? _lastFeedbackLost;
   DateTime? _lastBitrateFeedbackAt;
   DateTime? _lastBitrateAdjustAt;
@@ -426,18 +444,62 @@ class ScreenService extends ReduxNotifier<ScreenState> {
     }
     if (next == current) {
       _currentBitrateBps = current;
-      return;
+    } else {
+      _currentBitrateBps = next;
+      final bitrateSession = _engineSession;
+      if (bitrateSession != null) {
+        try {
+          await bitrateSession.setBitrate(next);
+        } catch (e) {
+          _logger.fine('changing bitrate failed: $e');
+        }
+      }
     }
-    _currentBitrateBps = next;
-    final session = _engineSession;
-    if (session == null) {
-      return;
+    // Frame-rate control shares the same feedback sample. The sender's own
+    // encoded frames per second (lastStats.frames) is the only way to tell
+    // "the receiver is decode-limited" from "there was little motion".
+    final encodedFrames = state.active?.lastStats?.frames ?? 0;
+    final fpsTarget = nextFpsTarget(encodedFrames: encodedFrames, decodedFrames: frames, lossRate: lossRate);
+    if (fpsTarget != null && fpsTarget != _lastSentFpsTarget) {
+      _lastSentFpsTarget = fpsTarget;
+      final fpsSession = _engineSession;
+      if (fpsSession != null) {
+        try {
+          await fpsSession.setMaxFps(fpsTarget);
+        } catch (e) {
+          _logger.fine('changing frame rate failed: $e');
+        }
+      }
     }
-    try {
-      await session.setBitrate(next);
-    } catch (e) {
-      _logger.fine('changing bitrate failed: $e');
+    return;
+  }
+
+  /// Matches the encode frame rate to what the receiver can actually decode.
+  ///
+  /// `encodedFrames` is what this sender produced in the last window,
+  /// `decodedFrames` what the receiver decoded in the same window. Encoding
+  /// clearly more than the receiver decodes only builds its decode queue
+  /// (latency), so the cap steps down; when the receiver keeps up and the
+  /// encoder is already at the cap, it steps up. Hysteresis (3 fps down,
+  /// 2 fps up, min 10 / max 60) prevents flapping, and a single bad window can
+  /// only move the target by 2 fps.
+  int? nextFpsTarget({required int encodedFrames, required int decodedFrames, required double lossRate}) {
+    if (encodedFrames <= 0 || decodedFrames < 0) {
+      return _senderTargetFps;
     }
+    final current = _senderTargetFps ?? 30;
+    var next = current;
+    if (decodedFrames + 3 < encodedFrames) {
+      final upper = (current - 2).clamp(10, 60);
+      final wanted = (decodedFrames + 2).clamp(10, upper);
+      if (wanted < current) {
+        next = wanted;
+      }
+    } else if (lossRate < 0.005 && encodedFrames >= current - 1 && current < 60) {
+      next = (current + 2).clamp(10, 60);
+    }
+    _senderTargetFps = next;
+    return next;
   }
 
   /// Polls the receiver engine for the monitor size (the native window is

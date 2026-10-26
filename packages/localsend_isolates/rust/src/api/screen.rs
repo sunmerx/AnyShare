@@ -249,6 +249,22 @@ impl RsScreenSender {
         }
     }
 
+    /// Requests an encode frame-rate cap. The receiver reports how many frames
+    /// it decodes per second; encoding faster only grows its backlog.
+    pub fn set_max_fps(&self, fps: u32) {
+        #[cfg(target_os = "windows")]
+        {
+            let inner = self.inner.lock().unwrap();
+            if let Some(handle) = inner.handle.as_ref() {
+                handle.set_max_fps(fps);
+            }
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            let _ = fps;
+        }
+    }
+
     /// Requests a new encoder bitrate (the receiver's adaptive-quality
     /// feedback, relayed by the app control plane). Safe to call while
     /// `listen` runs.

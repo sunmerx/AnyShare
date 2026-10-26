@@ -99,6 +99,95 @@ impl Packet {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Latency probe (clock-offset calibration)
+//
+// The sender stamps every access unit with its own wall clock (epoch, 100 ns).
+// Subtracting that from the receiver's wall clock only yields the true
+// one-way latency when both machines share a clock; independent machines are
+// routinely hundreds of milliseconds apart. The receiver therefore probes the
+// sender over the same UDP socket:
+//
+//   receiver -> sender : PING  {nonce, t1}
+//   sender  -> receiver: PONG  {nonce, t1, t2, t3}
+//
+// t1/t4 are the receiver's clock, t2/t3 the sender's. Assuming symmetric path
+// delay, offset = ((t2 - t1) + (t3 - t4)) / 2 is the sender clock minus the
+// receiver clock, and rtt = (t4 - t1) - (t3 - t2).
+// ---------------------------------------------------------------------------
+
+pub const LAT_PING_MAGIC: &[u8; 8] = b"ANYSLAT1";
+pub const LAT_PONG_MAGIC: &[u8; 8] = b"ANYSLAT2";
+/// PING: magic(8) + nonce(8) + t1(8); PONG: magic(8) + nonce(8) + t1(8) + t2(8) + t3(8).
+pub const LAT_PING_LEN: usize = 24;
+pub const LAT_PONG_LEN: usize = 40;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct LatPing {
+    pub nonce: u64,
+    pub t1_us: u64,
+}
+
+impl LatPing {
+    pub fn encode(&self) -> Vec<u8> {
+        let mut out = Vec::with_capacity(LAT_PING_LEN);
+        out.extend_from_slice(LAT_PING_MAGIC);
+        out.extend_from_slice(&self.nonce.to_le_bytes());
+        out.extend_from_slice(&self.t1_us.to_le_bytes());
+        out
+    }
+
+    pub fn decode(buffer: &[u8]) -> Option<LatPing> {
+        if buffer.len() != LAT_PING_LEN || &buffer[..8] != LAT_PING_MAGIC {
+            return None;
+        }
+        Some(LatPing {
+            nonce: u64::from_le_bytes(buffer[8..16].try_into().ok()?),
+            t1_us: u64::from_le_bytes(buffer[16..24].try_into().ok()?),
+        })
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct LatPong {
+    pub nonce: u64,
+    pub t1_us: u64,
+    pub t2_us: u64,
+    pub t3_us: u64,
+}
+
+impl LatPong {
+    pub fn encode(&self) -> Vec<u8> {
+        let mut out = Vec::with_capacity(LAT_PONG_LEN);
+        out.extend_from_slice(LAT_PONG_MAGIC);
+        out.extend_from_slice(&self.nonce.to_le_bytes());
+        out.extend_from_slice(&self.t1_us.to_le_bytes());
+        out.extend_from_slice(&self.t2_us.to_le_bytes());
+        out.extend_from_slice(&self.t3_us.to_le_bytes());
+        out
+    }
+
+    pub fn decode(buffer: &[u8]) -> Option<LatPong> {
+        if buffer.len() != LAT_PONG_LEN || &buffer[..8] != LAT_PONG_MAGIC {
+            return None;
+        }
+        Some(LatPong {
+            nonce: u64::from_le_bytes(buffer[8..16].try_into().ok()?),
+            t1_us: u64::from_le_bytes(buffer[16..24].try_into().ok()?),
+            t2_us: u64::from_le_bytes(buffer[24..32].try_into().ok()?),
+            t3_us: u64::from_le_bytes(buffer[32..40].try_into().ok()?),
+        })
+    }
+}
+
+/// Clock offset (sender minus receiver, microseconds) and round-trip time.
+pub fn clock_offset_us(t1_us: u64, t2_us: u64, t3_us: u64, t4_us: u64) -> (i64, u64) {
+    let rtt = t4_us.saturating_sub(t1_us).saturating_sub(t3_us.saturating_sub(t2_us));
+    let forward = t2_us as i64 - t1_us as i64;
+    let backward = t3_us as i64 - t4_us as i64;
+    ((forward + backward) / 2, rtt)
+}
+
 /// A selective retransmission request for one frame.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Nack {
@@ -591,6 +680,46 @@ mod tests {
         Instant::now()
     }
 
+    #[test]
+    fn latency_probe_roundtrip() {
+        let ping = LatPing {
+            nonce: 42,
+            t1_us: 1_000_000,
+        };
+        assert_eq!(LatPing::decode(&ping.encode()), Some(ping));
+        assert!(LatPing::decode(b"nope").is_none());
+        // A data packet must never decode as a probe.
+        let packet = packetize(1, 1, 0, 0, &[0u8; 10]);
+        assert!(LatPing::decode(&packet[0].encode()).is_none());
+
+        let pong = LatPong {
+            nonce: 42,
+            t1_us: 1_000_000,
+            t2_us: 1_000_030,
+            t3_us: 1_000_030,
+        };
+        assert_eq!(LatPong::decode(&pong.encode()), Some(pong));
+    }
+
+    #[test]
+    fn clock_offset_handles_symmetric_and_skewed_clocks() {
+        // Same clock, 30 us one way: no offset, 60 us RTT.
+        let (offset, rtt) = clock_offset_us(1_000_000, 1_000_030, 1_000_030, 1_000_060);
+        assert_eq!(offset, 0);
+        assert_eq!(rtt, 60);
+
+        // Sender clock 5 s ahead. True offset must be recovered regardless of
+        // the (symmetric) path delay.
+        let sender_ahead = 5_000_000i64;
+        let t1 = 10_000_000u64;
+        let d = 250u64;
+        let t2 = (t1 as i64 + d as i64 + sender_ahead) as u64;
+        let t3 = t2;
+        let t4 = t1 + 2 * d;
+        let (offset, rtt) = clock_offset_us(t1, t2, t3, t4);
+        assert_eq!(offset, sender_ahead as i64);
+        assert_eq!(rtt, 2 * d);
+    }
     #[test]
     fn packet_roundtrip() {
         let packet = Packet {

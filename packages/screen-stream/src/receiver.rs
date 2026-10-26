@@ -3,7 +3,7 @@
 //! feature; the window is opened on a dedicated thread so the caller's main
 //! thread (e.g. the Flutter engine) is never blocked.
 
-use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU32, AtomicU64, Ordering};
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
@@ -70,6 +70,11 @@ struct Shared {
     monitor_height: AtomicU32,
     /// Wakes the viewer thread as soon as a frame is published.
     proxy: Mutex<Option<winit::event_loop::EventLoopProxy<ViewerCommand>>>,
+    /// Sender clock minus receiver clock (microseconds), from the latency probe.
+    clock_offset_us: AtomicI64,
+    /// Valid only after the first successful probe.
+    offset_valid: AtomicBool,
+    rtt_us: AtomicU64,
 }
 
 impl Shared {
@@ -85,10 +90,20 @@ impl Shared {
             monitor_width: AtomicU32::new(0),
             monitor_height: AtomicU32::new(0),
             proxy: Mutex::new(None),
+            clock_offset_us: AtomicI64::new(0),
+            offset_valid: AtomicBool::new(false),
+            rtt_us: AtomicU64::new(0),
         }
     }
 }
 
+/// Wall-clock microseconds since the Unix epoch (matches the sender's probe).
+fn epoch_us() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|value| value.as_micros() as u64)
+        .unwrap_or(0)
+}
 fn publish(shared: &Shared, frame: Frame) {
     *shared.frame.lock().unwrap() = Some(Arc::new(frame));
     shared.generation.fetch_add(1, Ordering::AcqRel);
@@ -756,8 +771,12 @@ fn ffmpeg_loop(
                     .map(|value| value.as_secs_f64() * 1000.0)
                     .unwrap_or(0.0);
                 let au_epoch_ms = frame.timestamp_100ns as f64 / 10_000.0;
-                if au_epoch_ms > 1.0e12 {
-                    let e2e_ms = now_epoch_ms - au_epoch_ms;
+                let offset_valid = shared.offset_valid.load(Ordering::Acquire);
+                let offset_ms = shared.clock_offset_us.load(Ordering::Acquire) as f64 / 1000.0;
+                if offset_valid && au_epoch_ms > 1.0e12 {
+                    // Only frames after calibration are meaningful: without the
+                    // offset the reading would carry the whole host clock skew.
+                    let e2e_ms = now_epoch_ms - (au_epoch_ms - offset_ms);
                     if e2e_ms > e2e_max_ms {
                         e2e_max_ms = e2e_ms;
                     }
@@ -769,12 +788,18 @@ fn ffmpeg_loop(
                 queue_frames += 1;
                 if last_pipe_stats.elapsed() >= Duration::from_secs(1) {
                     eprintln!(
-                        "decode queue: avg={:.1}ms max={:.1}ms frames={} e2e(pipe) avg={:.1}ms max={:.1}ms",
+                        "decode queue: avg={:.1}ms max={:.1}ms frames={} e2e avg={:.1}ms max={:.1}ms (offset={} rtt={:.1}ms)",
                         if queue_frames > 0 { queue_ms_sum / queue_frames as f64 } else { 0.0 },
                         queue_ms_max,
                         queue_frames,
                         if e2e_count > 0 { e2e_sum_ms / e2e_count as f64 } else { 0.0 },
-                        e2e_max_ms
+                        e2e_max_ms,
+                        if shared.offset_valid.load(Ordering::Acquire) {
+                            format!("{:.0}ms", shared.clock_offset_us.load(Ordering::Acquire) as f64 / 1000.0)
+                        } else {
+                            "unknown".to_string()
+                        },
+                        shared.rtt_us.load(Ordering::Acquire) as f64 / 1000.0
                     );
                     e2e_sum_ms = 0.0;
                     e2e_max_ms = 0.0;
@@ -918,18 +943,43 @@ fn nv12_to_argb(nv12: &[u8], width: usize, height: usize, out: &mut Vec<u32>) {
     out.resize(width * height, 0);
     let y_plane = &nv12[..width * height];
     let uv_plane = &nv12[width * height..];
-    let uv_width = width / 2;
+    let uv_width = (width + 1) / 2;
     for row in 0..height {
-        let uv_row = (row / 2) * uv_width;
-        for col in 0..width {
-            let y = i32::from(y_plane[row * width + col]) - 16;
-            let u = i32::from(uv_plane[(uv_row + col / 2) * 2]) - 128;
-            let v = i32::from(uv_plane[(uv_row + col / 2) * 2 + 1]) - 128;
-            let y = y.max(0);
-            let r = ((298 * y + 409 * v + 128) >> 8).clamp(0, 255) as u32;
-            let g = ((298 * y - 100 * u - 208 * v + 128) >> 8).clamp(0, 255) as u32;
-            let b = ((298 * y + 516 * u + 128) >> 8).clamp(0, 255) as u32;
-            out[row * width + col] = (r << 16) | (g << 8) | b;
+        // Row-local slices: no per-pixel multiplications, and one UV load
+        // serves two neighbouring pixels (4:2:0 chroma is shared by 2x2).
+        let y_row = &y_plane[row * width..row * width + width];
+        let uv_row_base = (row / 2) * uv_width * 2;
+        let uv_row = &uv_plane[uv_row_base..uv_row_base + uv_width * 2];
+        let out_row = &mut out[row * width..row * width + width];
+        let mut col = 0;
+        while col + 1 < width {
+            let uv = (col / 2) * 2;
+            let u = i32::from(uv_row[uv]) - 128;
+            let v = i32::from(uv_row[uv + 1]) - 128;
+            let r_add = 409 * v + 128;
+            let g_add = -100 * u - 208 * v + 128;
+            let b_add = 516 * u + 128;
+            for offset in 0..2 {
+                let y = (i32::from(y_row[col + offset]) - 16).max(0);
+                let luma = 298 * y;
+                let r = ((luma + r_add) >> 8).clamp(0, 255) as u32;
+                let g = ((luma + g_add) >> 8).clamp(0, 255) as u32;
+                let b = ((luma + b_add) >> 8).clamp(0, 255) as u32;
+                out_row[col + offset] = (r << 16) | (g << 8) | b;
+            }
+            col += 2;
+        }
+        if col < width {
+            // Odd width: last column reuses the last chroma pair.
+            let uv = (col / 2) * 2;
+            let u = i32::from(uv_row[uv]) - 128;
+            let v = i32::from(uv_row[uv + 1]) - 128;
+            let y = (i32::from(y_row[col]) - 16).max(0);
+            let luma = 298 * y;
+            let r = ((luma + 409 * v + 128) >> 8).clamp(0, 255) as u32;
+            let g = ((luma - 100 * u - 208 * v + 128) >> 8).clamp(0, 255) as u32;
+            let b = ((luma + 516 * u + 128) >> 8).clamp(0, 255) as u32;
+            out_row[col] = (r << 16) | (g << 8) | b;
         }
     }
 }
@@ -1270,6 +1320,12 @@ fn receive_loop(
     let mut nack_state: std::collections::HashMap<u32, (u8, Instant)> = std::collections::HashMap::new();
     let mut last_nack_scan = Instant::now();
     let mut last_counter_publish = Instant::now();
+    let mut last_latency_ping = Instant::now() - Duration::from_secs(1);
+    let mut latency_ping_nonce: u64 = 0;
+    let mut pending_latency_ping: Option<(u64, u64)> = None;
+    // Best-of-N clock samples: the minimum-RTT sample is the least biased by
+    // asymmetric queueing on either direction.
+    let mut latency_samples: std::collections::VecDeque<(i64, u64)> = std::collections::VecDeque::new();
     let nack_enabled = std::env::var("ANYSHARE_NACK").map(|value| value != "0").unwrap_or(true);
     let mut nacks_sent: u64 = 0;
     let mut dropped_frames: u64 = 0;
@@ -1283,6 +1339,34 @@ fn receive_loop(
         let now = Instant::now();
         match socket.recv_from(&mut buffer) {
             Ok((len, from)) => {
+                // Clock-sync reply: measure the clock offset so frame ages can
+                // be corrected (the two hosts are rarely in sync).
+                if let Some(pong) = crate::transport::LatPong::decode(&buffer[..len]) {
+                    if let Some((nonce, t1_us)) = pending_latency_ping {
+                        if nonce == pong.nonce && pong.t1_us == t1_us {
+                            let t4_us = epoch_us();
+                            let (offset_us, rtt_us) = crate::transport::clock_offset_us(t1_us, pong.t2_us, pong.t3_us, t4_us);
+                            pending_latency_ping = None;
+                            // Reject implausible samples (clock jumps, grossly
+                            // asymmetric paths) instead of trusting them.
+                            let plausible = rtt_us <= 500_000 && offset_us.abs() <= 86_400_000_000;
+                            if plausible {
+                                latency_samples.push_back((offset_us, rtt_us));
+                                while latency_samples.len() > 5 {
+                                    latency_samples.pop_front();
+                                }
+                                let best = *latency_samples
+                                    .iter()
+                                    .min_by_key(|(_, rtt)| *rtt)
+                                    .expect("sample just pushed");
+                                shared.clock_offset_us.store(best.0, Ordering::Release);
+                                shared.rtt_us.store(best.1, Ordering::Release);
+                                shared.offset_valid.store(true, Ordering::Release);
+                            }
+                        }
+                    }
+                    continue;
+                }
                 if let Some(packet) = Packet::decode(&buffer[..len]) {
                     // Only the current session's peer may redirect NACKs: a
                     // stray datagram must not turn us into a reflector.
@@ -1332,6 +1416,22 @@ fn receive_loop(
                 }
             }
             Err(e) => return Err(anyhow::anyhow!("recv_from failed: {e}")),
+        }
+        // Clock-offset probe: one ping per second (with pacing/NACK traffic the
+        // reply usually returns in well under a millisecond on a LAN).
+        if now.duration_since(last_latency_ping) >= Duration::from_secs(1) {
+            if let Some(peer) = peer_addr {
+                latency_ping_nonce = latency_ping_nonce.wrapping_add(1);
+                let t1_us = epoch_us();
+                let ping = crate::transport::LatPing {
+                    nonce: latency_ping_nonce,
+                    t1_us,
+                };
+                if socket.send_to(&ping.encode(), peer).is_ok() {
+                    pending_latency_ping = Some((latency_ping_nonce, t1_us));
+                }
+            }
+            last_latency_ping = now;
         }
         // Selective retransmission: NACK missing data packets of frames that
         // stopped making progress (two attempts, 8 ms apart). FEC already
@@ -1414,6 +1514,30 @@ fn receive_loop(
 mod tests {
     use super::*;
 
+    #[test]
+    fn nv12_conversion_matches_known_values() {
+        // 2x2 NV12: black (Y=16) and white (Y=235), neutral chroma (128).
+        let nv12 = [16u8, 16, 235, 235, 128, 128];
+        let mut argb = Vec::new();
+        nv12_to_argb(&nv12, 2, 2, &mut argb);
+        assert_eq!(argb.len(), 4);
+        assert_eq!(argb[0], 0x000000, "Y=16 is limited-range black");
+        assert_eq!(argb[3], 0xffffff, "Y=235 is limited-range white");
+
+        // Neutral chroma with mid luma stays grey (R == G == B).
+        let grey = [126u8, 126, 126, 126, 128, 128];
+        nv12_to_argb(&grey, 2, 2, &mut argb);
+        let r = argb[0] >> 16 & 0xff;
+        let g = argb[0] >> 8 & 0xff;
+        let b = argb[0] & 0xff;
+        assert_eq!(r, g);
+        assert_eq!(g, b);
+
+        // Odd width must not panic and must fill every pixel.
+        let odd = [100u8; 3 * 2 + 4];
+        nv12_to_argb(&odd, 3, 2, &mut argb);
+        assert_eq!(argb.len(), 6);
+    }
     #[test]
     fn bilinear_upscale_blends_neighbours() {
         let src = [0x0000_0000u32, 0x00ff_ffffu32];

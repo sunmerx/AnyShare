@@ -49,6 +49,7 @@ pub struct SenderHandle {
     stop: Arc<AtomicBool>,
     force_keyframe: Arc<AtomicBool>,
     bitrate_bps: Arc<std::sync::atomic::AtomicU32>,
+    max_fps: Arc<std::sync::atomic::AtomicU32>,
     stats: Arc<Mutex<StreamStats>>,
     join: Option<JoinHandle<()>>,
 }
@@ -70,6 +71,15 @@ impl SenderHandle {
 
     /// Requests a new encoder bitrate (adaptive quality). 0 is ignored;
     /// requests coalesce, the latest value wins.
+    /// Requests a new encode frame-rate cap (0 = no pending request). The
+    /// receiver reports how many frames it can decode, so encoding faster
+    /// than that only grows its decode backlog (= latency).
+    pub fn set_max_fps(&self, fps: u32) {
+        if (1..=120).contains(&fps) {
+            self.max_fps.store(fps, Ordering::Release);
+        }
+    }
+
     pub fn set_bitrate(&self, bitrate_bps: u32) {
         if bitrate_bps >= 500_000 && bitrate_bps <= 50_000_000 {
             self.bitrate_bps.store(bitrate_bps, Ordering::Release);
@@ -289,6 +299,14 @@ mod imp {
         (tx, join)
     }
 
+    /// Wall-clock microseconds since the Unix epoch (both ends must use the
+    /// same unit for clock-offset probing).
+    fn epoch_us() -> u64 {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|value| value.as_micros() as u64)
+            .unwrap_or(0)
+    }
     /// Answers pending NACKs (bounded) and retransmits from the history under
     /// a per-frame budget. Shared by the inter-job drain and the pacing loop
     /// so fast retransmit is never delayed by pacing.
@@ -304,6 +322,20 @@ mod imp {
         while processed < 32 {
             let Ok(len) = socket.recv(nack_buf) else { break };
             processed += 1;
+            // Clock-sync probe: reply with our own timestamps so the receiver
+            // can compute the clock offset (and therefore the true one-way
+            // latency of every frame).
+            if let Some(ping) = crate::transport::LatPing::decode(&nack_buf[..len]) {
+                let now_us = epoch_us();
+                let pong = crate::transport::LatPong {
+                    nonce: ping.nonce,
+                    t1_us: ping.t1_us,
+                    t2_us: now_us,
+                    t3_us: epoch_us(),
+                };
+                let _ = send_udp(socket, &pong.encode());
+                continue;
+            }
             let Some(packet) = Packet::decode(&nack_buf[..len]) else { continue };
             let Some(nack) = Nack::from_packet(&packet) else { continue };
             if nack.session != session {
@@ -526,18 +558,28 @@ mod imp {
         let stop = Arc::new(AtomicBool::new(false));
         let force_keyframe = Arc::new(AtomicBool::new(false));
         let bitrate_bps = Arc::new(std::sync::atomic::AtomicU32::new(0));
+        let max_fps = Arc::new(std::sync::atomic::AtomicU32::new(0));
         let stats = Arc::new(Mutex::new(StreamStats::default()));
 
         let thread_stop = Arc::clone(&stop);
         let thread_force_keyframe = Arc::clone(&force_keyframe);
         let thread_bitrate = Arc::clone(&bitrate_bps);
+        let thread_max_fps = Arc::clone(&max_fps);
         let thread_stats = Arc::clone(&stats);
         // Everything COM/DXGI/MF related (output enumeration, duplicator,
         // encoder) is created and used on this one worker thread: the objects
         // are not Send, and MF wants a stable apartment per object.
         let join = std::thread::spawn(move || {
             send_event(&event_tx, StreamEvent::Status(StreamState::Starting));
-            if let Err(e) = run(config, thread_stop, thread_force_keyframe, thread_bitrate, Arc::clone(&thread_stats), &event_tx) {
+            if let Err(e) = run(
+                config,
+                thread_stop,
+                thread_force_keyframe,
+                thread_bitrate,
+                thread_max_fps,
+                Arc::clone(&thread_stats),
+                &event_tx,
+            ) {
                 send_event(&event_tx, StreamEvent::Error(format!("{e:#}")));
                 send_event(&event_tx, StreamEvent::Ended(EndReason::Error));
                 return;
@@ -549,6 +591,7 @@ mod imp {
             stop,
             force_keyframe,
             bitrate_bps,
+            max_fps,
             stats,
             join: Some(join),
         })
@@ -559,6 +602,7 @@ mod imp {
         stop: Arc<AtomicBool>,
         force_keyframe: Arc<AtomicBool>,
         bitrate_bps: Arc<std::sync::atomic::AtomicU32>,
+        max_fps: Arc<std::sync::atomic::AtomicU32>,
         stats: Arc<Mutex<StreamStats>>,
         event_tx: &Sender<StreamEvent>,
     ) -> Result<()> {
@@ -682,7 +726,20 @@ mod imp {
         };
         eprintln!("sender: gpu convert = {}", gpu.is_some());
 
-        run_loop(config, socket, session, encoder, dup, gpu, stop, force_keyframe, bitrate_bps, stats, event_tx)
+        run_loop(
+            config,
+            socket,
+            session,
+            encoder,
+            dup,
+            gpu,
+            stop,
+            force_keyframe,
+            bitrate_bps,
+            max_fps,
+            stats,
+            event_tx,
+        )
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -696,6 +753,7 @@ mod imp {
         stop: Arc<AtomicBool>,
         force_keyframe: Arc<AtomicBool>,
         bitrate_bps: Arc<std::sync::atomic::AtomicU32>,
+        max_fps: Arc<std::sync::atomic::AtomicU32>,
         stats: Arc<Mutex<StreamStats>>,
         event_tx: &Sender<StreamEvent>,
     ) -> Result<()> {
@@ -922,6 +980,10 @@ mod imp {
                         }
                     }
 
+                    let requested_fps = max_fps.swap(0, Ordering::AcqRel);
+                    if requested_fps != 0 {
+                        gate.set_max_fps(requested_fps);
+                    }
                     let mut decision = gate.decide(&meta, Instant::now());
                     if force_keyframe.load(Ordering::Acquire) {
                         // Loss-recovery request from the receiver: force an IDR

@@ -148,6 +148,9 @@ class ScreenSenderSession {
   /// Requests a new encoder bitrate (adaptive quality feedback).
   Future<void> setBitrate(int bitrateBps) => _inner.setBitrate(bitrateBps: bitrateBps);
 
+  /// Caps the encoder frame rate (the receiver reports what it can decode).
+  Future<void> setMaxFps(int fps) => _inner.setMaxFps(fps: fps);
+
   Future<void> stop() => _inner.stop();
 }
 

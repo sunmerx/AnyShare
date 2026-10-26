@@ -40,6 +40,13 @@ class FakeScreenSession implements ScreenEngineSession {
     bitrates.add(bitrateBps);
   }
 
+  @override
+  Future<void> setMaxFps(int fps) async {
+    fpsTargets.add(fps);
+  }
+
+  final List<int> fpsTargets = [];
+
   final List<int> bitrates = [];
 
   @override
@@ -476,6 +483,30 @@ void main() {
     expect(session.bitrates, [11200000]);
   });
 
+  test('sender lowers the frame rate when the receiver cannot keep up', () async {
+    await container.redux(screenProvider).dispatchAsync(StartScreenShareAction(peerIp: '127.0.0.1', peerAlias: 'Peer'));
+    final active = container.read(screenProvider).active!;
+    final session = engine.sessions.last;
+
+    // The sender reports 30 encoded frames in its last window: that is the
+    // reference the receiver's decode rate is compared against.
+    session.emit(
+      const ScreenSessionStatsEvent(
+        ScreenSessionStats(frames: 30, keyframes: 1, fps: 30, mbps: 14, packets: 900, lost: 0, decodeErrors: 0),
+      ),
+    );
+    await Future<void>.delayed(const Duration(milliseconds: 150));
+
+    // First receiver sample only seeds the delta baseline.
+    await post('screen/bitrate', {'session': active.sessionId, 'lost': 0, 'frames': 30});
+    await Future<void>.delayed(const Duration(milliseconds: 600));
+
+    // The receiver decoded 12 while we encoded 30: the cap must step down.
+    await post('screen/bitrate', {'session': active.sessionId, 'lost': 0, 'frames': 12});
+
+    expect(session.fpsTargets, isNotEmpty);
+    expect(session.fpsTargets.last, lessThan(30));
+  });
   test('bitrate feedback with a stale session is ignored', () async {
     await container.redux(screenProvider).dispatchAsync(StartScreenShareAction(peerIp: '127.0.0.1', peerAlias: 'Peer'));
     final session = engine.sessions.last;

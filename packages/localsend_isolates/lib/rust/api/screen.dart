@@ -64,6 +64,10 @@ abstract class RsScreenSender implements RustOpaqueInterface {
   /// `listen` runs.
   Future<void> setBitrate({required int bitrateBps});
 
+  /// Requests an encode frame-rate cap. The receiver reports how many frames
+  /// it decodes per second; encoding faster only grows its backlog.
+  Future<void> setMaxFps({required int fps});
+
   Future<RsScreenStats?> stats();
 
   /// Stops the session; the join happens on a background thread so the
