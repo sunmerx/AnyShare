@@ -53,6 +53,14 @@
 - `pubspec.lock`:8 个 build 工具链传递依赖小版本再解析(archive/build_config/build_daemon 等,仅 codegen 使用;官方源解析,运行时依赖零漂移)
 - `app/pubspec.yaml`:description 重写、homepage → github.com/sunmerx/AnyShare
 
+### 编码器积压与采集目标批次(2026-10-27)
+
+- `packages/screen-stream/src/windows_encoder.rs`:`pump()` 空闲泵输出(静态画面不再等下一次 encode)
+- `packages/screen-stream/src/sender.rs`:在飞帧上限 2(先泵出再提交,硬等待 ≤500ms);采集超时 500→16ms;启动打印全部输出;采集目标可选(`config.output` / `ANYSHARE_OUTPUT` / `%APPDATA%/AnyShare/stream_output.txt` 持久化)
+- 诊断:1.15s 的 e2e 读数为两机 1.24s 钟差;校正后发送 50ms、接收排队 1ms
+- 虚拟屏验证:#2 `\\.\DISPLAY6` 1920x1080,capture=encode=1920x1080
+- 38 Rust 测试
+
 ### 配对设备换 IP 修复批次(2026-10-25)
 
 - `app/lib/util/device_groups.dart`:新增纯函数 `favoriteWithRefreshedAddress`(地址变化时刷新收藏的 ip/port,保留 customAlias)
