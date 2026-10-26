@@ -68,6 +68,8 @@ struct Shared {
     lost: AtomicU64,
     monitor_width: AtomicU32,
     monitor_height: AtomicU32,
+    /// Wakes the viewer thread as soon as a frame is published.
+    proxy: Mutex<Option<winit::event_loop::EventLoopProxy<ViewerCommand>>>,
 }
 
 impl Shared {
@@ -82,6 +84,7 @@ impl Shared {
             lost: AtomicU64::new(0),
             monitor_width: AtomicU32::new(0),
             monitor_height: AtomicU32::new(0),
+            proxy: Mutex::new(None),
         }
     }
 }
@@ -89,6 +92,10 @@ impl Shared {
 fn publish(shared: &Shared, frame: Frame) {
     *shared.frame.lock().unwrap() = Some(Arc::new(frame));
     shared.generation.fetch_add(1, Ordering::AcqRel);
+    // Latency: wake the viewer immediately instead of waiting for its tick.
+    if let Some(proxy) = shared.proxy.lock().unwrap().as_ref() {
+        let _ = proxy.send_event(ViewerCommand::Frame);
+    }
 }
 
 pub struct ReceiverHandle {
@@ -306,6 +313,8 @@ fn window_loop(
 ) -> Result<()> {
     let (done_tx, done_rx) = std::sync::mpsc::channel::<()>();
     let proxy = viewer_proxy()?;
+    // Let the decode threads wake this window as soon as they publish.
+    *shared.proxy.lock().unwrap() = Some(proxy.clone());
     proxy
         .send_event(ViewerCommand::Start(ViewerSession {
             shared,
@@ -329,6 +338,9 @@ fn window_loop(
 
 enum ViewerCommand {
     Start(ViewerSession),
+    /// A new decoded frame is ready: present immediately instead of waiting
+    /// for the periodic tick (the tick would add up to a few ms per frame).
+    Frame,
 }
 
 struct ViewerSession {
@@ -430,6 +442,7 @@ impl ViewerHost {
         // late poll cannot hand out a stale viewport.
         active.shared.monitor_width.store(0, Ordering::Release);
         active.shared.monitor_height.store(0, Ordering::Release);
+        *active.shared.proxy.lock().unwrap() = None;
         let _ = active.done.send(());
         self.window = None;
         self.surface = None;
@@ -443,6 +456,7 @@ impl ViewerHost {
         active.stop.store(true, Ordering::Release);
         active.shared.monitor_width.store(0, Ordering::Release);
         active.shared.monitor_height.store(0, Ordering::Release);
+        *active.shared.proxy.lock().unwrap() = None;
         let _ = active.done.send(());
     }
 
@@ -521,7 +535,16 @@ impl ApplicationHandler<ViewerCommand> for ViewerHost {
     fn resumed(&mut self, _event_loop: &ActiveEventLoop) {}
 
     fn user_event(&mut self, event_loop: &ActiveEventLoop, event: ViewerCommand) {
-        let ViewerCommand::Start(session) = event;
+        let session = match event {
+            ViewerCommand::Frame => {
+                // A frame was published: present it now, not on the next tick.
+                if let Some(window) = &self.window {
+                    window.request_redraw();
+                }
+                return;
+            }
+            ViewerCommand::Start(session) => session,
+        };
         if let Some(existing) = self.active.take() {
             // One viewer at a time: finish the previous session synchronously
             // (a quick stop→start must not lose the new session).
@@ -559,10 +582,14 @@ impl ApplicationHandler<ViewerCommand> for ViewerHost {
         }
         self.context = context;
         self.surface = surface;
+        // Present the first frame immediately (it may already be published).
+        window.request_redraw();
         self.window = Some(window);
         self.present_errors = 0;
         self.active = Some(session);
-        event_loop.set_control_flow(ControlFlow::WaitUntil(Instant::now() + Duration::from_millis(4)));
+        // Frame arrivals wake the loop explicitly (ViewerCommand::Frame), so
+        // this tick is only a fallback for stats/duration bookkeeping.
+        event_loop.set_control_flow(ControlFlow::WaitUntil(Instant::now() + Duration::from_millis(16)));
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
@@ -650,7 +677,9 @@ impl ApplicationHandler<ViewerCommand> for ViewerHost {
         }
         // Tick at ~125 Hz instead of busy-polling: cheap when the screen is
         // static, responsive enough for 60 fps content.
-        event_loop.set_control_flow(ControlFlow::WaitUntil(Instant::now() + Duration::from_millis(4)));
+        // Frame arrivals wake the loop explicitly (ViewerCommand::Frame), so
+        // this tick is only a fallback for stats/duration bookkeeping.
+        event_loop.set_control_flow(ControlFlow::WaitUntil(Instant::now() + Duration::from_millis(16)));
         self.active = Some(active);
     }
 }
