@@ -162,7 +162,7 @@ class _DeviceDetailsPageState extends State<DeviceDetailsPage> with Refena {
                   await ref
                       .redux(screenProvider)
                       .dispatchAsync(
-                        StartScreenShareAction(peerIp: screenHost!, peerAlias: device.alias),
+                        StartScreenShareAction(peerIp: screenHost!, peerAlias: device.alias, peerFingerprint: device.fingerprint),
                       );
                 },
               ),

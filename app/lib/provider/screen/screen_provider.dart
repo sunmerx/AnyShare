@@ -160,6 +160,10 @@ class ActiveScreenSession {
   final String peerIp;
   final String peerAlias;
 
+  /// Certificate fingerprint of the peer (uppercase hex). Used to pin the
+  /// TLS control plane before any data-plane key may be exchanged.
+  final String? peerFingerprint;
+
   /// Correlation id (sender: generated locally; receiver: from the offer).
   final String sessionId;
   final DateTime startedAt;
@@ -172,6 +176,7 @@ class ActiveScreenSession {
     required this.role,
     required this.peerIp,
     required this.peerAlias,
+    this.peerFingerprint,
     required this.sessionId,
     required this.startedAt,
     this.phase = 'starting',
@@ -183,6 +188,7 @@ class ActiveScreenSession {
       role: role,
       peerIp: peerIp,
       peerAlias: peerAlias,
+      peerFingerprint: peerFingerprint,
       sessionId: sessionId,
       startedAt: startedAt,
       phase: phase ?? this.phase,
@@ -215,6 +221,7 @@ class PendingScreenOffer {
 /// Outgoing offer answered with `pending`; waiting for the receiver's accept.
 class WaitingScreenAccept {
   final String sessionId;
+  final String? peerFingerprint;
 
   /// Session key generated for this offer; the sender engine must use the
   /// same key the receiver was told about.
@@ -227,6 +234,7 @@ class WaitingScreenAccept {
     required this.peerIp,
     required this.peerAlias,
     this.keyHex,
+    this.peerFingerprint,
   });
 }
 
@@ -553,6 +561,7 @@ class ScreenService extends ReduxNotifier<ScreenState> {
     int? maxHeight,
     int? maxWidth,
     String? keyHex,
+    String? peerFingerprint,
   }) async {
     try {
       final session = await ref
@@ -566,6 +575,7 @@ class ScreenService extends ReduxNotifier<ScreenState> {
           role: ScreenRole.sender,
           peerIp: peerIp,
           peerAlias: peerAlias,
+          peerFingerprint: peerFingerprint,
           sessionId: id,
           startedAt: DateTime.now(),
         ),
@@ -581,7 +591,13 @@ class ScreenService extends ReduxNotifier<ScreenState> {
   /// Starts a receiver session; returns the new state or `null` on failure.
   /// Arms a watchdog: a session that never receives frames is torn down
   /// instead of leaving an empty window around.
-  Future<ScreenState?> startReceiverSession(String peerIp, String peerAlias, String sessionId, {String? keyHex}) async {
+  Future<ScreenState?> startReceiverSession(
+    String peerIp,
+    String peerAlias,
+    String sessionId, {
+    String? keyHex,
+    String? peerFingerprint,
+  }) async {
     try {
       final session = await ref.read(screenEngineProvider).startReceiver(port: kScreenDataPort, keyHex: keyHex);
       cancelTimer();
@@ -595,6 +611,7 @@ class ScreenService extends ReduxNotifier<ScreenState> {
           role: ScreenRole.receiver,
           peerIp: peerIp,
           peerAlias: peerAlias,
+          peerFingerprint: peerFingerprint,
           sessionId: sessionId,
           startedAt: DateTime.now(),
         ),
@@ -641,7 +658,10 @@ class StartScreenShareAction extends AsyncReduxAction<ScreenService, ScreenState
   final String peerIp;
   final String peerAlias;
 
-  StartScreenShareAction({required this.peerIp, required this.peerAlias});
+  /// Peer certificate fingerprint, used to pin the TLS control plane.
+  final String? peerFingerprint;
+
+  StartScreenShareAction({required this.peerIp, required this.peerAlias, this.peerFingerprint});
 
   @override
   Future<ScreenState> reduce() async {
@@ -683,6 +703,7 @@ class StartScreenShareAction extends AsyncReduxAction<ScreenService, ScreenState
               sessionId: sessionId,
               maxWidth: maxWidth,
               maxHeight: maxHeight,
+              peerFingerprint: peerFingerprint,
             ) ??
             state;
       }
@@ -693,7 +714,12 @@ class StartScreenShareAction extends AsyncReduxAction<ScreenService, ScreenState
           notifier.ref.redux(screenProvider).dispatchAsync(_ScreenWaitingTimeoutAction(sessionId));
         });
         return state.copyWith(
-          waiting: WaitingScreenAccept(sessionId: sessionId, peerIp: peerIp, peerAlias: peerAlias),
+          waiting: WaitingScreenAccept(
+            sessionId: sessionId,
+            peerIp: peerIp,
+            peerAlias: peerAlias,
+            peerFingerprint: peerFingerprint,
+          ),
           clearError: true,
         );
       }
@@ -769,7 +795,7 @@ class HandleScreenOfferAction extends AsyncReduxActionWithResult<ScreenService, 
         final sessionId = const Uuid().v4();
         notifier.startingOffer = true;
         try {
-          final started = await notifier.startReceiverSession(peerIp, peerAlias, sessionId, keyHex: keyHex);
+          final started = await notifier.startReceiverSession(peerIp, peerAlias, sessionId, keyHex: keyHex, peerFingerprint: peerFingerprint);
           final viewport = started != null ? await notifier.receiverMonitorSize() : null;
           if (started != null && notifier._engineEnded) {
             // The viewer died while we polled for its size: fail the offer.
@@ -812,7 +838,13 @@ class AcceptPendingScreenOfferAction extends AsyncReduxAction<ScreenService, Scr
     }
     notifier.acceptingOffer = true;
     try {
-      final started = await notifier.startReceiverSession(pending.peerIp, pending.peerAlias, pending.sessionId, keyHex: pending.keyHex);
+      final started = await notifier.startReceiverSession(
+        pending.peerIp,
+        pending.peerAlias,
+        pending.sessionId,
+        keyHex: pending.keyHex,
+        peerFingerprint: pending.peerFingerprint,
+      );
       if (started == null) {
         return state.copyWith(clearPendingOffer: true, lastError: t.ui2.screen.errStartReceiverFailed);
       }
