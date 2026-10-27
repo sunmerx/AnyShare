@@ -168,9 +168,24 @@ mod imp {
     /// Encodes packets for the wire, sealing the payload when a session key is
     /// present. The 30-byte header stays readable (AAD) so the receiver can
     /// route/sequence before decrypting.
-    fn encode_packets(packets: &[Packet], cipher: Option<&aes_gcm::Aes256Gcm>) -> Vec<(bool, Vec<u8>, usize)> {
+    fn encode_packets(
+        packets: &[Packet],
+        cipher: Option<&aes_gcm::Aes256Gcm>,
+        fec_enabled: bool,
+    ) -> Vec<(bool, Vec<u8>, usize)> {
+        // FEC parity costs ~12.5% of the data bytes. With NACK working it is
+        // redundant on a clean link, so adaptive FEC drops it while no loss has
+        // been observed — EXCEPT for frames that have no recovery path without
+        // parity: a fully-lost small frame (count <= FEC_BLOCK) never enters the
+        // receiver's pending map, and keyframes cost far more to lose.
+        let data_count = packets.iter().filter(|packet| !packet.is_fec()).count();
+        let has_keyframe = packets
+            .iter()
+            .any(|packet| packet.flags & crate::transport::FLAG_KEYFRAME != 0);
+        let keep_parity = fec_enabled || has_keyframe || data_count <= crate::transport::FEC_BLOCK;
         packets
             .iter()
+            .filter(|packet| keep_parity || !packet.is_fec())
             .map(|packet| {
                 let mut sealed = packet.clone();
                 if let Some(cipher) = cipher {
@@ -224,6 +239,8 @@ mod imp {
         counters: Arc<NetCounters>,
         error: Arc<std::sync::Mutex<Option<String>>>,
         current_bitrate: Arc<std::sync::atomic::AtomicU32>,
+        last_nack_ms: Arc<std::sync::atomic::AtomicU64>,
+        session_start: Arc<Instant>,
     ) -> (std::sync::mpsc::SyncSender<NetJob>, JoinHandle<()>) {
         let (tx, rx) = std::sync::mpsc::sync_channel::<NetJob>(8);
         let join = std::thread::spawn(move || {
@@ -283,6 +300,8 @@ mod imp {
                                     &history,
                                     &mut nack_budget,
                                     &counters,
+                                    &last_nack_ms,
+                                    &session_start,
                                 );
                             }
                         }
@@ -306,6 +325,8 @@ mod imp {
                     &history,
                     &mut nack_budget,
                     &counters,
+                    &last_nack_ms,
+                    &session_start,
                 );
             }
         });
@@ -330,6 +351,8 @@ mod imp {
         history: &PacketHistory,
         nack_budget: &mut std::collections::HashMap<u32, u8>,
         counters: &NetCounters,
+        last_nack_ms: &std::sync::atomic::AtomicU64,
+        session_start: &Instant,
     ) {
         let mut processed = 0;
         while processed < 32 {
@@ -354,6 +377,10 @@ mod imp {
             if nack.session != session {
                 continue;
             }
+            // Loss observed: keep/restore FEC protection (see the sender loop).
+            // Monotonic (same clock domain as the FEC state machine below):
+            // wall-clock jumps (NTP, VM resume) must not pin FEC on or off.
+            last_nack_ms.store(session_start.elapsed().as_millis() as u64, Ordering::Relaxed);
             let resent = apply_nack(history, &nack, nack_budget, |bytes| {
                 if send_udp(socket, bytes).is_ok() {
                     counters.packets.fetch_add(1, Ordering::Relaxed);
@@ -480,6 +507,39 @@ mod imp {
     #[cfg(test)]
     mod tests {
         use super::*;
+
+        #[test]
+        fn adaptive_fec_drops_parity_but_keeps_data_bytes() {
+            use crate::transport::{packetize, DEFAULT_PAYLOAD, FLAG_KEYFRAME};
+            // A large non-keyframe (> FEC_BLOCK data packets) is where adaptive
+            // FEC actually saves bandwidth.
+            let packets = packetize(1, 1, 0, 0, &vec![0u8; DEFAULT_PAYLOAD * 9 + 10]);
+            let data_count = packets.iter().filter(|packet| !packet.is_fec()).count();
+            assert!(data_count < packets.len(), "packetize emits parity");
+
+            let protected = encode_packets(&packets, None, true);
+            assert_eq!(protected.len(), packets.len(), "FEC on keeps everything");
+
+            let lean = encode_packets(&packets, None, false);
+            assert_eq!(lean.len(), data_count, "FEC off drops parity only");
+            assert!(lean.iter().all(|(is_fec, _, _)| !is_fec));
+            // Data packets must be byte-identical to the protected variant.
+            let expected: Vec<(bool, Vec<u8>, usize)> = protected.iter().filter(|(is_fec, _, _)| !is_fec).cloned().collect();
+            assert_eq!(lean, expected, "data packets unchanged and in order");
+
+            // Small frames and keyframes must keep parity: without it a fully
+            // lost frame never enters the receiver's pending map (no NACK).
+            let small = packetize(1, 2, 0, 0, &[0u8; 40]);
+            assert_eq!(encode_packets(&small, None, false).len(), small.len(), "small frame keeps parity");
+            let key = packetize(1, 3, FLAG_KEYFRAME, 0, &vec![0u8; DEFAULT_PAYLOAD * 9]);
+            assert_eq!(encode_packets(&key, None, false).len(), key.len(), "keyframe keeps parity");
+
+            // The encrypted path filters the same way.
+            let cipher = crate::transport::cipher_from_key(&[5u8; 32]).unwrap();
+            let sealed_lean = encode_packets(&packets, Some(&cipher), false);
+            assert_eq!(sealed_lean.len(), data_count);
+            assert!(sealed_lean.iter().all(|(is_fec, _, _)| !is_fec));
+        }
 
         #[test]
         fn pacer_accumulates_wire_time_and_catches_up() {
@@ -771,11 +831,21 @@ mod imp {
         event_tx: &Sender<StreamEvent>,
     ) -> Result<()> {
         let cipher = config.session_key.as_ref().and_then(|key| crate::transport::cipher_from_key(key));
+        // Adaptive FEC: start protected, drop parity after 10 s without NACKs,
+        // re-enable on the first NACK. The net thread records NACK arrivals.
+        let fec_enabled = Arc::new(AtomicBool::new(true));
+        let last_nack_ms = Arc::new(std::sync::atomic::AtomicU64::new(0));
         eprintln!(
             "sender: data plane encryption = {}",
             if cipher.is_some() { "AES-256-GCM" } else { "OFF (plaintext)" }
         );
         let mut gate = VfrGate::new(VfrConfig::with_intra_refresh(encoder.gradual_intra_refresh()));
+        // Adaptive FEC state machine (see fec_enabled above).
+        let fec_grace = Duration::from_secs(10);
+        let fec_hold = Duration::from_secs(30);
+        let session_start = Arc::new(Instant::now());
+        let session_started = *session_start;
+        let mut fec_logged_on = true;
         if encoder.gradual_intra_refresh() {
             eprintln!("sender: gradual intra refresh enabled (periodic keyframes relaxed to 10s)");
         }
@@ -794,6 +864,8 @@ mod imp {
         let net_counters = Arc::new(NetCounters::default());
         let net_error: Arc<std::sync::Mutex<Option<String>>> = Arc::new(std::sync::Mutex::new(None));
         let current_bitrate = Arc::new(std::sync::atomic::AtomicU32::new(config.bitrate_bps));
+        let fec_enabled_for_loop = Arc::clone(&fec_enabled);
+        let last_nack_for_loop = Arc::clone(&last_nack_ms);
         let (net_tx, net_join) = spawn_net_thread(
             socket.try_clone()?,
             session,
@@ -801,6 +873,8 @@ mod imp {
             Arc::clone(&net_counters),
             Arc::clone(&net_error),
             Arc::clone(&current_bitrate),
+            Arc::clone(&last_nack_ms),
+            Arc::clone(&session_start),
         );
         let mut last_net_packets: u64 = 0;
         let mut last_net_bytes: u64 = 0;
@@ -818,7 +892,7 @@ mod imp {
             // network writer keeps everything in FIFO order.
             let _ = net_tx.try_send(NetJob {
                 frame_id: 0,
-                packets: encode_packets(&packets, cipher.as_ref()),
+                packets: encode_packets(&packets, cipher.as_ref(), fec_enabled.load(Ordering::Relaxed)),
             });
         }
 
@@ -844,6 +918,22 @@ mod imp {
         while !stop.load(Ordering::Acquire) {
             if let Some(message) = net_error.lock().unwrap().clone() {
                 anyhow::bail!("network worker: {message}");
+            }
+            // Adaptive FEC state machine: protected for the first seconds, then
+            // parity is dropped (≈12% of the wire bytes) while the link is
+            // clean; the first NACK re-enables it for a 30 s hold window.
+            {
+                let now_ms = session_start.elapsed().as_millis() as u64;
+                let last_nack = last_nack_for_loop.load(Ordering::Relaxed);
+                let recently_lost = last_nack != 0 && now_ms.saturating_sub(last_nack) < fec_hold.as_millis() as u64;
+                let wanted = session_started.elapsed() < fec_grace || recently_lost;
+                if wanted != fec_enabled_for_loop.load(Ordering::Relaxed) {
+                    fec_enabled_for_loop.store(wanted, Ordering::Release);
+                }
+                if wanted != fec_logged_on {
+                    fec_logged_on = wanted;
+                    eprintln!("sender: adaptive FEC {}", if wanted { "ON (recent loss)" } else { "OFF (clean link)" });
+                }
             }
             if let Some(duration) = config.duration {
                 if started.elapsed() >= duration {
@@ -1070,7 +1160,7 @@ mod imp {
                             let queued = net_tx
                                 .try_send(NetJob {
                                     frame_id,
-                                    packets: encode_packets(&packets, cipher.as_ref()),
+                                    packets: encode_packets(&packets, cipher.as_ref(), fec_enabled.load(Ordering::Relaxed)),
                                 })
                                 .is_ok();
                             if !queued {
@@ -1092,6 +1182,22 @@ mod imp {
                         // (pipeline_age). Keep at most two frames in flight and
                         // drain the oldest output before submitting more.
                         let mut pre_outputs: Vec<Vec<u8>> = Vec::new();
+                        // Sparse submissions (static screen -> 2 s keyframe cadence)
+                        // leave one encoded frame sitting in the MFT; submitting
+                        // the next frame would deliver that stale one first. Give
+                        // the encoder a moment to flush it into this batch.
+                        if pending_meta.len() >= 1 {
+                            let mut flushed = 0;
+                            while pending_meta.len() > pre_outputs.len() && flushed < 20 {
+                                let pumped = encoder.pump()?;
+                                if pumped.is_empty() {
+                                    std::thread::sleep(Duration::from_millis(1));
+                                    flushed += 1;
+                                } else {
+                                    pre_outputs.extend(pumped);
+                                }
+                            }
+                        }
                         if pending_meta.len() >= 2 {
                             // Hard wait: giving up early let the encoder's
                             // internal queue grow to ~30 frames (1.1 s of
@@ -1165,7 +1271,7 @@ mod imp {
                             let packets = packetize(session, frame_id, flags, out_ts, payload);
                             let job = NetJob {
                                 frame_id,
-                                packets: encode_packets(&packets, cipher.as_ref()),
+                                packets: encode_packets(&packets, cipher.as_ref(), fec_enabled.load(Ordering::Relaxed)),
                             };
                             let pipeline_age_ms = std::time::SystemTime::now()
                                 .duration_since(std::time::UNIX_EPOCH)
@@ -1291,7 +1397,7 @@ mod imp {
             let packets = packetize(session, frame_id, 0, last_send_time_100ns.max(0) as u64, &chunk);
             // Same encryption path as live frames: a plaintext tail would both
             // leak content and be rejected by an encrypted receiver.
-            for (_, bytes, payload_len) in encode_packets(&packets, cipher.as_ref()) {
+            for (_, bytes, payload_len) in encode_packets(&packets, cipher.as_ref(), fec_enabled.load(Ordering::Relaxed)) {
                 if send_udp(&socket, &bytes).is_ok() {
                     net_counters.packets.fetch_add(1, Ordering::Relaxed);
                     net_counters.bytes.fetch_add(payload_len as u64, Ordering::Relaxed);
