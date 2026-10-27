@@ -53,6 +53,13 @@
 - `pubspec.lock`:8 个 build 工具链传递依赖小版本再解析(archive/build_config/build_daemon 等,仅 codegen 使用;官方源解析,运行时依赖零漂移)
 - `app/pubspec.yaml`:description 重写、homepage → github.com/sunmerx/AnyShare
 
+### F1 整帧丢失恢复批次(2026-10-27)
+
+- `packages/screen-stream/src/transport.rs`:`Nack` 支持 `count=0`(整帧全丢,位图为空);`missing_candidates` 扫描 `next_expected..max_frame_seen` 的空洞帧(高水位超前 ≥2,每次最多 2 个);2 个单测
+- `packages/screen-stream/src/sender.rs`:`apply_nack` 对 `count=0` 重发该帧全部数据包一次(绕过每帧 2 包预算,同帧只服务一次);1 个单测
+- 52 Rust 测试
+- 文档:`docs/E2-S0/串流整帧丢失恢复.md`
+
 ### E1 亮度锐化批次(2026-10-27)
 
 - `packages/screen-stream/src/convert.rs`:新增 `sharpen_nv12_luma`(仅 Y 平面 3×3 非锐化掩膜,strength 35%)+ 单测

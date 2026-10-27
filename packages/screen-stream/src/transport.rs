@@ -280,7 +280,9 @@ pub struct Nack {
 
 impl Nack {
     pub fn encode(&self) -> Vec<u8> {
-        let bytes = (self.count as usize).div_ceil(8).max(1);
+        // count == 0 is the "the whole frame is missing" request: the sender
+        // owns the count and resends every data packet of that frame.
+        let bytes = if self.count == 0 { 0 } else { (self.count as usize).div_ceil(8).max(1) };
         let mut bitmask = vec![0u8; bytes];
         for &index in &self.missing {
             if index < self.count as usize {
@@ -300,8 +302,17 @@ impl Nack {
     }
 
     pub fn from_packet(packet: &Packet) -> Option<Nack> {
-        if packet.flags & FLAG_NACK == 0 || packet.count == 0 {
+        if packet.flags & FLAG_NACK == 0 {
             return None;
+        }
+        // Whole-frame request: no bitmask at all.
+        if packet.count == 0 {
+            return packet.payload.is_empty().then_some(Nack {
+                session: packet.session,
+                frame_id: packet.frame_id,
+                count: 0,
+                missing: Vec::new(),
+            });
         }
         let expected = (packet.count as usize).div_ceil(8).max(1);
         if packet.payload.len() != expected {
@@ -567,8 +578,26 @@ impl Reassembler {
     /// - a NEWER frame has already been seen (fast retransmit): packets of the
     ///   older frame are no longer in flight, so waiting is pure latency.
     pub fn missing_candidates(&self, now: Instant) -> Vec<(u32, u16, Vec<usize>)> {
-        self.pending
+        let mut candidates: Vec<(u32, u16, Vec<usize>)> = Vec::new();
+        // Frames that never arrived at all (not even one packet) never enter
+        // `pending`, so the normal scan below cannot see them. Detect ids
+        // strictly between next_expected and the high-water mark that are
+        // neither pending nor ready and ask for a full retransmission
+        // (count = 0). The 2-frame-ahead rule keeps reordering out.
+        let mut missing_gap = 0;
+        let mut probe = self.next_expected;
+        while index_before(probe, self.max_frame_seen) && missing_gap < 2 {
+            let known = self.pending.contains_key(&probe) || self.ready.iter().any(|frame| frame.frame_id == probe);
+            let ahead = self.max_frame_seen.wrapping_sub(probe);
+            if !known && ahead >= 2 && ahead < u32::MAX / 2 {
+                candidates.push((probe, 0, Vec::new()));
+                missing_gap += 1;
+            }
+            probe = probe.wrapping_add(1);
+        }
+        candidates.extend(self.pending
             .iter()
+            .take(4)
             .filter_map(|(&frame_id, frame)| {
                 // Fast retransmit with a triple-ACK-like margin: only when the
                 // sender demonstrably moved 2+ frames ahead. One frame ahead can
@@ -584,8 +613,8 @@ impl Reassembler {
                 } else {
                     Some((frame_id, frame.count as u16, missing))
                 }
-            })
-            .collect()
+            }));
+        candidates
     }
 
     pub fn ingest(&mut self, packet: &Packet, now: Instant) -> Vec<Delivered> {
@@ -1128,6 +1157,50 @@ mod tests {
         assert_eq!(candidates[0].2, vec![1]);
     }
 
+    #[test]
+    fn fully_missing_frame_is_requested_as_a_whole() {
+        // Frame 5 never arrives at all; frames 7 and 8 do. The gap must be
+        // requested as count = 0 (sender resends every packet of frame 5),
+        // which is the only recovery path for a fully lost frame.
+        let mut receiver = Reassembler::new();
+        let t = now();
+        // Frame 1 defines next_expected = 1 and is delivered immediately.
+        for packet in packetize(3, 1, 0, 0, &vec![0x00; DEFAULT_PAYLOAD]) {
+            let _ = receiver.ingest(&packet, t);
+        }
+        let _ = receiver.poll(t);
+        // Frames 2..6 never arrive; 7 and 8 do.
+        let later = t + Duration::from_millis(1);
+        for packet in packetize(3, 7, 0, 0, &vec![0x11; DEFAULT_PAYLOAD]) {
+            let _ = receiver.ingest(&packet, later);
+        }
+        for packet in packetize(3, 8, 0, 0, &vec![0x22; DEFAULT_PAYLOAD]) {
+            let _ = receiver.ingest(&packet, later);
+        }
+        let candidates = receiver.missing_candidates(later);
+        let whole = candidates
+            .iter()
+            .find(|(frame_id, count, missing)| *frame_id == 2 && *count == 0 && missing.is_empty());
+        assert!(
+            whole.is_some(),
+            "a frame id that never arrived must be requested as a whole: {candidates:?}"
+        );
+    }
+
+    #[test]
+    fn whole_frame_nack_roundtrips() {
+        let nack = Nack {
+            session: 9,
+            frame_id: 42,
+            count: 0,
+            missing: Vec::new(),
+        };
+        let bytes = nack.encode();
+        let packet = Packet::decode(&bytes).unwrap();
+        assert_eq!(packet.flags & FLAG_NACK, FLAG_NACK);
+        assert_eq!(packet.count, 0);
+        assert_eq!(Nack::from_packet(&packet), Some(nack));
+    }
     #[test]
     fn session_restart_resets_the_frame_high_water_mark() {
         // Session 1 reaches frame 50, so the high-water mark is 50. A new

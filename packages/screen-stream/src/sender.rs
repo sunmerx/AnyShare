@@ -207,6 +207,26 @@ mod imp {
     where
         F: FnMut(&[u8]) -> bool,
     {
+        // count == 0: the receiver saw none of this frame's packets, so resend
+        // every data packet once (bypassing the per-frame packet budget, which
+        // exists to stop NACK amplification, not to drop a whole frame).
+        if nack.count == 0 {
+            // Once serviced, the frame stays closed (prevents request loops).
+            if budget.get(&nack.frame_id) == Some(&0) {
+                return 0;
+            }
+            let Some(frames) = history.get(nack.frame_id) else {
+                return 0;
+            };
+            budget.insert(nack.frame_id, 0);
+            let mut resent = 0;
+            for bytes in frames {
+                if send(bytes) {
+                    resent += 1;
+                }
+            }
+            return resent;
+        }
         let remaining = budget.entry(nack.frame_id).or_insert(2);
         if *remaining == 0 {
             return 0;
@@ -517,6 +537,32 @@ mod imp {
     mod tests {
         use super::*;
 
+        #[test]
+        fn whole_frame_nack_resends_every_packet_once() {
+            let mut history = PacketHistory::new(4);
+            history.push(7, vec![vec![1], vec![2], vec![3]]);
+            let mut budget = std::collections::HashMap::new();
+            let mut sent = 0;
+            let nack = Nack {
+                session: 1,
+                frame_id: 7,
+                count: 0,
+                missing: Vec::new(),
+            };
+            let resent = apply_nack(&history, &nack, &mut budget, |_| {
+                sent += 1;
+                true
+            });
+            assert_eq!(resent, 3, "all data packets of the frame are resent");
+            assert_eq!(sent, 3);
+            // The budget is exhausted for this frame: a follow-up is ignored.
+            let resent = apply_nack(&history, &nack, &mut budget, |_| {
+                sent += 1;
+                true
+            });
+            assert_eq!(resent, 0);
+            assert_eq!(sent, 3);
+        }
         #[test]
         fn adaptive_fec_drops_parity_but_keeps_data_bytes() {
             use crate::transport::{packetize, DEFAULT_PAYLOAD, FLAG_KEYFRAME};
