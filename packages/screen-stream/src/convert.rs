@@ -148,6 +148,41 @@ pub fn bgra_box_scale(src: &[u8], sw: u32, sh: u32, dw: u32, dh: u32, out: &mut 
     }
 }
 
+/// Unsharp mask on the luma plane only (chroma untouched, so colours cannot
+/// fringe). Screen content is mostly text and thin lines, which the downscale,
+/// 4:2:0 conversion and quantization soften; a mild 3x3 unsharp restores edge
+/// contrast. `strength` is the percentage of the high-pass added back.
+pub fn sharpen_nv12_luma(y: &mut [u8], width: u32, height: u32, strength: u32) {
+    let (w, h) = (width as usize, height as usize);
+    if strength == 0 || w < 3 || h < 3 || y.len() < w * h {
+        return;
+    }
+    let mut blur = vec![0u8; w * h];
+    for row in 0..h {
+        let row0 = row.saturating_sub(1) * w;
+        let row1 = row * w;
+        let row2 = (row + 1).min(h - 1) * w;
+        for col in 0..w {
+            let c0 = col.saturating_sub(1);
+            let c2 = (col + 1).min(w - 1);
+            let sum = u32::from(y[row0 + c0])
+                + u32::from(y[row0 + col])
+                + u32::from(y[row0 + c2])
+                + u32::from(y[row1 + c0])
+                + u32::from(y[row1 + col])
+                + u32::from(y[row1 + c2])
+                + u32::from(y[row2 + c0])
+                + u32::from(y[row2 + col])
+                + u32::from(y[row2 + c2]);
+            blur[row1 + col] = (sum / 9) as u8;
+        }
+    }
+    for index in 0..w * h {
+        let original = i32::from(y[index]);
+        let diff = original - i32::from(blur[index]);
+        y[index] = (original + diff * strength as i32 / 100).clamp(0, 255) as u8;
+    }
+}
 /// Cheap blank-frame check: samples every 4096th pixel (used to drop the
 /// driver's blank first frame after a duplication session starts).
 pub fn bgra_looks_blank(bgra: &[u8]) -> bool {
@@ -189,6 +224,30 @@ mod tests {
         v
     }
 
+    #[test]
+    fn sharpen_boosts_edges_and_leaves_flat_areas_alone() {
+        let (w, h) = (8u32, 8u32);
+        // A flat image has no high-pass content: it must be unchanged.
+        let flat = vec![90u8; (w * h) as usize];
+        let mut sharpened_flat = flat.clone();
+        sharpen_nv12_luma(&mut sharpened_flat, w, h, 50);
+        assert_eq!(sharpened_flat, flat);
+
+        // A lone bright pixel is pure high frequency: it must get brighter.
+        let mut bump = vec![100u8; (w * h) as usize];
+        bump[3 * 8 + 3] = 140;
+        let mut sharpened = bump.clone();
+        sharpen_nv12_luma(&mut sharpened, w, h, 50);
+        assert!(sharpened[3 * 8 + 3] > bump[3 * 8 + 3], "edge pixel is boosted");
+
+        // Neutral operations.
+        let mut untouched = bump.clone();
+        sharpen_nv12_luma(&mut untouched, w, h, 0);
+        assert_eq!(untouched, bump);
+        let mut tiny = vec![10u8, 20, 30, 40];
+        sharpen_nv12_luma(&mut tiny, 2, 2, 100);
+        assert_eq!(tiny, vec![10, 20, 30, 40], "images smaller than 3x3 are a no-op");
+    }
     #[test]
     fn nv12_plane_sizes_and_neutral_chroma() {
         let mut out = Vec::new();

@@ -53,6 +53,13 @@
 - `pubspec.lock`:8 个 build 工具链传递依赖小版本再解析(archive/build_config/build_daemon 等,仅 codegen 使用;官方源解析,运行时依赖零漂移)
 - `app/pubspec.yaml`:description 重写、homepage → github.com/sunmerx/AnyShare
 
+### E1 亮度锐化批次(2026-10-27)
+
+- `packages/screen-stream/src/convert.rs`:新增 `sharpen_nv12_luma`(仅 Y 平面 3×3 非锐化掩膜,strength 35%)+ 单测
+- `packages/screen-stream/src/sender.rs`:`maybe_sharpen` 接入 GPU/CPU 两条转换路径(指针合成之后、编码之前);`ANYSHARE_SHARPEN=0` 关闭
+- 成本 +1.2ms/帧(13.7→14.9ms 循环);49 Rust 测试
+- 文档:`docs/E2-S0/串流清晰度-亮度锐化.md`
+
 ### D1 自适应 FEC 批次(2026-10-27)
 
 - `packages/screen-stream/src/sender.rs`:`encode_packets` 增加 FEC 过滤(关键帧与 ≤8 包小帧始终保留校验包);net 线程在会话内 NACK 时记录**单调**时间戳;run_loop 状态机(10s 起步保护 / 30s 丢包保持 / 否则关闭)并打印切换日志;稀疏提交前冲刷滞留帧;1 个单测(数据包逐字节不变 + 小帧/关键帧保留 + 加密路径)

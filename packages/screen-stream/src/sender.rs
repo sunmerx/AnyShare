@@ -333,6 +333,15 @@ mod imp {
         (tx, join)
     }
 
+    /// Optional luma sharpening for text-heavy screen content. Enabled by
+    /// default; `ANYSHARE_SHARPEN=0` turns it off (e.g. for A/B comparisons).
+    /// The cost is two passes over the Y plane per sent frame.
+    fn maybe_sharpen(nv12: &mut [u8], width: u32, height: u32) {
+        if std::env::var("ANYSHARE_SHARPEN").map(|value| value == "0").unwrap_or(false) {
+            return;
+        }
+        crate::convert::sharpen_nv12_luma(nv12, width, height, 35);
+    }
     /// Wall-clock microseconds since the Unix epoch (both ends must use the
     /// same unit for clock-offset probing).
     fn epoch_us() -> u64 {
@@ -990,6 +999,7 @@ mod imp {
                     match converted {
                         Ok(mut bytes) => {
                             dup.composite_pointer_nv12(&mut bytes, encode_width, encode_height);
+                            maybe_sharpen(&mut bytes, encode_width, encode_height);
                             nv12_ready = Some(bytes);
                             Some((meta, None))
                         }
@@ -1135,7 +1145,10 @@ mod imp {
                             };
                             let bgra = if (pixels.width, pixels.height) == (sw, sh) { &pixels.bgra } else { &scaled_bgra };
                             match encoder.input_format() {
-                                InputPixelFormat::Nv12 => crate::convert::bgra_to_nv12(bgra, sw, sh, &mut i420),
+                                InputPixelFormat::Nv12 => {
+                                    crate::convert::bgra_to_nv12(bgra, sw, sh, &mut i420);
+                                    maybe_sharpen(&mut i420, sw, sh);
+                                }
                                 InputPixelFormat::I420 => crate::convert::bgra_to_i420(bgra, sw, sh, &mut i420),
                                 InputPixelFormat::Yv12 => {
                                     crate::convert::bgra_to_i420(bgra, sw, sh, &mut i420);
