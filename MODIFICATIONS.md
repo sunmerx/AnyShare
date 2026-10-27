@@ -53,6 +53,13 @@
 - `pubspec.lock`:8 个 build 工具链传递依赖小版本再解析(archive/build_config/build_daemon 等,仅 codegen 使用;官方源解析,运行时依赖零漂移)
 - `app/pubspec.yaml`:description 重写、homepage → github.com/sunmerx/AnyShare
 
+### G1-step1 指纹贯通批次(2026-10-27,无行为变更)
+
+- `app/lib/provider/screen/screen_provider.dart`:`ActiveScreenSession`/`WaitingScreenAccept` 增加 `peerFingerprint`;`StartScreenShareAction` 增加该字段;`startSenderSession`/`startReceiverSession` 透传并存入会话状态
+- `app/lib/pages/device_details_page.dart`:发起共享时传入 `device.fingerprint`
+- 网络行为不变(postScreenControl 仍为明文 HTTP);为控制面 TLS 的证书 pinning 准备数据
+- 设计文档:`docs/E2-S0/控制面TLS设计.md`;240 Dart 测试全绿、analyze 0
+
 ### F1 整帧丢失恢复批次(2026-10-27)
 
 - `packages/screen-stream/src/transport.rs`:`Nack` 支持 `count=0`(整帧全丢,位图为空);`missing_candidates` 扫描 `next_expected..max_frame_seen` 的空洞帧(高水位超前 ≥2,每次最多 2 个);2 个单测
