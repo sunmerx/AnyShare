@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:crypto/crypto.dart';
 import 'package:cryptography/cryptography.dart';
 import 'package:localsend_app/model/persistence/favorite_device.dart';
 import 'package:localsend_app/provider/favorites_provider.dart';
@@ -33,6 +34,11 @@ import 'package:uuid/uuid.dart';
 final _logger = Logger('ExtensionServer');
 
 const int kExtensionPort = 53318;
+
+/// TLS screen control plane (mutual certificates). Kept separate from the plain
+/// [kExtensionPort] so pairing/directory clients are unaffected; see
+/// docs/E2-S0/控制面TLS设计.md.
+const int kScreenSecurePort = 53320;
 const int kMaxBodyBytes = 64 * 1024;
 const Duration kPendingTtl = Duration(minutes: 5);
 
@@ -86,6 +92,47 @@ class ExtensionServerService extends ReduxNotifier<ExtensionServerState> {
 
   ExtensionServerService(this.ref);
 
+  /// TLS screen-control listener (see [StartScreenSecureServerAction]).
+  HttpServer? _screenSecureServer;
+
+  /// Closes the TLS screen-control listener (used by tests and shutdown).
+  Future<void> closeScreenSecure() async {
+    await _screenSecureServer?.close(force: true);
+    _screenSecureServer = null;
+  }
+
+  /// Certificate fingerprint of the authenticated client, uppercase hex.
+  /// Identity comes from the TLS layer, never from request bodies.
+  String? _peerFingerprintOf(HttpRequest request) {
+    final certificate = request.certificate;
+    if (certificate == null) {
+      return null;
+    }
+    return sha256.convert(certificate.der).toString().toUpperCase();
+  }
+
+  /// Handles requests on the mutual-TLS screen listener.
+  ///
+  /// Step 2 scope: only the probe endpoint is served. Screen routes move here
+  /// once the client side pins the server certificate (design doc step 3).
+  Future<void> _handleScreenSecure(HttpRequest request) async {
+    final peer = _peerFingerprintOf(request);
+    if (peer == null) {
+      await writeJson(request, {'error': 'tls_required'}, status: 403);
+      return;
+    }
+    final path = request.uri.path;
+    if (request.method == 'GET' && path == '/api/anyshare/v1/screen/tls') {
+      await writeJson(request, {
+        'ok': true,
+        'peer': peer,
+        'local': ref.read(securityProvider).certificateHash,
+      });
+      return;
+    }
+    await writeJson(request, {'error': 'not_found'}, status: 404);
+  }
+
   @override
   ExtensionServerState init() {
     // Starting happens via [StartExtensionServerAction] dispatched from
@@ -135,6 +182,52 @@ class StartExtensionServerAction extends AsyncReduxAction<ExtensionServerService
       _logger.warning('Extension server could not bind port $kExtensionPort: $e');
       return state;
     }
+  }
+}
+
+/// Starts the TLS screen-control listener (port [kScreenSecurePort]).
+///
+/// This is step 2 of docs/E2-S0/控制面TLS设计.md: the listener itself, with
+/// mandatory client certificates and certificate-derived peer identity. The
+/// screen routes are migrated onto it in a later step; for now it exposes a
+/// single probe endpoint so the mutual-TLS path can be verified end to end
+/// without changing any existing behaviour.
+class StartScreenSecureServerAction extends AsyncReduxAction<ExtensionServerService, ExtensionServerState> {
+  StartScreenSecureServerAction({this.port = kScreenSecurePort});
+
+  /// Ephemeral port (0) for tests.
+  final int port;
+
+  @override
+  Future<ExtensionServerState> reduce() async {
+    final security = notifier.ref.read(securityProvider);
+    try {
+      final context = SecurityContext(withTrustedRoots: false)
+        ..useCertificateChainBytes(utf8.encode(security.certificate))
+        ..usePrivateKeyBytes(utf8.encode(security.privateKey));
+      final server = await HttpServer.bindSecure(
+        InternetAddress.anyIPv6,
+        port,
+        context,
+        requestClientCertificate: true,
+        shared: true,
+      );
+      _logger.info('Screen TLS control listening on ${server.port} (mutual certificates)');
+      // ignore: discarded_futures
+      server.listen((request) async {
+        try {
+          await notifier._handleScreenSecure(request);
+        } catch (e, st) {
+          _logger.fine('Screen TLS request error: $e\n$st');
+        }
+      });
+      notifier._screenSecureServer = server;
+    } catch (e) {
+      // Never block app startup: screen sharing reports an explicit error when
+      // the secure listener is unavailable instead of silently using plain HTTP.
+      _logger.warning('Screen TLS control could not bind port $port: $e');
+    }
+    return state;
   }
 }
 

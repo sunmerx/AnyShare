@@ -201,6 +201,9 @@ Future<RefenaContainer> preInit(List<String> args) async {
   // first-time provider instantiation there throws LateInitializationError.
   try {
     await container.redux(extensionServerProvider).dispatchAsync(StartExtensionServerAction());
+    // Mutual-TLS screen control plane (design doc step 2): a failure here only
+    // disables TLS screen control, it never blocks app startup.
+    await container.redux(extensionServerProvider).dispatchAsync(StartScreenSecureServerAction());
   } catch (e, st) {
     _logger.warning('Starting extension server failed: $e $st');
   }
