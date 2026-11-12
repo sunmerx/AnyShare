@@ -1,0 +1,1833 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AnyShare UI 原型 · 基于归属关系的局域网协作</title>
+<style>
+  :root {
+    --primary: #00696C;
+    --primary-container: #9CF1F0;
+    --on-primary-container: #00201F;
+    --secondary-container: #CCE8E7;
+    --surface: #F7FAF9;
+    --surface-card: #FFFFFF;
+    --surface-variant: #EAF1EF;
+    --rail: #F1F6F4;
+    --outline: #DCE5E2;
+    --text: #171D1C;
+    --text-2: #5A6664;
+    --text-3: #8A9694;
+    --green: #2E7D46;
+    --green-bg: #DFF5E5;
+    --amber: #9A6700;
+    --amber-bg: #FFF1D2;
+    --blue: #22639C;
+    --blue-bg: #E1EEFB;
+    --red: #BA1A1A;
+    --red-bg: #FFE2E0;
+    --shadow: 0 1px 2px rgba(20,40,38,.06), 0 4px 14px rgba(20,40,38,.06);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: "Segoe UI", "Microsoft YaHei", system-ui, -apple-system, sans-serif;
+    background: #E7EDEB;
+    color: var(--text);
+    display: flex; align-items: center; justify-content: center;
+    padding: 24px; min-height: 100vh;
+  }
+  .win {
+    width: 1280px; max-width: 100%; height: 820px; max-height: calc(100vh - 48px);
+    background: var(--surface); border-radius: 14px; overflow: hidden;
+    box-shadow: 0 24px 60px rgba(15,35,32,.28);
+    display: flex; flex-direction: column;
+    transition: width .25s ease;
+  }
+  .win.mobile { width: 420px; height: 820px; }
+  /* ---------- title bar ---------- */
+  .titlebar {
+    height: 40px; background: var(--rail); border-bottom: 1px solid var(--outline);
+    display: flex; align-items: center; padding: 0 14px; gap: 10px; user-select: none;
+  }
+  .titlebar .dot { width: 12px; height: 12px; border-radius: 50%; }
+  .titlebar .t { font-size: 12.5px; color: var(--text-2); margin-left: 6px; }
+  .titlebar .spacer { flex: 1; }
+  .titlebar .demo-toggle {
+    font-size: 12px; color: var(--primary); border: 1px solid var(--primary);
+    background: transparent; border-radius: 999px; padding: 3px 12px; cursor: pointer;
+  }
+  .titlebar .demo-toggle:hover { background: var(--secondary-container); }
+  /* ---------- body ---------- */
+  .body { flex: 1; display: flex; min-height: 0; }
+  .rail {
+    width: 236px; background: var(--rail); border-right: 1px solid var(--outline);
+    display: flex; flex-direction: column; padding: 14px 10px; gap: 2px; flex-shrink: 0;
+  }
+  .win.mobile .rail { display: none; }
+  .brand { display: flex; align-items: center; gap: 10px; padding: 8px 12px 18px; }
+  .brand .logo {
+    width: 34px; height: 34px; border-radius: 10px;
+    background: linear-gradient(135deg, #00A69C, #00696C);
+    display: flex; align-items: center; justify-content: center; color: #fff;
+  }
+  .brand .name { font-size: 19px; font-weight: 700; letter-spacing: .2px; }
+  .brand .ver { font-size: 10.5px; color: var(--text-3); margin-top: 1px; }
+  .nav-item {
+    display: flex; align-items: center; gap: 12px; padding: 11px 14px;
+    border-radius: 999px; cursor: pointer; color: var(--text-2); font-size: 14px;
+    border: none; background: transparent; width: 100%; text-align: left;
+  }
+  .nav-item svg { width: 21px; height: 21px; flex-shrink: 0; }
+  .nav-item:hover { background: var(--surface-variant); }
+  .nav-item.active { background: var(--secondary-container); color: var(--on-primary-container); font-weight: 600; }
+  .nav-item .badge {
+    margin-left: auto; background: var(--primary); color: #fff; font-size: 11px;
+    min-width: 19px; height: 19px; border-radius: 999px; display: flex;
+    align-items: center; justify-content: center; padding: 0 6px; font-weight: 600;
+  }
+  .rail .foot { margin-top: 8px; padding: 10px 14px; font-size: 11px; color: var(--text-3); line-height: 1.6; }
+  /* ---------- rail transfer panel ---------- */
+  .rail-transfers { margin-top: auto; border-top: 1px solid var(--outline); padding-top: 8px; }
+  .rt-head { display: flex; align-items: center; gap: 8px; padding: 4px 14px 6px; font-size: 11.5px; font-weight: 700; color: var(--text-2); letter-spacing: .4px; }
+  .rt-head .badge { background: var(--primary); color: #fff; font-size: 10.5px; min-width: 17px; height: 17px; border-radius: 999px; display: flex; align-items: center; justify-content: center; padding: 0 5px; font-weight: 700; }
+  .rt-head .spacer { flex: 1; }
+  .rt-head button { border: none; background: transparent; color: var(--primary); font-size: 11px; cursor: pointer; font-weight: 600; }
+  .rt-item { padding: 7px 14px; display: flex; align-items: center; gap: 8px; }
+  .rt-item svg { width: 15px; height: 15px; flex-shrink: 0; color: var(--text-2); }
+  .rt-item .grow { flex: 1; min-width: 0; }
+  .rt-item .nm { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rt-item .meta { font-size: 10.5px; color: var(--text-3); margin-top: 1px; }
+  .rt-item .x { border: none; background: transparent; color: var(--text-3); cursor: pointer; padding: 2px; display: flex; }
+  .rt-item .x:hover { color: var(--red); }
+  .rt-item .x svg { width: 13px; height: 13px; }
+  .rt-bar { height: 4px; background: var(--surface-variant); border-radius: 999px; margin-top: 5px; overflow: hidden; }
+  .rt-bar .fill { height: 100%; background: var(--primary); border-radius: 999px; transition: width .25s linear; }
+  .rt-empty { padding: 4px 14px 6px; font-size: 11.5px; color: var(--text-3); }
+  .rt-done svg { color: var(--green); }
+  .rt-fail svg { color: var(--red); }
+  /* mobile transfer pill */
+  .transfer-pill { display: none; position: absolute; right: 14px; bottom: 78px; z-index: 40; background: #2A3836; color: #fff; border: none; border-radius: 999px; padding: 9px 16px; font-size: 12.5px; cursor: pointer; box-shadow: 0 8px 24px rgba(0,0,0,.3); align-items: center; gap: 8px; font-family: inherit; }
+  .transfer-pill svg { width: 15px; height: 15px; }
+  .win.mobile .transfer-pill.show { display: flex; }
+  .win { position: relative; }
+  /* keyboard/mouse layout editor */
+  .lay-tile { display: flex; flex-direction: column; align-items: center; gap: 5px; width: 112px; padding: 14px 8px; border: 1.5px solid var(--outline); border-radius: 14px; cursor: grab; background: var(--surface); }
+  .lay-tile:hover { border-color: var(--primary); }
+  .lay-tile:active { cursor: grabbing; }
+  .lay-tile svg { width: 26px; height: 26px; color: var(--primary); }
+  .lay-tile .nm { font-size: 12px; font-weight: 600; text-align: center; word-break: break-all; }
+  /* ---------- content ---------- */
+  .content { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .topbar {
+    height: 58px; display: flex; align-items: center; gap: 12px;
+    padding: 0 22px; border-bottom: 1px solid transparent; flex-shrink: 0;
+  }
+  .topbar h1 { font-size: 19px; font-weight: 700; }
+  .topbar .sub { font-size: 12.5px; color: var(--text-2); margin-top: 2px; }
+  .topbar .spacer { flex: 1; }
+  .icon-btn {
+    width: 36px; height: 36px; border-radius: 50%; border: none; background: transparent;
+    display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--text-2);
+  }
+  .icon-btn:hover { background: var(--surface-variant); }
+  .icon-btn svg { width: 20px; height: 20px; }
+  .chips { padding: 0 22px 4px; display: flex; flex-direction: column; gap: 8px; }
+  .chip {
+    display: flex; align-items: center; gap: 10px; background: var(--primary-container);
+    color: var(--on-primary-container); border-radius: 12px; padding: 9px 14px; font-size: 13px;
+  }
+  .chip .spacer { flex: 1; }
+  .chip button {
+    border: none; background: rgba(0,0,0,.08); border-radius: 999px; padding: 5px 14px;
+    font-size: 12.5px; cursor: pointer; color: inherit; font-weight: 600;
+  }
+  .chip button:hover { background: rgba(0,0,0,.15); }
+  .scroll { flex: 1; overflow-y: auto; padding: 6px 22px 26px; }
+  .section-title {
+    font-size: 12.5px; font-weight: 700; color: var(--text-2); letter-spacing: .4px;
+    margin: 18px 2px 10px; display: flex; align-items: center; gap: 8px;
+  }
+  .section-title .count { color: var(--text-3); font-weight: 500; }
+  .section-title .spacer { flex: 1; }
+  .section-title button {
+    border: none; background: transparent; color: var(--primary); font-size: 12.5px;
+    cursor: pointer; font-weight: 600; display: flex; align-items: center; gap: 4px;
+  }
+  /* ---------- device cards ---------- */
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 12px; }
+  .win.mobile .cards { grid-template-columns: 1fr; }
+  .card {
+    background: var(--surface-card); border: 1px solid var(--outline); border-radius: 16px;
+    padding: 15px 16px 13px; cursor: pointer; transition: box-shadow .15s, border-color .15s;
+    position: relative;
+  }
+  .card:hover { box-shadow: var(--shadow); border-color: #C9D6D3; }
+  .card .row1 { display: flex; align-items: center; gap: 12px; }
+  .dev-icon {
+    width: 42px; height: 42px; border-radius: 12px; background: var(--surface-variant);
+    display: flex; align-items: center; justify-content: center; color: var(--primary); flex-shrink: 0;
+  }
+  .dev-icon svg { width: 23px; height: 23px; }
+  .card .meta { flex: 1; min-width: 0; }
+  .card .name { font-size: 14.5px; font-weight: 600; display: flex; align-items: center; gap: 7px; }
+  .card .plat { font-size: 12px; color: var(--text-2); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .status { display: flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--text-2); flex-shrink: 0; }
+  .dot-on { width: 8px; height: 8px; border-radius: 50%; background: #34A853; box-shadow: 0 0 0 3px #DFF5E5; }
+  .dot-off { width: 8px; height: 8px; border-radius: 50%; background: #B9C4C2; }
+  .tag {
+    font-size: 10.5px; font-weight: 600; padding: 2.5px 8px; border-radius: 999px; white-space: nowrap;
+  }
+  .tag.self { background: var(--secondary-container); color: var(--on-primary-container); }
+  .tag.temp { background: var(--amber-bg); color: var(--amber); }
+  .tag.limited { background: var(--blue-bg); color: var(--blue); }
+  .tag.full { background: var(--green-bg); color: var(--green); }
+  .tag.near { background: var(--surface-variant); color: var(--text-2); }
+  .card .actions { display: flex; gap: 6px; margin-top: 13px; flex-wrap: wrap; }
+  .act {
+    display: flex; align-items: center; gap: 6px; border: 1px solid var(--outline);
+    background: transparent; color: var(--text-2); border-radius: 999px; padding: 6px 13px;
+    font-size: 12.5px; cursor: pointer;
+  }
+  .act svg { width: 15px; height: 15px; }
+  .act:hover { background: var(--surface-variant); color: var(--text); }
+  .act.primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+  .act.primary:hover { background: #005B5E; }
+  .act:disabled { opacity: .45; cursor: not-allowed; }
+  .act:disabled:hover { background: transparent; color: var(--text-2); }
+  /* ---------- list rows (blocklist / settings) ---------- */
+  .rows { display: flex; flex-direction: column; gap: 8px; }
+  .row {
+    background: var(--surface-card); border: 1px solid var(--outline); border-radius: 14px;
+    padding: 12px 16px; display: flex; align-items: center; gap: 14px;
+  }
+  .row .grow { flex: 1; min-width: 0; }
+  .row .title { font-size: 13.5px; font-weight: 600; }
+  .row .desc { font-size: 12px; color: var(--text-2); margin-top: 2px; line-height: 1.5; }
+  .row .trail { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+  .mono { font-family: Consolas, "Courier New", monospace; font-size: 11.5px; color: var(--text-2); }
+  /* ---------- settings ---------- */
+  .group { margin-bottom: 6px; }
+  .switch { position: relative; width: 46px; height: 26px; flex-shrink: 0; }
+  .switch input { display: none; }
+  .switch .track {
+    position: absolute; inset: 0; background: #C4CFCC; border-radius: 999px; transition: .15s;
+  }
+  .switch .knob {
+    position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; background: #fff;
+    border-radius: 50%; transition: .15s; box-shadow: 0 1px 3px rgba(0,0,0,.25);
+  }
+  .switch input:checked + .track { background: var(--primary); }
+  .switch input:checked + .track + .knob { left: 23px; }
+  .switch input:disabled + .track { opacity: .45; }
+  select, input[type=text] {
+    border: 1px solid var(--outline); border-radius: 10px; padding: 8px 12px; font-size: 13px;
+    background: var(--surface-card); color: var(--text); font-family: inherit;
+  }
+  select:disabled, input:disabled { opacity: .5; }
+  /* ---------- buttons ---------- */
+  .btn {
+    border: none; border-radius: 999px; padding: 9px 20px; font-size: 13.5px; cursor: pointer;
+    font-weight: 600; font-family: inherit;
+  }
+  .btn.filled { background: var(--primary); color: #fff; }
+  .btn.filled:hover { background: #005B5E; }
+  .btn.tonal { background: var(--secondary-container); color: var(--on-primary-container); }
+  .btn.text { background: transparent; color: var(--primary); }
+  .btn.danger { background: transparent; color: var(--red); border: 1px solid #F0B9B6; }
+  .btn.danger:hover { background: var(--red-bg); }
+  /* ---------- detail ---------- */
+  .detail-head { display: flex; align-items: center; gap: 16px; margin: 8px 0 4px; }
+  .detail-head .dev-icon { width: 64px; height: 64px; border-radius: 18px; }
+  .detail-head .dev-icon svg { width: 34px; height: 34px; }
+  .detail-head h2 { font-size: 21px; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+  .kv { display: grid; grid-template-columns: 110px 1fr; gap: 7px 12px; font-size: 13px; }
+  .kv .k { color: var(--text-2); }
+  .kv .v { color: var(--text); display: flex; align-items: center; gap: 8px; }
+  .trust-opts { display: flex; gap: 8px; flex-wrap: wrap; }
+  .trust-opt {
+    border: 1.5px solid var(--outline); border-radius: 12px; padding: 10px 14px; cursor: pointer;
+    background: transparent; text-align: left; min-width: 150px; font-family: inherit;
+  }
+  .trust-opt .t { font-size: 13px; font-weight: 700; }
+  .trust-opt .d { font-size: 11.5px; color: var(--text-2); margin-top: 3px; line-height: 1.45; }
+  .trust-opt.sel { border-color: var(--primary); background: var(--secondary-container); }
+  .big-actions { display: flex; gap: 10px; flex-wrap: wrap; margin: 6px 0 4px; }
+  /* ---------- dir browser ---------- */
+  .crumbs { display: flex; align-items: center; gap: 4px; font-size: 13px; color: var(--text-2); margin: 8px 0 12px; flex-wrap: wrap; }
+  .crumbs .c { cursor: pointer; padding: 3px 8px; border-radius: 8px; }
+  .crumbs .c:hover { background: var(--surface-variant); }
+  .crumbs .c.cur { color: var(--text); font-weight: 600; }
+  .file-row { cursor: default; }
+  .file-row:hover { border-color: #C9D6D3; }
+  .file-row .fi { width: 34px; height: 34px; border-radius: 9px; background: var(--surface-variant); display: flex; align-items: center; justify-content: center; color: var(--text-2); flex-shrink: 0; }
+  .file-row .fi svg { width: 18px; height: 18px; }
+  /* ---------- bottom nav (mobile) ---------- */
+  .bottomnav { display: none; height: 64px; background: var(--rail); border-top: 1px solid var(--outline); }
+  .win.mobile .bottomnav { display: flex; }
+  .bottomnav button {
+    flex: 1; border: none; background: transparent; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 3px; font-size: 10.5px; color: var(--text-2);
+    cursor: pointer; font-family: inherit;
+  }
+  .bottomnav button svg { width: 22px; height: 22px; }
+  .bottomnav button.active { color: var(--primary); font-weight: 700; }
+  .bottomnav button.active svg { color: var(--primary); }
+  /* ---------- dialogs ---------- */
+  .scrim {
+    position: fixed; inset: 0; background: rgba(10,25,23,.42); display: none;
+    align-items: center; justify-content: center; z-index: 50;
+  }
+  .scrim.show { display: flex; }
+  .dialog {
+    width: 400px; max-width: calc(100vw - 48px); background: var(--surface-card);
+    border-radius: 22px; padding: 24px; box-shadow: 0 20px 60px rgba(0,0,0,.3);
+    animation: pop .16s ease;
+  }
+  @keyframes pop { from { transform: scale(.94); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  .dialog h3 { font-size: 17px; margin-bottom: 8px; display: flex; align-items: center; gap: 10px; }
+  .dialog p { font-size: 13px; color: var(--text-2); line-height: 1.65; }
+  .dialog .d-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+  .sas {
+    font-size: 34px; font-weight: 700; letter-spacing: 8px; text-align: center;
+    color: var(--primary); margin: 16px 0; font-family: Consolas, monospace;
+  }
+  /* ---------- toast / demo fab ---------- */
+  .toasts { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%); z-index: 80; display: flex; flex-direction: column; gap: 8px; align-items: center; }
+  .toast {
+    background: #2A3836; color: #fff; font-size: 13px; padding: 10px 20px; border-radius: 999px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.25); animation: pop .18s ease; max-width: 70vw;
+  }
+  .demo-fab { position: fixed; right: 34px; bottom: 30px; z-index: 70; }
+  .demo-fab .fbtn {
+    background: #2A3836; color: #fff; border: none; border-radius: 999px; padding: 11px 20px;
+    font-size: 13px; cursor: pointer; box-shadow: 0 8px 24px rgba(0,0,0,.28); font-family: inherit;
+  }
+  .demo-menu {
+    position: absolute; bottom: 52px; right: 0; background: #fff; border-radius: 14px;
+    box-shadow: 0 12px 40px rgba(0,0,0,.25); padding: 6px; display: none; min-width: 210px;
+  }
+  .demo-menu.show { display: block; }
+  .demo-menu button {
+    display: block; width: 100%; text-align: left; border: none; background: transparent;
+    padding: 10px 14px; font-size: 13px; border-radius: 9px; cursor: pointer; font-family: inherit;
+  }
+  .demo-menu button:hover { background: var(--surface-variant); }
+  /* ---------- dir browser (multi-device tree + pane) ---------- */
+  .dirwrap { display: flex; height: 100%; min-height: 0; }
+  .dirtree { width: 252px; flex-shrink: 0; border-right: 1px solid var(--outline); background: var(--rail); overflow-y: auto; padding: 12px 8px 20px; }
+  .dt-title { font-size: 11.5px; font-weight: 700; color: var(--text-3); padding: 4px 10px 10px; letter-spacing: .5px; }
+  .tnode { display: flex; align-items: center; gap: 7px; padding: 7px 8px; border-radius: 9px; cursor: pointer; font-size: 13px; color: var(--text-2); white-space: nowrap; }
+  .tnode:hover { background: var(--surface-variant); }
+  .tnode.sel { background: var(--secondary-container); color: var(--on-primary-container); font-weight: 600; }
+  .tnode.off { opacity: .5; }
+  .tnode.off:hover { background: transparent; cursor: not-allowed; }
+  .tnode svg { width: 16px; height: 16px; flex-shrink: 0; }
+  .tnode .arrow { width: 13px; height: 13px; transition: transform .12s; color: var(--text-3); }
+  .tnode .arrow.open { transform: rotate(90deg); }
+  .tnode .arrow.ghost { visibility: hidden; }
+  .tnode .dev-dot { width: 7px; height: 7px; border-radius: 50%; margin-left: auto; flex-shrink: 0; }
+  .tnode .dev-dot.on { background: #34A853; }
+  .tnode .dev-dot.offd { background: #B9C4C2; }
+  .dirpane { flex: 1; overflow-y: auto; padding: 14px 20px 26px; min-width: 0; position: relative; }
+  .pane-head { display: flex; align-items: center; gap: 8px; margin: 2px 0 10px; color: var(--text-2); font-size: 12.5px; }
+  .pane-head .spacer { flex: 1; }
+  .f-check { width: 16px; height: 16px; accent-color: var(--primary); cursor: pointer; flex-shrink: 0; }
+  .dirpane .file-row .title { cursor: pointer; }
+  /* toolbar icon toggle */
+  .vt-btn { width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--outline); background: transparent; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--text-2); }
+  .vt-btn svg { width: 16px; height: 16px; }
+  .vt-btn.sel { background: var(--secondary-container); color: var(--on-primary-container); border-color: transparent; }
+  /* tags & notes (directly visible in lists) */
+  .tagchip { font-size: 10.5px; background: var(--secondary-container); color: var(--on-primary-container); border-radius: 999px; padding: 2px 8px; margin-left: 6px; white-space: nowrap; }
+  .tagchip.note { background: var(--amber-bg); color: var(--amber); }
+  .tagchip .x { cursor: pointer; opacity: .6; margin-left: 3px; }
+  .note-inline { display: inline-flex; align-items: center; gap: 4px; color: var(--text-2); font-size: 11.5px; font-style: italic; overflow: hidden; min-width: 0; }
+  .note-inline > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .note-inline svg { width: 12px; height: 12px; flex-shrink: 0; color: var(--amber); }
+  .meta-cell { display: flex; align-items: center; overflow: hidden; min-width: 0; cursor: pointer; }
+  /* detail view columns */
+  .dhead { display: grid; grid-template-columns: 24px 34px minmax(170px,1.25fr) 84px 84px minmax(150px,1fr) 138px 44px; gap: 10px; padding: 0 16px 8px; color: var(--text-3); font-size: 11.5px; font-weight: 700; }
+  .drow { display: grid; grid-template-columns: 24px 34px minmax(170px,1.25fr) 84px 84px minmax(150px,1fr) 138px 44px; gap: 10px; align-items: center; background: var(--surface-card); border: 1px solid var(--outline); border-radius: 12px; padding: 9px 16px; margin-bottom: 7px; }
+  .drow:hover { border-color: #C9D6D3; }
+  .drow .fname { font-size: 13.5px; font-weight: 600; cursor: pointer; display: flex; align-items: center; min-width: 0; }
+  .drow .fname span.nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .drow .cell { font-size: 12px; color: var(--text-2); }
+  .drow .fi, .listrow .fi { width: 30px; height: 30px; }
+  /* list (compact) view */
+  .listrow { display: flex; align-items: center; gap: 10px; padding: 6px 12px; border-radius: 10px; }
+  .listrow:hover { background: var(--surface-variant); }
+  .listrow .fname { flex: 1; font-size: 13px; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; }
+  .listrow .cell { font-size: 12px; color: var(--text-2); }
+  /* context menu */
+  .ctxmenu { position: fixed; z-index: 95; background: #fff; border-radius: 13px; box-shadow: 0 10px 36px rgba(0,0,0,.28); padding: 6px; min-width: 178px; display: none; }
+  .ctxmenu.show { display: block; }
+  .ctxmenu button { display: flex; align-items: center; gap: 10px; width: 100%; border: none; background: transparent; padding: 9px 12px; font-size: 13px; border-radius: 9px; cursor: pointer; font-family: inherit; color: var(--text); text-align: left; }
+  .ctxmenu button:hover { background: var(--surface-variant); }
+  .ctxmenu button svg { width: 16px; height: 16px; color: var(--text-2); }
+  .ctxmenu button.danger { color: var(--red); }
+  .ctxmenu button.danger svg { color: var(--red); }
+  .ctxmenu .sep { height: 1px; background: var(--outline); margin: 5px 8px; }
+  /* drop highlight */
+  .dropzone-hint { position: absolute; inset: 10px; border: 2px dashed var(--primary); border-radius: 14px; background: rgba(0,105,108,.06); display: none; align-items: center; justify-content: center; font-size: 14px; color: var(--primary); font-weight: 600; pointer-events: none; z-index: 5; }
+  .dirpane.dragover .dropzone-hint { display: flex; }
+  .tnode.dropok { background: var(--secondary-container); }
+  /* lightbox */
+  .lightbox { width: 720px; max-width: calc(100vw - 40px); background: #101917; border-radius: 20px; padding: 16px; box-shadow: 0 24px 70px rgba(0,0,0,.5); }
+  .lightbox .lb-head { display: flex; align-items: center; gap: 10px; color: #E8F2F0; font-size: 13.5px; margin-bottom: 12px; }
+  .lightbox .lb-head .spacer { flex: 1; }
+  .lightbox img { width: 100%; border-radius: 12px; display: block; }
+  .lightbox .lb-actions { display: flex; gap: 8px; justify-content: center; margin-top: 14px; }
+  .lb-nav { width: 36px; height: 36px; border-radius: 50%; border: none; background: rgba(255,255,255,.12); color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .lb-nav:hover { background: rgba(255,255,255,.22); }
+  .lb-nav svg { width: 18px; height: 18px; }
+  /* markdown preview */
+  .dialog.mdlg { width: 760px; max-width: calc(100vw - 48px); }
+  .mdbox { max-height: 62vh; overflow-y: auto; background: var(--surface); border: 1px solid var(--outline); border-radius: 12px; padding: 20px 26px; font-size: 14px; line-height: 1.8; }
+  .mdbox h1 { font-size: 19px; margin-bottom: 10px; }
+  .mdbox h2 { font-size: 15.5px; margin: 14px 0 6px; }
+  .mdbox p { margin: 6px 0; color: var(--text); }
+  .mdbox code { background: var(--surface-variant); border-radius: 5px; padding: 1px 6px; font-family: Consolas, monospace; font-size: 12.5px; }
+  .mdbox ul { padding-left: 20px; }
+  /* mobile drawer */
+  .win.mobile .dirwrap { position: relative; }
+  .win.mobile .dirtree { position: absolute; left: 0; top: 0; bottom: 0; z-index: 30; transform: translateX(-102%); transition: transform .18s ease; box-shadow: none; }
+  .win.mobile .dirtree.open { transform: none; box-shadow: 12px 0 40px rgba(0,0,0,.25); }
+  .drawer-backdrop { display: none; position: absolute; inset: 0; background: rgba(10,25,23,.35); z-index: 25; }
+  .win.mobile .drawer-backdrop.show { display: block; }
+  .m-only { display: none !important; }
+  .win.mobile .m-only { display: flex !important; }
+  .win:not(.mobile) .d-only { display: flex; }
+  .d-only { display: none; }
+  .sel-banner { display: flex; align-items: center; gap: 10px; background: var(--primary-container); color: var(--on-primary-container); border-radius: 12px; padding: 8px 14px; font-size: 12.5px; margin-bottom: 10px; }
+  .sel-banner .spacer { flex: 1; }
+  .sel-banner button { border: none; border-radius: 999px; padding: 5px 14px; font-size: 12px; font-weight: 600; cursor: pointer; background: var(--primary); color: #fff; }
+  .sel-banner button.ghost { background: rgba(0,0,0,.08); color: inherit; }
+  .send-on-node { width: 22px; height: 22px; border-radius: 50%; border: none; background: var(--primary); color: #fff; display: none; align-items: center; justify-content: center; cursor: pointer; margin-left: auto; flex-shrink: 0; }
+  .send-on-node svg { width: 12px; height: 12px; }
+  .tree-has-sel .tnode .send-on-node { display: flex; }
+  .empty { text-align: center; color: var(--text-3); padding: 60px 20px; font-size: 13.5px; line-height: 1.8; }
+  .empty svg { width: 46px; height: 46px; color: #C4CFCC; margin-bottom: 12px; }
+  /* svg sizing fallbacks */
+  svg:not([width]) { width: 20px; height: 20px; }
+  .row > svg { color: var(--green); flex-shrink: 0; }
+  .chip > svg { width: 18px; height: 18px; flex-shrink: 0; }
+  .crumbs svg { width: 15px; height: 15px; color: var(--text-3); }
+  .row .trail svg { width: 18px; height: 18px; color: var(--text-2); }
+  .dialog h3 svg { width: 22px; height: 22px; color: var(--primary); }
+  .scroll::-webkit-scrollbar { width: 9px; }
+  .scroll::-webkit-scrollbar-thumb { background: #CBD7D4; border-radius: 9px; }
+</style>
+</head>
+<body>
+
+<!-- SVG sprite -->
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <symbol id="i-devices" viewBox="0 0 24 24"><rect x="2.5" y="4.5" width="13" height="9.5" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="M6.5 18.5h6" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><path d="M9.5 14v4.5" stroke="currentColor" stroke-width="1.9"/><rect x="16" y="9" width="6" height="11" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="M18.4 17.6h1.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+    <symbol id="i-list" viewBox="0 0 24 24"><rect x="3.5" y="4" width="7" height="7" rx="1.8" fill="none" stroke="currentColor" stroke-width="1.9"/><rect x="13.5" y="4" width="7" height="7" rx="1.8" fill="none" stroke="currentColor" stroke-width="1.9"/><rect x="3.5" y="13" width="7" height="7" rx="1.8" fill="none" stroke="currentColor" stroke-width="1.9"/><rect x="13.5" y="13" width="7" height="7" rx="1.8" fill="none" stroke="currentColor" stroke-width="1.9"/></symbol>
+    <symbol id="i-ban" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="M6.2 6.2l11.6 11.6" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></symbol>
+    <symbol id="i-gear" viewBox="0 0 24 24"><path d="M4 7h9.5M17.5 7H20M4 12h2.5M10.5 12H20M4 17h6.5M14.5 17H20" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><circle cx="15.5" cy="7" r="2.1" fill="none" stroke="currentColor" stroke-width="1.9"/><circle cx="8.5" cy="12" r="2.1" fill="none" stroke="currentColor" stroke-width="1.9"/><circle cx="12.5" cy="17" r="2.1" fill="none" stroke="currentColor" stroke-width="1.9"/></symbol>
+    <symbol id="i-send" viewBox="0 0 24 24"><path d="M12 15V4.5M12 4.5L8 8.5M12 4.5l4 4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/><path d="M4.5 15v3.4a1.6 1.6 0 0 0 1.6 1.6h11.8a1.6 1.6 0 0 0 1.6-1.6V15" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></symbol>
+    <symbol id="i-screen" viewBox="0 0 24 24"><rect x="2.5" y="4" width="19" height="12.5" rx="1.8" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="M12 12.8V7.6M12 7.6l-2.6 2.6M12 7.6l2.6 2.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 20h8" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></symbol>
+    <symbol id="i-mouse" viewBox="0 0 24 24"><rect x="7" y="2.8" width="10" height="18.4" rx="5" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="M12 6.5v3.4" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 6.8a1.8 1.8 0 0 1 1.8-1.8h4.3l2.1 2.4h7a1.8 1.8 0 0 1 1.8 1.8v8.6a1.8 1.8 0 0 1-1.8 1.8H4.8A1.8 1.8 0 0 1 3 17.8V6.8z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24"><path d="M6 3.8h7.5L18 8.3v11.9a1.6 1.6 0 0 1-1.6 1.6H7.6A1.6 1.6 0 0 1 6 20.2V3.8z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><path d="M13.5 4v4.5H18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></symbol>
+    <symbol id="i-chev" viewBox="0 0 24 24"><path d="M9 5.5l6.5 6.5L9 18.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 5.5L8.5 12l6.5 6.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.6 4.6L19 7.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="M12 7.5V12l3 2" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="11" height="11" rx="1.8" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="M15.5 5.5v-1a1.6 1.6 0 0 0-1.6-1.6H6.1A1.6 1.6 0 0 0 4.5 4.5v7.8a1.6 1.6 0 0 0 1.6 1.6h1" fill="none" stroke="currentColor" stroke-width="1.9"/></symbol>
+    <symbol id="i-warn" viewBox="0 0 24 24"><path d="M12 3.5L21.5 20h-19L12 3.5z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><path d="M12 10v4.2" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><circle cx="12" cy="17.1" r="1.1" fill="currentColor"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-pc" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="12" rx="1.8" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="M8 20h8M12 16.5V20" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></symbol>
+    <symbol id="i-laptop" viewBox="0 0 24 24"><rect x="4.5" y="5" width="15" height="10.5" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="M2.5 18.5h19" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></symbol>
+    <symbol id="i-phone" viewBox="0 0 24 24"><rect x="7" y="2.8" width="10" height="18.4" rx="2.4" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="M10.6 5.4h2.8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="12" cy="18" r="1" fill="currentColor"/></symbol>
+    <symbol id="i-wifi" viewBox="0 0 24 24"><path d="M3.5 9.5a13 13 0 0 1 17 0" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><path d="M6.5 13a8.6 8.6 0 0 1 11 0" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><path d="M9.5 16.4a4.3 4.3 0 0 1 5 0" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><circle cx="12" cy="19.4" r="1.2" fill="currentColor"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" fill="none" stroke="currentColor" stroke-width="1.9"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="M15.5 15.5L21 21" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6.5h16M4 12h16M4 17.5h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-rows" viewBox="0 0 24 24"><path d="M4 6.5h16M4 12h16M4 17.5h16" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><circle cx="6.5" cy="6.5" r="1.2" fill="currentColor"/><circle cx="6.5" cy="12" r="1.2" fill="currentColor"/><circle cx="6.5" cy="17.5" r="1.2" fill="currentColor"/></symbol>
+    <symbol id="i-grid" viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.9"/><rect x="13" y="4" width="7" height="7" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.9"/><rect x="4" y="13" width="7" height="7" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.9"/><rect x="13" y="13" width="7" height="7" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.9"/></symbol>
+    <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5.5" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="18.5" cy="12" r="1.6" fill="currentColor"/></symbol>
+    <symbol id="i-edit" viewBox="0 0 24 24"><path d="M14.5 5.5l4 4L8 20H4v-4L14.5 5.5z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><path d="M12.5 7.5l4 4" stroke="currentColor" stroke-width="1.9"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M5 7h14M10 7V5.4A1.4 1.4 0 0 1 11.4 4h1.2A1.4 1.4 0 0 1 14 5.4V7M7 7l1 12.6A1.4 1.4 0 0 0 9.4 21h5.2a1.4 1.4 0 0 0 1.4-1.4L17 7" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-dl" viewBox="0 0 24 24"><path d="M12 4.5V15M12 15l-4-4M12 15l4-4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/><path d="M4.5 15.5v2.9A1.6 1.6 0 0 0 6.1 20h11.8a1.6 1.6 0 0 0 1.6-1.6v-2.9" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></symbol>
+    <symbol id="i-tag" viewBox="0 0 24 24"><path d="M4 4h7.2L20 12.8a1.6 1.6 0 0 1 0 2.3l-4.9 4.9a1.6 1.6 0 0 1-2.3 0L4 11.2V4z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><circle cx="8.4" cy="8.4" r="1.4" fill="currentColor"/></symbol>
+    <symbol id="i-clip" viewBox="0 0 24 24"><path d="M9 4.5h6M9 4.5A1.5 1.5 0 0 0 7.5 6v.5h9V6A1.5 1.5 0 0 0 15 4.5M7.5 6.5h-1A1.5 1.5 0 0 0 5 8v10a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 18V8a1.5 1.5 0 0 0-1.5-1.5h-1" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></symbol>
+  </defs>
+</svg>
+
+<div class="win" id="win">
+  <div class="titlebar">
+    <div class="dot" style="background:#FF5F57"></div>
+    <div class="dot" style="background:#FEBC2E"></div>
+    <div class="dot" style="background:#28C840"></div>
+    <span class="t" id="winTitle">AnyShare — 我的设备</span>
+    <div class="spacer"></div>
+    <button class="demo-toggle" onclick="toggleMobile()" id="mobileBtn">移动预览</button>
+  </div>
+  <div class="body">
+    <nav class="rail" id="rail"></nav>
+    <div class="content">
+      <div class="topbar" id="topbar"></div>
+      <div class="chips" id="chips"></div>
+      <div class="scroll" id="content"></div>
+    </div>
+  </div>
+  <nav class="bottomnav" id="bottomnav"></nav>
+  <button class="transfer-pill" id="transferPill" onclick="showTransfersDialog()"></button>
+</div>
+
+<div class="scrim" id="scrim"><div class="dialog" id="dialog"></div></div>
+<div class="ctxmenu" id="ctxmenu"></div>
+<div class="toasts" id="toasts"></div>
+<div class="demo-fab">
+  <div class="demo-menu" id="demoMenu">
+    <button onclick="demoScreenRequest()">📺 收到投屏请求(接收端弹窗)</button>
+    <button onclick="demoTransferConfirm()">📁 收到文件传输(确认弹窗)</button>
+    <button onclick="demoTransferDone()">✅ 传输完成通知</button>
+    <button onclick="demoPairing()">🔗 附近设备配对(SAS 码)</button>
+  </div>
+  <button class="fbtn" onclick="document.getElementById('demoMenu').classList.toggle('show')">演示触发器</button>
+</div>
+
+<script>
+/* ================= 数据 ================= */
+const state = {
+  view: 'mine',            // mine | list | block | settings | detail | dir
+  detailId: null,
+  dirSel: { device: 'office', path: '' },
+  dirExpanded: new Set(['office', 'office:共享照片']),
+  dirChecked: new Set(),
+  dirView: 'details',      // details | list
+  dirClipboard: null,      // {op:'copy'|'cut', device, path, items:[names]}
+  dirTreeOpen: true,
+  dirDrawer: false,
+  dirTags: {
+    'office:共享照片/IMG_2031.jpg': { tags: ['重要', '待打印'], note: '打印三份 A4' },
+    'office:/README.md': { tags: ['入口'], note: '先读这个,端点速览' },
+    'mac:文档/周报.docx': { tags: ['每周'], note: '' },
+  },
+  drag: null,              // {device, path, name, isDir}
+  netMbps: 22,             // 检测到的上行带宽(投屏建议数用)
+  kmLayout: [],            // 键鼠共享的屏幕排列(设备名顺序)
+  sharePicker: null,       // {type:'screen'|'km', checked:Set}
+  layFrom: null,
+  transfers: [],           // {id,name,dir:'up'|'down',peer,total,done,speed,status:'active'|'done'|'failed',time}
+  transferHistory: [
+    { name: '已发送 3 个文件', dir: 'up', peer: '办公室-Ubuntu', status: 'done', time: '昨天 21:04', size: '1.2 GB' },
+    { name: '已接收 1 个文件', dir: 'down', peer: 'MacBook Pro', status: 'done', time: '10-14 09:31', size: '22 MB' },
+    { name: '传输已取消', dir: 'up', peer: '妈妈的手机', status: 'failed', time: '10-13 18:20', size: '340 MB' },
+  ],
+  sessions: [],            // {type:'screen'|'km', peer}
+  settings: {
+    dirShare: true,
+    dirPath: 'D:\\共享\\AnyShare',
+    notify: true,
+    theme: '跟随系统',
+  },
+};
+
+/* 写权限(演示):office 可写、mac 可写、phone 只读 */
+const writableDevices = { mac: true, office: true, phone: false };
+
+const isImage = (n) => /\.(jpg|jpeg|png|gif|webp|heic|bmp)$/i.test(n);
+const isMd = (n) => /\.md$/i.test(n);
+const fileType = (n) => {
+  const ext = (n.split('.').pop() || '').toLowerCase();
+  return { jpg: 'JPEG 图片', jpeg: 'JPEG 图片', png: 'PNG 图片', heic: 'HEIC 图片', gif: 'GIF 图片', mp4: 'MP4 视频', md: 'Markdown', txt: '文本', docx: 'Word 文档', pdf: 'PDF 文档', fig: 'Figma 文件', pngx: '' }[ext] || (ext ? ext.toUpperCase() + ' 文件' : '文件');
+};
+const imgDataUri = (label, hue) => 'data:image/svg+xml;utf8,' + encodeURIComponent(
+  `<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="hsl(${hue},62%,55%)"/><stop offset="1" stop-color="hsl(${(hue + 60) % 360},58%,38%)"/></linearGradient></defs><rect width="960" height="540" fill="url(#g)"/><circle cx="740" cy="140" r="90" fill="rgba(255,255,255,.22)"/><circle cx="180" cy="420" r="130" fill="rgba(0,0,0,.14)"/><text x="48" y="492" font-family="Segoe UI, sans-serif" font-size="34" fill="rgba(255,255,255,.92)" font-weight="700">${label}</text></svg>`);
+const MD_SAMPLE = `<h1>接口说明</h1><p>AnyShare 扩展服务器端点速览(演示渲染)。</p><h2>配对</h2><ul><li><code>POST /api/anyshare/v1/pair/register</code> — 注册配对会话,返回 SAS 码</li><li><code>POST /api/anyshare/v1/pair/confirm</code> — 确认配对,落库设备</li></ul><h2>屏幕共享</h2><ul><li><code>POST /api/anyshare/v1/screen/offer</code> — 发起投屏请求</li><li><code>POST /api/anyshare/v1/screen/accept</code> / <code>stop</code> — 会话控制</li></ul><h2>共享目录</h2><ul><li><code>GET /dir/list</code> — 列目录(只读设备仅此端点)</li><li><code>POST /dir/write</code> — 写入(可写目录)</li></ul><p>完整定义见 <code>docs/扩展协议设计.md</code>。</p>`;
+
+const ownerName = 'sunmerx';
+const selfFp = 'A3F9 2C81 D45B 90EE 71B2 4C08 F6A1 3D55';
+
+const devices = [
+  { id: 'self', name: '我的台式机', plat: 'Windows 11 · AMD Ryzen', icon: 'i-pc', online: true, self: true, dir: false },
+  { id: 'mac', name: 'MacBook Pro', plat: 'macOS 15 · M3', icon: 'i-laptop', online: true, mine: true, dir: true, dirFiles: 24 },
+  { id: 'phone', name: 'iPhone 15', plat: 'iOS 18', icon: 'i-phone', online: false, last: '2 小时前', mine: true, dir: true, dirFiles: 8 },
+  // 已配对(非本人归属)
+  { id: 'office', name: '办公室-Ubuntu', plat: 'Ubuntu 24.04 · 台式', icon: 'i-pc', online: true, trust: 'full', dir: true, dirFiles: 132, screen: true },
+  { id: 'mom', name: '妈妈的手机', plat: 'Android 15', icon: 'i-phone', online: false, last: '昨天', trust: 'limited' },
+  { id: 'guest', name: '访客-Linux', plat: 'Fedora 42', icon: 'i-laptop', online: true, trust: 'temp' },
+  // 附近(未配对)
+  { id: 'near1', name: 'WIN-DEV-02', plat: 'Windows 10', icon: 'i-pc', online: true, nearby: true },
+  { id: 'near2', name: '会议室投影', plat: 'Android TV', icon: 'i-pc', online: true, nearby: true },
+  // 黑名单
+  { id: 'bad', name: '旧笔记本', plat: 'Windows 10', icon: 'i-laptop', online: false, blocked: true },
+];
+
+const dirTrees = {
+  mac: {
+    label: 'MacBook Pro', online: true,
+    folders: {
+      '': [ { d: '照片', n: 12 }, { d: '文档', n: 5 }, { f: '壁纸.png', size: '2.1 MB', date: '2026-10-01 10:20' } ],
+      '照片': [ { d: '2026 团建', n: 3 }, { f: 'IMG_2031.jpg', size: '3.2 MB', date: '2026-10-12 14:22' }, { f: 'IMG_2032.jpg', size: '2.9 MB', date: '2026-10-12 14:25' } ],
+      '照片/2026 团建': [ { f: '合照.jpg', size: '5.1 MB', date: '2026-10-12 15:00' }, { f: '花絮.mp4', size: '210 MB', date: '2026-10-12 15:40' } ],
+      '文档': [ { f: '周报.docx', size: '88 KB', date: '2026-10-16 18:02' }, { d: '合同', n: 4 } ],
+      '文档/合同': [ { f: '2026-框架协议.pdf', size: '1.2 MB', date: '2026-09-30 09:00' } ],
+    },
+  },
+  phone: {
+    label: 'iPhone 15', online: false,
+    folders: {
+      '': [ { d: 'DCIM', n: 328 }, { d: '备忘录', n: 6 } ],
+      'DCIM': [ { d: '相机胶卷', n: 326 } ],
+      'DCIM/相机胶卷': [ { f: 'IMG_8841.HEIC', size: '4.4 MB', date: '2026-10-15 20:11' } ],
+      '备忘录': [ { f: '购物清单.txt', size: '2 KB', date: '2026-10-10 08:30' } ],
+    },
+  },
+  office: {
+    label: '办公室-Ubuntu', online: true,
+    folders: {
+      '': [ { d: '共享照片', n: 4 }, { d: '项目', n: 2 }, { f: 'README.md', size: '1 KB', date: '2026-10-09 11:00' } ],
+      '共享照片': [ { d: '2026 团建', n: 3 }, { f: 'IMG_2031.jpg', size: '3.2 MB', date: '2026-10-12 14:22' }, { f: 'IMG_2032.jpg', size: '2.9 MB', date: '2026-10-12 14:25' }, { f: '视频片段.mp4', size: '128 MB', date: '2026-10-10 09:11' } ],
+      '共享照片/2026 团建': [ { f: '合照.jpg', size: '5.1 MB', date: '2026-10-12 15:00' }, { f: '花絮.mp4', size: '210 MB', date: '2026-10-12 15:40' } ],
+      '项目': [ { d: 'anyShare', n: 9 }, { d: '文档', n: 3 } ],
+      '项目/anyShare': [ { f: '设计稿.fig', size: '12 MB', date: '2026-10-17 01:20' } ],
+      '项目/文档': [ { f: '接口说明.md', size: '18 KB', date: '2026-10-14 16:40' } ],
+    },
+  },
+};
+
+/* ================= 工具 ================= */
+const $ = (id) => document.getElementById(id);
+const icon = (n, cls='') => `<svg class="${cls}"><use href="#${n}"/></svg>`;
+const trustTag = (t) => ({ temp: '<span class="tag temp">临时</span>', limited: '<span class="tag limited">一般</span>', full: '<span class="tag full">完全</span>' }[t] || '');
+
+function toast(msg, ms = 2600) {
+  const el = document.createElement('div');
+  el.className = 'toast'; el.textContent = msg;
+  $('toasts').appendChild(el);
+  setTimeout(() => el.remove(), ms);
+}
+function dialog(html, cls = '') {
+  $('dialog').className = 'dialog ' + cls;
+  $('dialog').innerHTML = html;
+  $('scrim').classList.add('show');
+}
+function closeDialog() { $('scrim').classList.remove('show'); }
+$('scrim').addEventListener('click', (e) => { if (e.target === $('scrim')) closeDialog(); });
+
+/* context menu */
+function showCtx(x, y, html) {
+  const m = $('ctxmenu');
+  m.innerHTML = html;
+  m.classList.add('show');
+  const w = m.offsetWidth, h = m.offsetHeight;
+  m.style.left = Math.min(x, window.innerWidth - w - 12) + 'px';
+  m.style.top = Math.min(y, window.innerHeight - h - 12) + 'px';
+}
+function closeCtx() { $('ctxmenu').classList.remove('show'); }
+document.addEventListener('click', () => closeCtx());
+document.addEventListener('contextmenu', (e) => { if (!e.target.closest('.dirpane, .dirtree')) closeCtx(); });
+
+function onlineBadge(d) {
+  if (d.online) return `<span class="status"><span class="dot-on"></span>在线</span>`;
+  return `<span class="status"><span class="dot-off"></span>${d.last ? d.last : '离线'}</span>`;
+}
+
+/* ================= 导航 ================= */
+const NAV = [
+  { id: 'mine', label: '我的设备', icon: 'i-devices' },
+  { id: 'list', label: '设备列表', icon: 'i-list' },
+  { id: 'block', label: '黑名单', icon: 'i-ban' },
+  { id: 'settings', label: '设置', icon: 'i-gear' },
+];
+
+function renderNav() {
+  $('rail').innerHTML = `
+    <div class="brand">
+      <div class="logo">${icon('i-wifi')}</div>
+      <div><div class="name">AnyShare</div><div class="ver">v0.1.1 · 局域网协作</div></div>
+    </div>
+    ${NAV.map(n => `
+      <button class="nav-item ${state.view === n.id || (state.view === 'detail' && n.id === currentRoot()) || (state.view === 'dir' && n.id === currentRoot()) ? 'active' : ''}"
+        onclick="go('${n.id}')">
+        ${icon(n.icon)}<span>${n.label}</span>
+        ${n.id === 'list' ? `<span class="badge">${devices.filter(d => d.nearby).length}</span>` : ''}
+      </button>`).join('')}
+    ${transferPanelHtml()}
+    <div class="foot">归属者:${ownerName}<br>同一归属者的设备互相免确认</div>`;
+  $('bottomnav').innerHTML = NAV.map(n => `
+    <button class="${state.view === n.id || state.view === 'detail' || state.view === 'dir' ? (n.id === currentRoot() ? 'active' : '') : ''}" onclick="go('${n.id}')">
+      ${icon(n.icon)}<span>${n.label}</span>
+    </button>`).join('');
+  const pill = $('transferPill');
+  if (pill) {
+    const active = state.transfers.filter(t => t.status === 'active');
+    pill.classList.toggle('show', active.length > 0);
+    pill.innerHTML = `${icon('i-send')} 传输中 ${active.length} · 查看`;
+  }
+}
+
+/* ---------- 传输面板(侧栏常驻 + 移动端浮标) ---------- */
+function transferPanelHtml() {
+  const active = state.transfers;
+  const hist = state.transferHistory.slice(0, 3);
+  return `
+    <div class="rail-transfers">
+      <div class="rt-head">传输 ${active.length ? `<span class="badge">${active.length}</span>` : ''}<span class="spacer"></span><button onclick="showTransfersDialog()">查看全部</button></div>
+      ${active.length ? active.map(t => transferItemHtml(t)).join('') : '<div class="rt-empty">暂无进行中的传输</div>'}
+      ${hist.map(h => `
+        <div class="rt-item ${h.status === 'done' ? 'rt-done' : 'rt-fail'}">
+          ${icon(h.dir === 'up' ? 'i-send' : 'i-dl')}
+          <div class="grow"><div class="nm">${h.name}</div><div class="meta">${h.dir === 'up' ? '→' : '←'} ${h.peer} · ${h.time}</div></div>
+        </div>`).join('')}
+    </div>`;
+}
+
+function transferItemHtml(t) {
+  const pct = Math.min(100, Math.round(t.done / t.total * 100));
+  return `
+    <div class="rt-item">
+      ${icon(t.dir === 'up' ? 'i-send' : 'i-dl')}
+      <div class="grow">
+        <div class="nm">${t.name}</div>
+        <div class="meta">${t.dir === 'up' ? '→' : '←'} ${t.peer} · ${pct}% · ${t.speed}</div>
+        <div class="rt-bar"><div class="fill" style="width:${pct}%"></div></div>
+      </div>
+      <button class="x" title="取消" onclick="cancelTransfer(${t.id})">${icon('i-close')}</button>
+    </div>`;
+}
+
+function cancelTransfer(id) {
+  const t = state.transfers.find(x => x.id === id);
+  if (!t) return;
+  clearInterval(t.timer);
+  state.transfers = state.transfers.filter(x => x.id !== id);
+  state.transferHistory.unshift({ name: `已取消:${t.name}`, dir: t.dir, peer: t.peer, status: 'failed', time: '刚刚', size: t.total + ' MB' });
+  toast('已取消传输');
+  render();
+}
+
+let transferSeq = 1;
+function startTransfer(name, peer, sizeMb) {
+  const t = { id: transferSeq++, name, dir: 'up', peer, total: sizeMb, done: 0, speed: '—', status: 'active', time: '刚刚' };
+  state.transfers.push(t);
+  t.timer = setInterval(() => {
+    if (!state.transfers.includes(t)) { clearInterval(t.timer); return; }
+    t.done = Math.min(t.total, t.done + t.total * 0.12);
+    t.speed = (12 + Math.random() * 30).toFixed(1) + ' MB/s';
+    if (t.done >= t.total) {
+      clearInterval(t.timer);
+      state.transfers = state.transfers.filter(x => x.id !== t.id);
+      state.transferHistory.unshift({ name: `已发送:${t.name}`, dir: 'up', peer: t.peer, status: 'done', time: '刚刚', size: t.total + ' MB' });
+      toast(`已发送「${t.name}」到「${t.peer}」`);
+      render();
+      return;
+    }
+    renderTransferPanelOnly();
+  }, 300);
+  render();
+}
+
+function renderTransferPanelOnly() {
+  const wrap = document.querySelector('.rail-transfers');
+  if (wrap) wrap.outerHTML = transferPanelHtml();
+  const pill = $('transferPill');
+  if (pill) {
+    const active = state.transfers.filter(t => t.status === 'active');
+    pill.classList.toggle('show', active.length > 0);
+    pill.innerHTML = `${icon('i-send')} 传输中 ${active.length} · 查看`;
+  }
+}
+
+function showTransfersDialog() {
+  dialog(`<h3>${icon('i-send')}传输记录</h3>
+    <div class="rows" style="margin-top:10px;max-height:52vh;overflow-y:auto">
+      ${state.transfers.map(t => `<div class="row"><div class="dev-icon">${icon(t.dir === 'up' ? 'i-send' : 'i-dl')}</div><div class="grow"><div class="title">${t.name}</div><div class="desc">${t.dir === 'up' ? '发送到' : '接收自'} ${t.peer} · 进行中 ${Math.round(t.done / t.total * 100)}%</div></div><button class="btn tonal" onclick="closeDialog();cancelTransfer(${t.id})">取消</button></div>`).join('')}
+      ${state.transferHistory.map(h => `<div class="row"><div class="dev-icon">${icon(h.dir === 'up' ? 'i-send' : 'i-dl')}</div><div class="grow"><div class="title">${h.name}</div><div class="desc">${h.dir === 'up' ? '发送到' : '接收自'} ${h.peer} · ${h.size || ''} · ${h.time}</div></div>${h.status === 'done' ? icon('i-check') : `<span style="color:var(--red);font-size:12px">失败</span>`}</div>`).join('')}
+    </div>
+    <div class="d-actions"><button class="btn filled" onclick="closeDialog()">关闭</button></div>`);
+}
+
+function currentRoot() {
+  if (state.view === 'detail' || state.view === 'dir') {
+    const d = devices.find(x => x.id === state.detailId);
+    if (d) return d.mine || d.self ? 'mine' : 'list';
+  }
+  return state.view;
+}
+
+function go(view) {
+  state.view = view; state.detailId = null;
+  render();
+}
+function openDetail(id) {
+  state.view = 'detail'; state.detailId = id;
+  render();
+}
+
+/* ================= 视图 ================= */
+function render() {
+  renderNav();
+  renderChips();
+  const c = $('content');
+  c.style.padding = state.view === 'dir' ? '0' : '';
+  c.style.overflow = state.view === 'dir' ? 'hidden' : '';
+  if (state.view === 'mine') renderMine(c);
+  else if (state.view === 'list') renderList(c);
+  else if (state.view === 'block') renderBlock(c);
+  else if (state.view === 'settings') renderSettings(c);
+  else if (state.view === 'detail') renderDetail(c);
+  else if (state.view === 'dir') renderDir(c);
+  $('winTitle').textContent = 'AnyShare — ' + (NAV.find(n => n.id === currentRoot())?.label || '');
+}
+
+function topbar(title, sub, backId) {
+  return `
+    ${backId ? `<button class="icon-btn" onclick="openDetail('${backId}')">${icon('i-back')}</button>` : ''}
+    <div><h1>${title}</h1>${sub ? `<div class="sub">${sub}</div>` : ''}</div>
+    <div class="spacer"></div>`;
+}
+
+function renderChips() {
+  $('chips').innerHTML = state.sessions.map((s, i) => {
+    const peers = s.peers || [];
+    const label = peers.length > 1 ? `${peers.length} 台设备` : `「${peers[0]}」`;
+    return `
+    <div class="chip">
+      ${icon(s.type === 'screen' ? 'i-screen' : 'i-mouse')}
+      ${s.type === 'screen' ? `正在共享屏幕到 ${label}` : `键鼠共享中 ↔ ${label}<span style="opacity:.7;font-size:11.5px">· 实验性 · Ctrl+Alt+Shift+Esc 紧急退出</span>`}
+      <span class="spacer"></span>
+      ${s.type === 'km' ? `<button onclick="openLayoutEditor(${i})">布局</button>` : ''}
+      <button onclick="stopSession(${i})">停止</button>
+    </div>`;
+  }).join('');
+}
+function stopSession(i) {
+  const s = state.sessions.splice(i, 1)[0];
+  const peers = s.peers || [];
+  const label = peers.length > 1 ? `${peers.length} 台设备` : `「${peers[0]}」`;
+  toast(`已停止与 ${label} 的${s.type === 'screen' ? '屏幕' : '键鼠'}共享`);
+  render();
+}
+
+/* -------- 设备卡片 -------- */
+function deviceCard(d) {
+  const acts = [];
+  if (d.self) {
+    acts.push(`<button class="act" disabled title="本机">${icon('i-send')}发送文件</button>`);
+  } else {
+    acts.push(`<button class="act primary" onclick="event.stopPropagation();sendFiles('${d.id}')">${icon('i-send')}发送文件</button>`);
+    if (d.nearby) {
+      acts.push(`<button class="act" onclick="event.stopPropagation();demoPairing('${d.id}')">${icon('i-wifi')}配对</button>`);
+    } else {
+      const canScreen = d.trust !== 'temp';
+      acts.push(`<button class="act" ${canScreen ? '' : 'disabled'} title="${d.trust === 'temp' ? '临时设备不可投屏' : ''}"
+        onclick="event.stopPropagation();shareScreen('${d.id}')">${icon('i-screen')}共享屏幕</button>`);
+      acts.push(`<button class="act" onclick="event.stopPropagation();shareKm('${d.id}')">${icon('i-mouse')}键鼠共享</button>`);
+      if (d.dir) acts.push(`<button class="act" onclick="event.stopPropagation();browseDir('${d.id}')">${icon('i-folder')}浏览目录</button>`);
+    }
+  }
+  return `
+    <div class="card" onclick="openDetail('${d.id}')">
+      <div class="row1">
+        <div class="dev-icon">${icon(d.icon)}</div>
+        <div class="meta">
+          <div class="name">${d.name}
+            ${d.self ? '<span class="tag self">本机</span>' : ''}
+            ${d.mine && !d.self ? '<span class="tag self">我的</span>' : ''}
+            ${d.trust ? trustTag(d.trust) : ''}
+          </div>
+          <div class="plat">${d.plat}${d.dir ? ` · 共享目录 ${d.dirFiles} 项` : ''}</div>
+        </div>
+        ${onlineBadge(d)}
+      </div>
+      <div class="actions">${acts.join('')}</div>
+    </div>`;
+}
+
+function renderMine(c) {
+  $('topbar').innerHTML = topbar('我的设备', `归属者:${ownerName} · 同一归属者的设备互相免确认,可直接操作`);
+  const mine = devices.filter(d => d.self || d.mine);
+  c.innerHTML = `
+    <div class="cards">${mine.map(deviceCard).join('')}</div>
+    ${mine.length <= 1 ? `<div class="empty">${icon('i-devices')}<br>其他设备安装 AnyShare 并把归属者设置为「${ownerName}」后,<br>会自动出现在这里,互相免确认。</div>` : ''}`;
+}
+
+function renderList(c) {
+  const nearby = devices.filter(d => d.nearby);
+  const paired = devices.filter(d => d.trust);
+  $('topbar').innerHTML = topbar('设备列表', '附近发现的设备 · 已配对的设备(非本人归属)');
+  c.innerHTML = `
+    <div class="section-title">附近的设备 <span class="count">${nearby.length}</span></div>
+    ${nearby.length ? `<div class="cards">${nearby.map(deviceCard).join('')}</div>`
+      : `<div class="empty">${icon('i-search')}<br>附近没有发现设备<br>请确认对方已打开 AnyShare 且在同一网络</div>`}
+    <div class="section-title" style="margin-top:22px">已配对 <span class="count">${paired.length}</span></div>
+    ${paired.length ? `<div class="cards">${paired.map(deviceCard).join('')}</div>`
+      : `<div class="empty">${icon('i-list')}<br>还没有配对的设备<br>在附近设备上点击「配对」建立关系</div>`}`;
+}
+
+function renderBlock(c) {
+  const blocked = devices.filter(d => d.blocked);
+  $('topbar').innerHTML = topbar('黑名单', '被拉黑的设备不能传输文件、投屏或浏览目录');
+  c.innerHTML = blocked.length ? `<div class="rows">${blocked.map(d => `
+    <div class="row">
+      <div class="dev-icon">${icon(d.icon)}</div>
+      <div class="grow">
+        <div class="title">${d.name}</div>
+        <div class="desc">${d.plat} · 指纹 <span class="mono">7C2B…9E11</span></div>
+      </div>
+      <div class="trail">
+        <button class="btn tonal" onclick="unblock('${d.id}')">解除拉黑</button>
+        <button class="btn text" style="color:var(--red)" onclick="removeDevice('${d.id}')">删除记录</button>
+      </div>
+    </div>`).join('')}</div>`
+    : `<div class="empty">${icon('i-ban')}<br>没有被拉黑的设备</div>`;
+}
+
+function unblock(id) {
+  const d = devices.find(x => x.id === id);
+  dialog(`<h3>解除拉黑「${d.name}」?</h3>
+    <p>解除后,该设备需要重新发送请求(传输/投屏),并按照其信任等级处理。</p>
+    <div class="d-actions">
+      <button class="btn text" onclick="closeDialog()">取消</button>
+      <button class="btn filled" onclick="doUnblock('${id}')">解除拉黑</button>
+    </div>`);
+}
+function doUnblock(id) {
+  const d = devices.find(x => x.id === id);
+  d.blocked = false;
+  d.trust = 'limited';
+  closeDialog();
+  toast(`已解除拉黑「${d.name}」,信任等级:一般`);
+  render();
+}
+function removeDevice(id) {
+  const i = devices.findIndex(x => x.id === id);
+  const d = devices[i];
+  dialog(`<h3>删除「${d.name}」的记录?</h3>
+    <p>将同时移除配对关系与信任设置。该设备以后会作为全新设备出现。</p>
+    <div class="d-actions">
+      <button class="btn text" onclick="closeDialog()">取消</button>
+      <button class="btn filled" style="background:var(--red)" onclick="doRemove(${i})">删除</button>
+    </div>`);
+}
+function doRemove(i) {
+  const d = devices.splice(i, 1)[0];
+  closeDialog();
+  toast(`已删除「${d.name}」的记录`);
+  render();
+}
+
+/* -------- 设置 -------- */
+function renderSettings(c) {
+  $('topbar').innerHTML = topbar('设置', '本机 · 接收 · 共享目录 · 屏幕共享 · 网络 · 安全');
+  c.innerHTML = `
+    <div class="section-title">本机</div>
+    <div class="rows">
+      <div class="row"><div class="grow"><div class="title">归属者名称</div><div class="desc">同一归属者的设备互相免确认</div></div>
+        <div class="trail"><input type="text" value="${ownerName}" style="width:130px"><button class="btn tonal" onclick="toast('已保存(演示)')">保存</button></div></div>
+      <div class="row"><div class="grow"><div class="title">设备别名</div><div class="desc">局域网内其他设备看到的名字</div></div>
+        <div class="trail"><input type="text" value="我的台式机" style="width:130px"></div></div>
+      <div class="row"><div class="grow"><div class="title">本机指纹</div><div class="desc mono">${selfFp}</div></div>
+        <div class="trail"><button class="icon-btn" onclick="toast('指纹已复制')">${icon('i-copy')}</button></div></div>
+    </div>
+
+    <div class="section-title">接收</div>
+    <div class="rows">
+      <div class="row"><div class="grow"><div class="title">保存目录</div><div class="desc mono">C:\\Users\\sunmerx\\Downloads\\AnyShare</div></div>
+        <div class="trail"><button class="btn tonal" onclick="toast('打开目录选择器(演示)')">更改</button></div></div>
+      <div class="row"><div class="grow"><div class="title">快速保存</div><div class="desc">完全信任的设备传输时不弹确认</div></div>
+        <div class="trail"><label class="switch"><input type="checkbox" checked><span class="track"></span><span class="knob"></span></label></div></div>
+      <div class="row"><div class="grow"><div class="title">传输完成通知</div><div class="desc">桌面通知 + 点击打开目录</div></div>
+        <div class="trail"><label class="switch"><input type="checkbox" ${state.settings.notify ? 'checked' : ''} onchange="state.settings.notify=this.checked"><span class="track"></span><span class="knob"></span></label></div></div>
+    </div>
+
+    <div class="section-title">共享目录 <span class="count">(E-3)</span></div>
+    <div class="rows">
+      <div class="row"><div class="grow"><div class="title">开放本机目录</div><div class="desc">同一归属者与「完全信任」的设备可以浏览与取用(只读)</div></div>
+        <div class="trail"><label class="switch"><input type="checkbox" ${state.settings.dirShare ? 'checked' : ''} onchange="state.settings.dirShare=this.checked"><span class="track"></span><span class="knob"></span></label></div></div>
+      <div class="row" style="${state.settings.dirShare ? '' : 'opacity:.5'}"><div class="grow"><div class="title">共享目录</div><div class="desc mono">${state.settings.dirPath}</div></div>
+        <div class="trail"><button class="btn tonal" ${state.settings.dirShare ? '' : 'disabled'} onclick="toast('打开目录选择器(演示)')">选择目录</button></div></div>
+    </div>
+
+    <div class="section-title">屏幕共享 <span class="count">(E-2 · 即将开放)</span></div>
+    <div class="rows">
+      <div class="row"><div class="grow"><div class="title">画质与码率</div><div class="desc">当前参数:1080p · 60fps · 8 Mbps</div></div>
+        <div class="trail"><select disabled><option>1080p 60fps / 8Mbps</option></select>${icon('i-lock')}</div></div>
+      <div class="row"><div class="grow"><div class="title">允许接收投屏</div><div class="desc">完全信任与同归属者免确认;一般信任需本机确认;临时设备不允许</div></div>
+        <div class="trail"><label class="switch"><input type="checkbox" checked disabled><span class="track"></span><span class="knob"></span></label>${icon('i-lock')}</div></div>
+    </div>
+
+    <div class="section-title">通用与安全</div>
+    <div class="rows">
+      <div class="row"><div class="grow"><div class="title">主题</div><div class="desc">跟随系统 / 浅色 / 深色</div></div>
+        <div class="trail"><select onchange="state.settings.theme=this.value"><option>跟随系统</option><option>浅色</option><option>深色</option></select></div></div>
+      <div class="row"><div class="grow"><div class="title">传输加密(HTTPS)</div><div class="desc">使用本机证书加密文件传输</div></div>
+        <div class="trail"><label class="switch"><input type="checkbox" checked><span class="track"></span><span class="knob"></span></label></div></div>
+      <div class="row" style="cursor:pointer" onclick="toast('打开传输记录(演示)')"><div class="grow"><div class="title">传输记录</div><div class="desc">发送历史 / 接收历史</div></div>
+        <div class="trail">${icon('i-chev')}</div></div>
+      <div class="row" style="cursor:pointer" onclick="toast('打开问题排查(演示)')"><div class="grow"><div class="title">问题排查</div><div class="desc">防火墙、端口、网络接口</div></div>
+        <div class="trail">${icon('i-chev')}</div></div>
+    </div>`;
+}
+
+/* -------- 设备详情 -------- */
+function renderDetail(c) {
+  const d = devices.find(x => x.id === state.detailId);
+  if (!d) { go('mine'); return; }
+  $('topbar').innerHTML = `
+    <button class="icon-btn" onclick="go(currentRoot())">${icon('i-back')}</button>
+    <div><h1>设备详情</h1></div>
+    <div class="spacer"></div>`;
+  const trustOpts = ['temp', 'limited', 'full'].map(t => `
+    <button class="trust-opt ${d.trust === t ? 'sel' : ''}" onclick="setTrust('${d.id}','${t}')">
+      <div class="t">${{ temp: '临时', limited: '一般', full: '完全' }[t]}</div>
+      <div class="d">${{ temp: '配对确认过;不可投屏,传输需确认', limited: '传输需确认;可投屏(需确认)', full: '免确认;可投屏;可浏览共享目录' }[t]}</div>
+    </button>`).join('');
+
+  const ops = [];
+  if (!d.self) {
+    ops.push(`<button class="btn filled" onclick="sendFiles('${d.id}')">发送文件</button>`);
+    if (!d.nearby) {
+      const canScreen = d.trust !== 'temp';
+      ops.push(`<button class="btn tonal" ${canScreen ? '' : 'disabled style="opacity:.5"'} onclick="shareScreen('${d.id}')">共享屏幕</button>`);
+      ops.push(`<button class="btn tonal" onclick="shareKm('${d.id}')">键鼠共享</button>`);
+      if (d.dir) ops.push(`<button class="btn tonal" onclick="browseDir('${d.id}')">浏览共享目录</button>`);
+    } else {
+      ops.push(`<button class="btn tonal" onclick="demoPairing('${d.id}')">配对</button>`);
+    }
+  }
+
+  c.innerHTML = `
+    <div class="detail-head">
+      <div class="dev-icon">${icon(d.icon)}</div>
+      <div>
+        <h2>${d.name} ${d.self ? '<span class="tag self">本机</span>' : ''} ${d.trust ? trustTag(d.trust) : ''}</h2>
+        <div style="color:var(--text-2);font-size:13px;margin-top:4px">${d.plat} · ${d.online ? '在线' : (d.last || '离线')}</div>
+      </div>
+    </div>
+
+    ${ops.length ? `<div class="big-actions">${ops.join('')}</div>` : ''}
+
+    <div class="section-title">身份</div>
+    <div class="rows"><div class="row"><div class="grow kv">
+      <span class="k">归属者</span><span class="v">${d.mine || d.self ? ownerName + '(我的设备)' : '外部设备'}</span>
+      <span class="k">指纹</span><span class="v"><span class="mono">${d.id === 'office' ? 'B8E4 11A0 93CD 22F7 5B6E 8A91 04D2 C3F8' : '7C2B … 9E11'}</span><button class="icon-btn" style="width:28px;height:28px" onclick="toast('指纹已复制')">${icon('i-copy')}</button></span>
+      <span class="k">地址</span><span class="v mono">${d.online ? '192.168.1.' + (20 + d.name.length % 60) + ':53317' : '—'}</span>
+    </div></div></div>
+
+    ${!d.self && !d.nearby && !d.mine ? `
+    <div class="section-title">信任等级</div>
+    <div class="trust-opts">${trustOpts}</div>
+    <div class="section-title">最近传输</div>
+    <div class="rows">
+      <div class="row"><div class="dev-icon">${icon('i-send')}</div><div class="grow"><div class="title">已发送 3 个文件</div><div class="desc">2026-10-16 21:04 · 1.2 GB</div></div>${icon('i-check')}</div>
+      <div class="row"><div class="dev-icon">${icon('i-file')}</div><div class="grow"><div class="title">已接收 1 个文件</div><div class="desc">2026-10-14 09:31 · 22 MB</div></div>${icon('i-check')}</div>
+    </div>
+    <div class="section-title">危险区</div>
+    <div class="rows"><div class="row"><div class="grow"><div class="title" style="color:var(--red)">拉黑设备</div><div class="desc">拒绝其所有请求;可从黑名单页解除</div></div>
+      <div class="trail"><button class="btn danger" onclick="blockDevice('${d.id}')">拉黑</button></div></div></div>` : ''}
+  `;
+}
+
+function setTrust(id, t) {
+  const d = devices.find(x => x.id === id);
+  d.trust = t;
+  toast(`「${d.name}」信任等级:${ { temp: '临时', limited: '一般', full: '完全' }[t] }`);
+  render();
+}
+function blockDevice(id) {
+  const d = devices.find(x => x.id === id);
+  dialog(`<h3>拉黑「${d.name}」?</h3>
+    <p>该设备将被移入黑名单:文件传输、投屏、共享目录浏览全部拒绝。</p>
+    <div class="d-actions">
+      <button class="btn text" onclick="closeDialog()">取消</button>
+      <button class="btn filled" style="background:var(--red)" onclick="doBlock('${id}')">拉黑</button>
+    </div>`);
+}
+function doBlock(id) {
+  const d = devices.find(x => x.id === id);
+  d.blocked = true; delete d.trust;
+  closeDialog(); toast(`已拉黑「${d.name}」`); go('block');
+}
+
+/* -------- 共享目录浏览(多设备树 + 文件面板) -------- */
+function browseDir(id) {
+  state.detailId = id;
+  if (dirTrees[id]) {
+    state.dirSel = { device: id, path: '' };
+    state.dirExpanded.add(id);
+  }
+  state.dirChecked.clear();
+  state.view = 'dir';
+  render();
+}
+
+function renderDir(c) {
+  const writable = writableDevices[state.dirSel.device];
+  $('topbar').innerHTML = `
+    <button class="icon-btn" onclick="${state.detailId ? `openDetail('${state.detailId}')` : "go(currentRoot())"}">${icon('i-back')}</button>
+    <button class="icon-btn m-only" onclick="toggleDrawer()">${icon('i-menu')}</button>
+    <button class="icon-btn d-only" onclick="toggleTree()" title="${state.dirTreeOpen ? '收起设备树' : '展开设备树'}">${icon('i-rows')}</button>
+    <div><h1>共享目录</h1><div class="sub">多设备同时浏览 · ${writable ? '可写' : '只读'} · 支持复制/剪切/粘贴/拖放</div></div>
+    <div class="spacer"></div>`;
+  c.innerHTML = `
+    <div class="dirwrap">
+      ${state.dirTreeOpen ? `<div class="dirtree ${state.dirDrawer ? 'open' : ''} ${state.dirChecked.size ? 'tree-has-sel' : ''}">
+        <div class="dt-title">设备目录</div>
+        ${treeGroup('本机与我的设备', devices.filter(d => d.self || d.mine))}
+        ${treeGroup('已配对', devices.filter(d => d.trust))}
+        ${treeGroup('附近', devices.filter(d => d.nearby))}
+      </div>` : ''}
+      <div class="drawer-backdrop ${state.dirDrawer ? 'show' : ''}" onclick="toggleDrawer()"></div>
+      <div class="dirpane" ondragover="paneDragOver(event)" ondragleave="paneDragLeave(event)" ondrop="paneDrop(event)">
+        ${dirPaneHtml()}
+        <div class="dropzone-hint">${icon('i-dl')} 释放以上传到当前目录</div>
+      </div>
+    </div>`;
+}
+
+function treeGroup(title, list) {
+  if (!list.length) return '';
+  return `<div class="dt-title" style="padding-top:12px">${title}</div>${list.map(d => dirTrees[d.id] ? treeDeviceNode(d) : simpleNode(d)).join('')}`;
+}
+
+function treeDeviceNode(d) {
+  const t = dirTrees[d.id];
+  const open = state.dirExpanded.has(d.id);
+  const sel = state.dirSel.device === d.id && state.dirSel.path === '';
+  const hasKids = (t.folders[''] || []).some(f => f.d);
+  return `
+    <div class="tnode ${sel ? 'sel' : ''} ${d.online ? '' : 'off'}"
+      onclick="treeClick('${d.id}', '', ${d.online})"
+      ondragover="treeDragOver(event, this)" ondragleave="treeDragLeave(this)" ondrop="treeDrop(event,'${d.id}','')">
+      <svg class="arrow ${open ? 'open' : ''} ${hasKids ? '' : 'ghost'}"><use href="#i-chev"/></svg>
+      ${icon(d.icon)}
+      <span>${t.label}</span>
+      ${writableDevices[d.id] ? '<span class="tagchip">可写</span>' : '<span class="tagchip" style="background:var(--surface-variant);color:var(--text-2)">只读</span>'}
+      <button class="send-on-node" title="发送选中文件到此设备" onclick="event.stopPropagation();sendTo('${d.id}')">${icon('i-send')}</button>
+      <span class="dev-dot ${d.online ? 'on' : 'offd'}" title="${d.online ? '在线' : '离线'}"></span>
+    </div>
+    ${open && d.online ? folderNodes(d.id, '') : ''}`;
+}
+
+function simpleNode(d) {
+  return `
+    <div class="tnode ${d.online ? '' : 'off'}" onclick="sendOrHint('${d.id}')"
+      ondragover="treeDragOver(event, this)" ondragleave="treeDragLeave(this)" ondrop="treeDrop(event,'${d.id}','')">
+      <svg class="arrow ghost"><use href="#i-chev"/></svg>
+      ${icon(d.icon)}
+      <span>${d.name}</span>
+      <button class="send-on-node" title="发送选中文件到此设备" onclick="event.stopPropagation();sendTo('${d.id}')">${icon('i-send')}</button>
+      <span class="dev-dot ${d.online ? 'on' : 'offd'}" title="${d.online ? '在线' : '离线'}"></span>
+    </div>`;
+}
+
+function folderNodes(devId, parentPath) {
+  const t = dirTrees[devId];
+  const folders = (t.folders[parentPath] || []).filter(f => f.d);
+  return folders.map(f => {
+    const path = parentPath ? parentPath + '/' + f.d : f.d;
+    const key = devId + ':' + path;
+    const open = state.dirExpanded.has(key);
+    const sel = state.dirSel.device === devId && state.dirSel.path === path;
+    const hasKids = (t.folders[path] || []).some(x => x.d);
+    return `
+      <div class="tnode ${sel ? 'sel' : ''}" style="padding-left:26px" onclick="treeClick('${devId}','${path}', true)"
+        ondragover="treeDragOver(event, this)" ondragleave="treeDragLeave(this)" ondrop="treeDrop(event,'${devId}','${path}')">
+        <svg class="arrow ${open ? 'open' : ''} ${hasKids ? '' : 'ghost'}"><use href="#i-chev"/></svg>
+        ${icon('i-folder')}
+        <span>${f.d}</span>
+      </div>
+      ${open ? folderNodes(devId, path) : ''}`;
+  }).join('');
+}
+
+function treeClick(devId, path, online) {
+  if (!online) { toast('设备离线,无法浏览共享目录'); return; }
+  const key = devId + ':' + path;
+  if (path === '') {
+    state.dirExpanded.has(devId) ? state.dirExpanded.delete(devId) : state.dirExpanded.add(devId);
+  } else if ((dirTrees[devId].folders[path] || []).some(x => x.d)) {
+    state.dirExpanded.has(key) ? state.dirExpanded.delete(key) : state.dirExpanded.add(key);
+  }
+  state.dirSel = { device: devId, path };
+  state.dirChecked.clear();
+  if ($('win').classList.contains('mobile')) state.dirDrawer = false;
+  render();
+}
+
+function sendOrHint(id) {
+  if (state.dirChecked.size) { sendTo(id); return; }
+  const d = devices.find(x => x.id === id);
+  toast(`「${d.name}」未开放共享目录 · 选中文件后可发送到该设备`);
+}
+
+function toggleTree() { state.dirTreeOpen = !state.dirTreeOpen; render(); }
+function toggleDrawer() {
+  state.dirDrawer = !state.dirDrawer;
+  const t = document.querySelector('.dirtree');
+  const b = document.querySelector('.drawer-backdrop');
+  if (t) t.classList.toggle('open', state.dirDrawer);
+  if (b) b.classList.toggle('show', state.dirDrawer);
+}
+
+/* ---------- 面板 ---------- */
+function dirPaneHtml() {
+  const { device, path } = state.dirSel;
+  const t = dirTrees[device];
+  const d = devices.find(x => x.id === device);
+  if (!t || !d.online) {
+    return `<div class="empty">${icon('i-warn')}<br>「${t ? t.label : ''}」当前离线<br>上线后即可浏览其共享目录</div>`;
+  }
+  const items = t.folders[path] || [];
+  const writable = writableDevices[device];
+  const crumbs = [`<span class="c ${path === '' ? 'cur' : ''}" onclick="treeClick('${device}','',true)">${t.label}</span>`]
+    .concat(path ? path.split('/').map((p, i, arr) => {
+      const sub = arr.slice(0, i + 1).join('/');
+      return `${icon('i-chev')}<span class="c ${i === arr.length - 1 ? 'cur' : ''}" onclick="treeClick('${device}','${sub}',true)">${p}</span>`;
+    }) : []).join('');
+  const checkedCount = state.dirChecked.size;
+  const cb = state.dirClipboard;
+  return `
+    <div class="crumbs">${crumbs}</div>
+    <div class="pane-head">
+      <span>${items.length} 项</span>
+      <span class="spacer"></span>
+      <button class="vt-btn ${state.dirView === 'details' ? 'sel' : ''}" title="详细信息视图" onclick="viewSet('details')">${icon('i-rows')}</button>
+      <button class="vt-btn ${state.dirView === 'list' ? 'sel' : ''}" title="列表视图" onclick="viewSet('list')">${icon('i-grid')}</button>
+      ${cb ? `<button class="btn ${writable ? 'filled' : 'tonal'}" ${writable ? '' : 'disabled title="只读目录不可写入"'} onclick="pasteHere()">${icon('i-clip')} 粘贴 ${cb.items.length} 项</button>` : ''}
+      <span style="color:var(--text-3);font-size:12px;display:flex;align-items:center;gap:5px">${icon('i-lock')} 由对端授权 · ${writable ? '可写' : '只读'}</span>
+    </div>
+    ${checkedCount ? `<div class="sel-banner">
+      ${icon('i-check')} 已选 ${checkedCount} 项
+      <span class="spacer"></span>
+      <button onclick="downloadChecked()">下载选中</button>
+      <button onclick="sendPicker()">发送到…</button>
+      <button class="ghost" onclick="clearChecked()">清除</button>
+    </div>` : ''}
+    ${items.length === 0 ? `<div class="empty">${icon('i-folder')}<br>此目录为空</div>`
+      : state.dirView === 'details' ? `
+      <div class="dhead"><span></span><span></span><span>名称</span><span>大小</span><span>类型</span><span>标签与备注</span><span>修改时间</span><span></span></div>
+      ${items.map(it => rowDetails(device, path, it, writable)).join('')}`
+      : `<div class="rows">${items.map(it => rowList(device, path, it, writable)).join('')}</div>`}`;
+}
+
+function tagsHtml(dev, path, name) {
+  const rec = state.dirTags[dev + ':' + path + '/' + name];
+  if (!rec) return '';
+  return rec.tags.map(t => `<span class="tagchip">${t}</span>`).join('');
+}
+
+function noteHtml(dev, path, name) {
+  const rec = state.dirTags[dev + ':' + path + '/' + name];
+  if (!rec || !rec.note) return '';
+  return `<span class="note-inline" title="备注:${rec.note}">${icon('i-tag')}<span>${rec.note}</span></span>`;
+}
+
+function rowDetails(dev, path, it, writable) {
+  const name = it.d || it.f;
+  const key = dev + ':' + path + '/' + name;
+  const checked = state.dirChecked.has(key);
+  return `
+    <div class="drow" oncontextmenu="ctxRow(event,'${dev}','${path}','${name}',${!!it.d})"
+      draggable="true" ondragstart="dragStart(event,'${dev}','${path}','${name}',${!!it.d})">
+      <input type="checkbox" class="f-check" ${checked ? 'checked' : ''} onchange="toggleCheck('${key}')">
+      <div class="fi" style="border-radius:9px;background:var(--surface-variant);display:flex;align-items:center;justify-content:center;color:var(--text-2)">${icon(it.d ? 'i-folder' : (isImage(name) ? 'i-grid' : 'i-file'))}</div>
+      <div class="fname" ${it.d ? `onclick="treeClick('${dev}','${path ? path + '/' : ''}${name}',true)"` : `onclick="previewFile('${dev}','${path}','${name}')"`}>
+        <span class="nm">${name}</span>${tagsHtml(dev, path, name)}
+      </div>
+      <span class="cell">${it.d ? it.n + ' 个项目' : it.size}</span>
+      <span class="cell">${it.d ? '文件夹' : fileType(name)}</span>
+      <span class="cell meta-cell" onclick="editTags('${dev}','${path}','${name}')" title="点击编辑标签与备注">${noteHtml(dev, path, name)}</span>
+      <span class="cell">${it.date || '—'}</span>
+      <button class="vt-btn" onclick="ctxMore(event,'${dev}','${path}','${name}',${!!it.d})">${icon('i-more')}</button>
+    </div>`;
+}
+
+function rowList(dev, path, it, writable) {
+  const name = it.d || it.f;
+  const key = dev + ':' + path + '/' + name;
+  const checked = state.dirChecked.has(key);
+  return `
+    <div class="listrow" oncontextmenu="ctxRow(event,'${dev}','${path}','${name}',${!!it.d})"
+      draggable="true" ondragstart="dragStart(event,'${dev}','${path}','${name}',${!!it.d})">
+      <input type="checkbox" class="f-check" ${checked ? 'checked' : ''} onchange="toggleCheck('${key}')">
+      <div class="fi" style="border-radius:9px;background:var(--surface-variant);display:flex;align-items:center;justify-content:center;color:var(--text-2)">${icon(it.d ? 'i-folder' : (isImage(name) ? 'i-grid' : 'i-file'))}</div>
+      <div class="fname" ${it.d ? `onclick="treeClick('${dev}','${path ? path + '/' : ''}${name}',true)"` : `onclick="previewFile('${dev}','${path}','${name}')"`}>
+        <span class="nm">${name}</span>${tagsHtml(dev, path, name)}${noteHtml(dev, path, name)}
+      </div>
+      <span class="cell">${it.d ? it.n + ' 项' : it.size}</span>
+      <button class="vt-btn" onclick="ctxMore(event,'${dev}','${path}','${name}',${!!it.d})">${icon('i-more')}</button>
+    </div>`;
+}
+
+function viewSet(v) { state.dirView = v; refreshPane(); }
+function toggleCheck(key) {
+  state.dirChecked.has(key) ? state.dirChecked.delete(key) : state.dirChecked.add(key);
+  refreshPane();
+}
+function clearChecked() { state.dirChecked.clear(); render(); }
+function refreshPane() {
+  const pane = document.querySelector('.dirpane');
+  if (pane) pane.innerHTML = dirPaneHtml() + `<div class="dropzone-hint">${icon('i-dl')} 释放以上传到当前目录</div>`;
+}
+
+/* ---------- 剪贴板 / 操作 ---------- */
+function checkedNames() {
+  const prefix = state.dirSel.device + ':' + state.dirSel.path + '/';
+  return [...state.dirChecked].filter(k => k.startsWith(prefix)).map(k => k.slice(prefix.length));
+}
+
+function clipSet(op, dev, path, name) {
+  closeCtx();
+  const inSel = state.dirChecked.has(dev + ':' + path + '/' + name);
+  const items = inSel && checkedNames().length ? checkedNames() : [name];
+  state.dirClipboard = { op, device: dev, path, items };
+  toast(`已${op === 'copy' ? '复制' : '剪切'} ${items.length} 项 · 切换到目标目录后点「粘贴」`);
+  refreshPane();
+}
+
+function folderArr(dev, path) {
+  const f = dirTrees[dev].folders;
+  if (!f[path]) f[path] = [];
+  return f[path];
+}
+
+function removeItems(dev, path, names) {
+  const arr = folderArr(dev, path);
+  for (const n of names) {
+    const i = arr.findIndex(x => (x.f || x.d) === n);
+    if (i >= 0) arr.splice(i, 1);
+  }
+}
+
+function pasteHere() {
+  const cb = state.dirClipboard;
+  if (!cb) return;
+  const { device, path } = state.dirSel;
+  if (!writableDevices[device]) { toast('只读目录不可写入'); return; }
+  const src = folderArr(cb.device, cb.path);
+  const moved = [];
+  for (const n of cb.items) {
+    const it = src.find(x => (x.f || x.d) === n);
+    if (it) moved.push({ ...it });
+  }
+  if (cb.op === 'cut') removeItems(cb.device, cb.path, cb.items);
+  const target = folderArr(device, path);
+  for (const it of moved) target.push(it);
+  const cross = cb.device !== device;
+  toast(`已粘贴 ${moved.length} 项到「${dirTrees[device].label}${path ? ' / ' + path : ''}」${cross ? ' · 跨设备直传(演示)' : ''}`);
+  if (cb.op === 'cut') state.dirClipboard = null;
+  state.dirChecked.clear();
+  render();
+}
+
+function ctxRow(e, dev, path, name, isDir) {
+  e.preventDefault();
+  e.stopPropagation();
+  ctxMore(e, dev, path, name, isDir);
+}
+
+function ctxMore(e, dev, path, name, isDir) {
+  e.preventDefault();
+  e.stopPropagation();
+  const writable = writableDevices[dev];
+  const img = !isDir && isImage(name);
+  const md = !isDir && isMd(name);
+  const inSel = state.dirChecked.has(dev + ':' + path + '/' + name);
+  const n = inSel && checkedNames().length ? checkedNames().length : 1;
+  showCtx(e.clientX, e.clientY, `
+    ${(img || md) ? `<button onclick="previewFile('${dev}','${path}','${name}')">${icon('i-grid')}预览</button>` : ''}
+    ${!isDir ? `<button onclick="closeCtx();toast('已加入下载队列:${name}')">${icon('i-dl')}下载</button>` : ''}
+    <button onclick="clipSet('copy','${dev}','${path}','${name}')">${icon('i-clip')}复制${n > 1 ? ' (' + n + ' 项)' : ''}</button>
+    <button onclick="clipSet('cut','${dev}','${path}','${name}')">${icon('i-clip')}剪切${n > 1 ? ' (' + n + ' 项)' : ''}</button>
+    <button onclick="closeCtx();sendPickerFor('${dev}','${path}','${name}')">${icon('i-send')}发送到…${n > 1 ? ' (' + n + ' 项)' : ''}</button>
+    ${writable ? `<button onclick="closeCtx();renameItem('${dev}','${path}','${name}')">${icon('i-edit')}重命名</button>` : ''}
+    <button onclick="closeCtx();editTags('${dev}','${path}','${name}')">${icon('i-tag')}标签与备注</button>
+    <div class="sep"></div>
+    ${writable ? `<button class="danger" onclick="closeCtx();deleteItem('${dev}','${path}','${name}',${isDir})">${icon('i-trash')}删除${n > 1 ? ' (' + n + ' 项)' : ''}</button>`
+      : `<button disabled style="opacity:.45">${icon('i-trash')}删除(只读目录)</button>`}
+  `);
+}
+
+function renameItem(dev, path, name) {
+  dialog(`<h3>${icon('i-edit')}重命名</h3>
+    <input id="renameInput" type="text" value="${name}" style="width:100%;margin:10px 0">
+    <div class="d-actions">
+      <button class="btn text" onclick="closeDialog()">取消</button>
+      <button class="btn filled" onclick="doRename('${dev}','${path}','${name}')">保存</button>
+    </div>`);
+  setTimeout(() => { const el = $('renameInput'); if (el) { el.focus(); el.select(); } }, 30);
+}
+
+function doRename(dev, path, name) {
+  const nn = ($('renameInput') || {}).value || '';
+  if (!nn.trim() || nn === name) { closeDialog(); return; }
+  const arr = folderArr(dev, path);
+  const it = arr.find(x => (x.f || x.d) === name);
+  if (it) { if (it.f) it.f = nn; else it.d = nn; }
+  closeDialog();
+  toast(`已重命名为「${nn}」`);
+  render();
+}
+
+function deleteItem(dev, path, name, isDir) {
+  const inSel = state.dirChecked.has(dev + ':' + path + '/' + name);
+  const names = inSel && checkedNames().length ? checkedNames() : [name];
+  state.del = { dev, path, names };
+  dialog(`<h3>${icon('i-warn')}删除确认</h3>
+    <p>将删除 ${names.length} 个项目:<br><b>${names.slice(0, 4).join('、')}${names.length > 4 ? ' 等' : ''}</b><br>
+    ${dev !== 'self' ? '跨设备删除将移入对端回收站(平台支持时)。' : ''}</p>
+    <div class="d-actions">
+      <button class="btn text" onclick="closeDialog()">取消</button>
+      <button class="btn filled" style="background:var(--red)" onclick="doDelete()">删除</button>
+    </div>`);
+}
+
+function doDelete() {
+  const { dev, path, names } = state.del;
+  removeItems(dev, path, names);
+  state.dirChecked.clear();
+  state.del = null;
+  closeDialog();
+  toast(`已删除 ${names.length} 项`);
+  render();
+}
+
+/* ---------- 标签与备注 ---------- */
+function editTags(dev, path, name) {
+  const key = dev + ':' + path + '/' + name;
+  const cur = state.dirTags[key] || { tags: [], note: '' };
+  state.tagDraft = { key, name, tags: [...cur.tags], note: cur.note };
+  renderTagDialog();
+}
+
+function renderTagDialog() {
+  const dr = state.tagDraft;
+  dialog(`<h3>${icon('i-tag')}标签与备注</h3>
+    <p style="margin-bottom:10px">${dr.name} <span style="color:var(--text-3)">· 本机个人标注,不上传</span></p>
+    <div style="min-height:26px">${dr.tags.map(t => `<span class="tagchip">${t}<span class="x" onclick="tagRemove('${t}')">×</span></span>`).join('') || '<span style="color:var(--text-3);font-size:12px">暂无标签</span>'}</div>
+    <div style="display:flex;gap:8px;margin:12px 0">
+      <input id="tagInput" type="text" placeholder="输入标签,回车添加" style="flex:1">
+      <button class="btn tonal" onclick="tagAdd()">添加</button>
+    </div>
+    <textarea id="tagNote" placeholder="备注…" style="width:100%;min-height:70px;border:1px solid var(--outline);border-radius:10px;padding:10px;font-family:inherit;font-size:13px;resize:vertical">${dr.note}</textarea>
+    <div class="d-actions">
+      <button class="btn text" onclick="closeDialog()">取消</button>
+      <button class="btn filled" onclick="tagSave()">保存</button>
+    </div>`);
+  setTimeout(() => {
+    const el = $('tagInput');
+    if (el) el.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); tagAdd(); } };
+  }, 30);
+}
+
+function tagAdd() {
+  const el = $('tagInput');
+  const v = (el.value || '').trim();
+  if (v && !state.tagDraft.tags.includes(v)) state.tagDraft.tags.push(v);
+  state.tagDraft.note = ($('tagNote') || {}).value || '';
+  renderTagDialog();
+}
+function tagRemove(t) {
+  state.tagDraft.tags = state.tagDraft.tags.filter(x => x !== t);
+  state.tagDraft.note = ($('tagNote') || {}).value || '';
+  renderTagDialog();
+}
+function tagSave() {
+  const dr = state.tagDraft;
+  dr.note = ($('tagNote') || {}).value || '';
+  if (dr.tags.length || dr.note) state.dirTags[dr.key] = { tags: dr.tags, note: dr.note };
+  else delete state.dirTags[dr.key];
+  state.tagDraft = null;
+  closeDialog();
+  toast('标签与备注已保存(本机标注)');
+  render();
+}
+
+/* ---------- 预览 ---------- */
+function previewFile(dev, path, name) {
+  if (isImage(name)) openLightbox(dev, path, name);
+  else if (isMd(name)) openMd(dev, path, name);
+  else toast('该类型暂不支持预览(演示:图片与 Markdown)');
+}
+
+function openLightbox(dev, path, name) {
+  const imgs = folderArr(dev, path).filter(f => f.f && isImage(f.f)).map(f => f.f);
+  state.lb = { dev, path, imgs, idx: Math.max(0, imgs.indexOf(name)) };
+  renderLightbox();
+}
+
+function renderLightbox() {
+  const { imgs, idx } = state.lb;
+  const name = imgs[idx];
+  dialog(`
+    <div class="lb-head">
+      ${icon('i-grid')} <span>${name}</span><span style="opacity:.6">(图片预览 ${idx + 1}/${imgs.length})</span>
+      <span class="spacer"></span>
+      <button class="lb-nav" onclick="closeDialog()">${icon('i-close')}</button>
+    </div>
+    <img src="${imgDataUri(name, 150 + idx * 47)}" alt="${name}">
+    <div class="lb-actions">
+      <button class="lb-nav" onclick="lbNav(-1)">${icon('i-back')}</button>
+      <button class="btn tonal" onclick="toast('已加入下载队列:${name}')">下载</button>
+      <button class="btn tonal" onclick="toast('选择设备后发送:${name}(演示)')">发送到…</button>
+      <button class="lb-nav" onclick="lbNav(1)">${icon('i-chev')}</button>
+    </div>`, 'lightbox');
+}
+
+function lbNav(d) {
+  const { imgs, idx } = state.lb;
+  state.lb.idx = (idx + d + imgs.length) % imgs.length;
+  renderLightbox();
+}
+
+function openMd(dev, path, name) {
+  dialog(`
+    <h3>${icon('i-file')}${name} <span style="font-size:12px;color:var(--text-3);font-weight:400">· Markdown 预览</span></h3>
+    <div class="mdbox">${MD_SAMPLE}</div>
+    <div class="d-actions">
+      <button class="btn text" onclick="toast('已加入下载队列:${name}')">下载</button>
+      <button class="btn filled" onclick="closeDialog()">关闭</button>
+    </div>`, 'mdlg');
+}
+
+/* ---------- 拖放 ---------- */
+function dragStart(e, dev, path, name, isDir) {
+  state.drag = { dev, path, name, isDir };
+  e.dataTransfer.setData('text/plain', name);
+  e.dataTransfer.effectAllowed = 'copyMove';
+}
+
+function treeDragOver(e, el) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; el.classList.add('dropok'); }
+function treeDragLeave(el) { el.classList.remove('dropok'); }
+
+function treeDrop(e, dev, path) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('dropok');
+  const dr = state.drag;
+  if (!dr) return;
+  if (!writableDevices[dev]) { toast('目标目录只读,无法接收'); return; }
+  if (dr.dev === dev && dr.path === path) return;
+  const src = folderArr(dr.dev, dr.path);
+  const it = src.find(x => (x.f || x.d) === dr.name);
+  if (!it) return;
+  removeItems(dr.dev, dr.path, [dr.name]);
+  folderArr(dev, path).push({ ...it });
+  state.drag = null;
+  toast(`已移动「${dr.name}」到「${dirTrees[dev].label}${path ? ' / ' + path : ''}」${dr.dev !== dev ? ' · 跨设备传输(演示)' : ''}`);
+  render();
+}
+
+function paneDragOver(e) {
+  e.preventDefault();
+  if (e.dataTransfer.types.includes('Files')) {
+    document.querySelector('.dirpane').classList.add('dragover');
+  }
+}
+
+function paneDragLeave(e) {
+  document.querySelector('.dirpane').classList.remove('dragover');
+}
+
+function paneDrop(e) {
+  e.preventDefault();
+  const pane = document.querySelector('.dirpane');
+  pane.classList.remove('dragover');
+  const { device, path } = state.dirSel;
+  if (e.dataTransfer.files && e.dataTransfer.files.length) {
+    if (!writableDevices[device]) { toast('只读目录不可上传'); return; }
+    toast(`已上传 ${e.dataTransfer.files.length} 个文件到当前目录(演示)`);
+    return;
+  }
+  treeDrop(e, device, path);
+}
+
+/* ---------- 发送 / 下载 ---------- */
+function sendPickerFor(dev, path, name) {
+  const inSel = state.dirChecked.has(dev + ':' + path + '/' + name);
+  const names = inSel && checkedNames().length ? checkedNames() : [name];
+  openSendPicker(names);
+}
+
+function sendPicker() { openSendPicker(checkedNames()); }
+
+function openSendPicker(names) {
+  if (!names || !names.length) { toast('先勾选要发送的文件'); return; }
+  state.pendingSendNames = names;
+  const targets = devices.filter(d => !d.self);
+  dialog(`<h3>${icon('i-send')}发送到…</h3>
+    <p>已选 ${names.length} 项 · 选择目标设备(本机设备与已配对设备均可):</p>
+    <div class="rows" style="margin-top:12px">
+      ${targets.map(d => `<div class="row" style="cursor:pointer" onclick="closeDialog();sendTo('${d.id}')">
+        <div class="dev-icon">${icon(d.icon)}</div>
+        <div class="grow"><div class="title">${d.name}</div><div class="desc">${d.plat}${d.online ? ' · 在线' : ' · 离线'}</div></div>
+        ${icon('i-chev')}
+      </div>`).join('')}
+    </div>
+    <div class="d-actions"><button class="btn text" onclick="closeDialog()">取消</button></div>`);
+}
+
+function sendTo(id, names) {
+  const d = devices.find(x => x.id === id);
+  names = (names && names.length) ? names : (state.pendingSendNames && state.pendingSendNames.length ? state.pendingSendNames : checkedNames());
+  if (!names.length) { toast('先勾选要发送的文件'); return; }
+  state.pendingSend = { id, names };
+  const label = names.length === 1 ? names[0] : `${names[0]} 等 ${names.length} 项`;
+  dialog(`<h3>${icon('i-send')}发送到「${d.name}」</h3>
+    <p>将发送 ${names.length} 个项目到「${d.name}」(文件与文件夹均支持,文件夹递归;<br>跨设备文件经本机中转,复用传输管线 F-XFER)。</p>
+    <p style="margin-top:8px"><b>${label}</b></p>
+    <div class="d-actions">
+      <button class="btn text" onclick="closeDialog()">取消</button>
+      <button class="btn filled" onclick="doSendTo()">发送</button>
+    </div>`);
+}
+
+function doSendTo() {
+  const { id, names } = state.pendingSend;
+  const d = devices.find(x => x.id === id);
+  state.pendingSend = null;
+  state.pendingSendNames = null;
+  state.dirChecked.clear();
+  closeDialog();
+  const label = names.length === 1 ? names[0] : `${names[0]} 等 ${names.length} 项`;
+  const size = Math.round(40 + Math.random() * 700);
+  startTransfer(label, d.name, size);
+  toast(`开始发送 ${names.length} 项到「${d.name}」`);
+}
+
+function downloadChecked() {
+  const n = state.dirChecked.size;
+  state.dirChecked.clear();
+  toast(`已加入下载队列:${n} 个文件(演示)`);
+  render();
+}
+
+/* ================= 动作 ================= */
+function sendFiles(id) {
+  const d = devices.find(x => x.id === id);
+  toast(`已选择「${d.name}」,拖入文件或点击选择(演示)`);
+}
+/* ---------- 多设备投屏 / 键鼠共享 ---------- */
+function shareScreen(id) { openSharePicker('screen', id); }
+function shareKm(id) { openSharePicker('km', id); }
+
+function recommendedScreens() { return Math.max(1, Math.floor(state.netMbps * 0.75 / 8)); }
+
+function openSharePicker(type, presetId) {
+  state.sharePicker = { type, checked: new Set(presetId ? [presetId] : []) };
+  renderSharePicker();
+}
+
+function renderSharePicker() {
+  const { type, checked } = state.sharePicker;
+  const targets = devices.filter(d => !d.self && !d.nearby);
+  const title = type === 'screen' ? '共享屏幕到…' : '键鼠共享到…';
+  const extra = type === 'screen'
+    ? `<p style="margin-top:10px">检测到上行带宽约 <b>${state.netMbps} Mbps</b>,按 8 Mbps/台 估算:<b>建议同时投屏不超过 ${recommendedScreens()} 台</b>
+       <button class="btn text" style="padding:2px 8px;font-size:12px" onclick="retestNet()">重新测速</button></p>`
+    : `<p style="margin-top:10px">一套键鼠按「布局」中的屏幕相对位置跨设备流转;共享后可编辑布局(实验性)。</p>`;
+  dialog(`<h3>${icon(type === 'screen' ? 'i-screen' : 'i-mouse')}${title}</h3>
+    <p>选择目标设备(可多选):</p>
+    <div class="rows" style="margin-top:10px;max-height:40vh;overflow-y:auto">
+      ${targets.map(d => {
+        const noScreen = type === 'screen' && d.trust === 'temp';
+        return `<label class="row" style="cursor:${noScreen ? 'not-allowed' : 'pointer'};${noScreen ? 'opacity:.5' : ''}">
+          <input type="checkbox" class="f-check" ${checked.has(d.id) ? 'checked' : ''} ${noScreen ? 'disabled' : ''} onchange="pickerToggle('${d.id}')">
+          <div class="dev-icon">${icon(d.icon)}</div>
+          <div class="grow"><div class="title">${d.name}</div><div class="desc">${d.plat}${d.online ? ' · 在线' : ' · 离线'}${noScreen ? ' · 临时设备不可投屏' : ''}</div></div>
+        </label>`;
+      }).join('')}
+    </div>
+    ${extra}
+    <div class="d-actions">
+      <button class="btn text" onclick="closeDialog()">取消</button>
+      <button class="btn filled" onclick="confirmSharePicker()">开始(${checked.size})</button>
+    </div>`);
+}
+
+function pickerToggle(id) {
+  const c = state.sharePicker.checked;
+  c.has(id) ? c.delete(id) : c.add(id);
+  renderSharePicker();
+}
+
+function retestNet() {
+  state.netMbps = Math.round(14 + Math.random() * 20);
+  renderSharePicker();
+  toast(`重新测速:上行 ${state.netMbps} Mbps`);
+}
+
+function confirmSharePicker() {
+  const { type, checked } = state.sharePicker;
+  const ids = [...checked];
+  if (!ids.length) { toast('先选择设备'); return; }
+  if (type === 'screen' && ids.length > recommendedScreens()) {
+    openLagWarning(ids);
+    return;
+  }
+  startShare(type, ids);
+  closeDialog();
+}
+
+function openLagWarning(ids) {
+  const rec = recommendedScreens();
+  const names = ids.map(i => devices.find(d => d.id === i).name).join('、');
+  dialog(`<h3>${icon('i-warn')}可能卡顿</h3>
+    <p>已选 <b>${ids.length}</b> 台,超过当前网络建议的 <b>${rec}</b> 台。<br>
+    上行带宽约 ${state.netMbps} Mbps(8 Mbps/台),同时投屏可能造成卡顿与延迟升高。</p>
+    <p style="margin-top:8px;color:var(--text-3);font-size:12px">${names}</p>
+    <div class="d-actions">
+      <button class="btn text" onclick="closeDialog()">取消</button>
+      <button class="btn tonal" onclick="reduceToRecommended()">减少到 ${rec} 台</button>
+      <button class="btn filled" onclick="forceShare()">仍然继续</button>
+    </div>`);
+}
+
+function reduceToRecommended() {
+  const rec = recommendedScreens();
+  state.sharePicker.checked = new Set([...state.sharePicker.checked].slice(0, rec));
+  renderSharePicker();
+}
+
+function forceShare() {
+  const ids = [...state.sharePicker.checked];
+  closeDialog();
+  startShare('screen', ids);
+}
+
+function startShare(type, ids) {
+  const peers = ids.map(i => devices.find(d => d.id === i).name);
+  state.sessions.push({ type, peers });
+  if (type === 'km') {
+    for (const p of peers) if (!state.kmLayout.includes(p)) state.kmLayout.push(p);
+  }
+  render();
+  toast(type === 'screen' ? `开始投屏到 ${peers.length} 台设备` : `键鼠共享已开启(实验性)↔ ${peers.length} 台设备`);
+}
+
+/* ---------- 键鼠布局编辑器 ---------- */
+function openLayoutEditor(i) {
+  const s = state.sessions[i];
+  const peers = s.peers || [];
+  for (const p of peers) if (!state.kmLayout.includes(p)) state.kmLayout.push(p);
+  renderLayoutEditor();
+}
+
+function renderLayoutEditor() {
+  dialog(`<h3>${icon('i-mouse')}键鼠布局(实验性)</h3>
+    <p>拖动调整屏幕相对位置;光标按左右顺序跨设备流转,布局随会话保存。</p>
+    <div style="display:flex;gap:10px;margin:16px 0;flex-wrap:wrap">
+      ${state.kmLayout.map((p, i) => `
+        <div class="lay-tile" draggable="true" ondragstart="layDrag(event,${i})" ondragover="event.preventDefault()" ondrop="layDrop(event,${i})">
+          ${icon('i-pc')}<span class="nm">${p}</span><span style="font-size:10px;color:var(--text-3)">第 ${i + 1} 屏</span>
+        </div>`).join('')}
+    </div>
+    <div class="d-actions">
+      <button class="btn text" onclick="closeDialog()">关闭</button>
+      <button class="btn tonal" onclick="autoLayout()">自动排列</button>
+    </div>`);
+}
+
+function layDrag(e, i) { state.layFrom = i; e.dataTransfer.setData('text/plain', String(i)); }
+function layDrop(e, i) {
+  e.preventDefault();
+  const from = state.layFrom;
+  if (from == null || from === i) return;
+  const arr = state.kmLayout;
+  const [m] = arr.splice(from, 1);
+  arr.splice(i, 0, m);
+  state.layFrom = null;
+  renderLayoutEditor();
+}
+function autoLayout() { state.kmLayout.sort(); renderLayoutEditor(); toast('已按名称排列'); }
+
+/* ================= 演示触发器 ================= */
+function demoScreenRequest() {
+  $('demoMenu').classList.remove('show');
+  dialog(`<h3>${icon('i-screen')}投屏请求</h3>
+    <p><b>办公室-Ubuntu</b> 想要把它的屏幕共享到本机。<br>对方是你的「完全信任」设备。</p>
+    <div class="d-actions">
+      <button class="btn text" onclick="closeDialog();toast('已拒绝该投屏请求')">拒绝</button>
+      <button class="btn filled" onclick="acceptScreen()">接受</button>
+    </div>`);
+}
+function acceptScreen() {
+  closeDialog();
+  state.sessions.push({ type: 'screen', peers: ['办公室-Ubuntu(接收中)'] });
+  render();
+  toast('已接受,原生投屏窗口已打开(1080p60)');
+}
+function demoTransferConfirm() {
+  $('demoMenu').classList.remove('show');
+  dialog(`<h3>${icon('i-file')}接收文件</h3>
+    <p><b>访客-Linux</b> 想要发送 3 个文件(共 1.4 GB)到本机。<br>对方是「临时」设备,需要你的确认。</p>
+    <div class="d-actions">
+      <button class="btn text" onclick="closeDialog();toast('已拒绝')">拒绝</button>
+      <button class="btn filled" onclick="closeDialog();toast('已接受,开始接收')">接受</button>
+    </div>`);
+}
+function demoTransferDone() {
+  $('demoMenu').classList.remove('show');
+  toast('✅ 已接收 3 个文件 · 点击打开目录(演示)');
+}
+function demoPairing(id) {
+  $('demoMenu').classList.remove('show');
+  const d = id ? devices.find(x => x.id === id) : null;
+  dialog(`<h3>${icon('i-wifi')}配对 ${d ? '「' + d.name + '」' : ''}</h3>
+    <p>请在对方设备上核对以下安全码(两端一致才配对成功):</p>
+    <div class="sas">482 913</div>
+    <p style="text-align:center">对方:${d ? d.name : 'WIN-DEV-02'} · 指纹 <span class="mono">7C2B…9E11</span></p>
+    <div class="d-actions">
+      <button class="btn text" onclick="closeDialog();toast('已取消配对')">取消</button>
+      <button class="btn filled" onclick="doPair('${id || ''}')">两端一致,配对</button>
+    </div>`);
+}
+function doPair(id) {
+  closeDialog();
+  if (id) {
+    const d = devices.find(x => x.id === id);
+    if (d) { d.nearby = false; d.trust = 'temp'; }
+  }
+  toast('配对成功,信任等级:临时(可在设备详情中调整)');
+  render();
+}
+
+/* ================= 移动预览 ================= */
+function toggleMobile() {
+  $('win').classList.toggle('mobile');
+  $('mobileBtn').textContent = $('win').classList.contains('mobile') ? '桌面预览' : '移动预览';
+}
+
+/* ================= 启动 ================= */
+(function initFromHash() {
+  const parts = location.hash.replace('#', '').split('+').filter(Boolean);
+  let openPreview = false, openTag = false, openMdDemo = false, openTransfer = false;
+  let openPick = false, openLag = false, openLay = false;
+  for (const h of parts) {
+    if (h === 'mobile') { $('win').classList.add('mobile'); $('mobileBtn').textContent = '桌面预览'; }
+    else if (h === 'drawer') state.dirDrawer = true;
+    else if (h === 'list') state.dirView = 'list';
+    else if (h === 'preview') openPreview = true;
+    else if (h === 'transfer') openTransfer = true;
+    else if (h === 'sharepick') openPick = true;
+    else if (h === 'lag') openLag = true;
+    else if (h === 'layout') openLay = true;
+    else if (h === 'tag') openTag = true;
+    else if (h === 'md') openMdDemo = true;
+    else if (h.startsWith('detail-')) { state.detailId = h.slice(7); state.view = 'detail'; }
+    else if (h.startsWith('dir-')) { browseDir(h.slice(4)); }
+    else if (NAV.some(n => n.id === h)) { state.view = h; }
+  }
+  render();
+  if (openPreview) openLightbox('office', '共享照片', 'IMG_2031.jpg');
+  if (openTag) editTags('office', '共享照片', 'IMG_2031.jpg');
+  if (openMdDemo) openMd('office', '项目/文档', '接口说明.md');
+  if (openTransfer) startTransfer('设计稿.fig 等 3 项', '办公室-Ubuntu', 260);
+  if (openPick) { state.sharePicker = { type: 'screen', checked: new Set(['office', 'mac', 'phone']) }; renderSharePicker(); }
+  if (openLag) { state.sharePicker = { type: 'screen', checked: new Set(['office', 'mac', 'phone']) }; openLagWarning(['office', 'mac', 'phone']); }
+  if (openLay) { state.kmLayout = ['我的台式机', 'MacBook Pro', '办公室-Ubuntu']; renderLayoutEditor(); }
+})();
+
+</script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+# Build output and machine-specific files from the historical spike projects.
+**/build/
+**/.gradle/
+**/.idea/
+**/local.properties
+
+# Never track the throwaway spike private key; the public half stays in the repo.
+E2-S0/ssh-backup/anyshare_e2s0

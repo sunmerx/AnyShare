@@ -1,0 +1,18 @@
+﻿y=1169,248] t=系统与更新 clickable=false
+y=384,374] t=系统导航方式 clickable=false
+y=1072,370] t=全面屏手势 clickable=false
+y=192,517] t=语言 clickable=false
+y=1072,513] t=简体中文 clickable=false
+y=1036,690] t=输入法 clickable=false
+y=1036,833] t=日期和时间 clickable=false
+y=1036,1034] t=备份与迁移 clickable=false
+y=1072,1147] t=重置手机 clickable=false
+y=288,1348] t=维修空间 clickable=false
+y=1036,1521] t=开发者选项 clickable=false
+y=1036,1664] t=增强服务 clickable=false
+y=1036,1807] t=Google 设置 clickable=false
+y=312,1982] t=你可能想找： clickable=false
+y=1120,2123] t=定时开关机 clickable=false
+y=1120,2240] t=手势体感 clickable=false
+y=1120,2357] t=无障碍 clickable=false
+y=1120,2474] t=悬浮球 clickable=false

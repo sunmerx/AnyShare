@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
+    <application
+        android:label="E2 Spike"
+        android:theme="@android:style/Theme.Material.Light">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <service
+            android:name=".InjectAccessibilityService"
+            android:exported="false"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
+
+        <receiver
+            android:name=".CommandReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="io.anyshare.e2spike.TAP" />
+                <action android:name="io.anyshare.e2spike.SWIPE" />
+                <action android:name="io.anyshare.e2spike.SCROLL2" />
+                <action android:name="io.anyshare.e2spike.LATENCY" />
+                <action android:name="io.anyshare.e2spike.SETTEXT" />
+                <action android:name="io.anyshare.e2spike.CURSOR" />
+                <action android:name="io.anyshare.e2spike.CURSOR_HIDE" />
+            </intent-filter>
+        </receiver>
+    </application>
+
+</manifest>

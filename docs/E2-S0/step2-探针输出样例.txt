@@ -1,0 +1,129 @@
+# Step 2 验收样例:ss-probe 实测输出(2026-10-17)
+
+## 输出枚举(--list)
+
+```
+outputs (3):
+  [0] \\.\DISPLAY1 AMD Radeon 780M Graphics 1920x1200 at (0,0) rotation=identity attached=true
+  [1] \\.\DISPLAY2 AMD Radeon 780M Graphics 3072x1728 at (-3840,-366) rotation=identity attached=true
+  [2] \\.\DISPLAY7 AMD Radeon 780M Graphics 1920x1080 at (2880,0) rotation=identity attached=true   ← VDD 虚拟屏
+```
+
+## 静止场景(VDD,12s)
+
+```
+t=  2s frames=1    idle=2    dirty=2   (  0.1% area) moved=0   pointer_upd=0   zero_present=0
+t=  3s frames=1    idle=1    dirty=2   (  0.1% area) moved=0   pointer_upd=0   zero_present=0
+...
+summary: 30 acquire iterations, frames=17 idle=13 (43.3% idle), access_lost_rebuilds=0
+```
+
+结论:桌面无用户活动时,99.9% 帧为 **0.1% 面积级小刷新**(系统级周期绘制,约 1 次/秒);`Idle` 超时路径工作正常。产品化 VFR 后,静止桌面的编码负载趋近于零。
+
+## 已知活动场景(VDD 上运行时钟窗口 640x200,12s)
+
+```
+t=  5s frames=48   idle=0    dirty=57  (295.7% area) moved=0   pointer_upd=0   zero_present=0
+...
+summary: 521 acquire iterations, frames=521 idle=0 (0.0% idle), access_lost_rebuilds=0
+```
+
+**精度验证**:每秒脏区面积 ≈270–295% ≈ 45 帧 × 6.2%/帧;时钟窗口 640×200 / 1920×1080 = **6.2%**——脏区面积与窗口几何**分毫不差**。
+
+## 附带发现
+
+- DISPLAY2(3072x1728,未知屏)t1–t3 有 34–41 帧/秒的活跃内容,随后回落到 0.1%/秒——该屏上有活动窗口(用户环境)
+- 两个虚拟/扩展屏上都存在 ~1 次/秒、0.1% 面积 的系统级小刷新;具体来源(任务栏/虚拟屏驱动光标)待后续标注,不影响结论
+
+# Step 3 验收样例(2026-10-17):VFR 门控 + 编码器探测
+
+## ss-encoders(本机)
+
+```
+H.264 encoder candidates (priority chain: discrete GPU > integrated GPU > CPU;
+dGPU-vs-iGPU is decided by trial-encode in a later step):
+  [0] (hardware) AMDh264Encoder
+  [1] (hardware) AMDh264Encoder
+  [2] (software) H264 Encoder MFT
+```
+
+## ss-probe --vfr 静止场景(8s)
+
+```
+t=  2s frames=1    idle=1    dirty=2   (  0.1% area) ... vfr_enc=1    kf=0
+t=  3s frames=2    idle=1    dirty=4   (  0.2% area) ... vfr_enc=2    kf=1
+...
+vfr summary: encoded=9 keyframes=4 skipped=1 (static=1, rate_limited=0)
+```
+
+结论:静止时仅 0.1% 级系统小刷新触发编码(约 1 次/秒),相对无条件 60fps **削减 ~60 倍**;关键帧按 2s 节奏随行。
+
+## ss-probe --vfr 活动场景(VDD 上时钟窗口 12s)
+
+```
+t=  2s frames=43   idle=0    dirty=50  (258.7% area) ... vfr_enc=27   kf=1
+t=  3s frames=43   idle=0    dirty=48  (258.9% area) ... vfr_enc=29   kf=0
+...
+vfr summary: encoded=348 keyframes=6 skipped=195 (static=21, rate_limited=174)
+```
+
+结论:内容连续变化时,~43-56 原始帧/秒被门控收敛到 ~27-31 编码/秒(帧率上限与无效帧合并生效);174 次速率合并、21 次指针-only 帧被跳过;关键帧每 ~2s(6 个/12s ✓)。单元测试 6 项全绿(静止/指针/突发合并/关键帧节奏/心跳/首次关键帧)。
+
+# Step 4 验收样例(2026-10-17):全链路编码(capture→VFR→NV12→H.264)
+
+## release 构建,AMD 硬件编码器,1080p,8s
+
+```
+encoder selected: AMDh264Encoder (input NV12, bitrate 6000 kbit/s, keyframe-force supported: true)
+t=  7s frames=50   idle=0    dirty=61  (307.8% area) ... vfr_enc=30   kf=1 enc=30 avg_ms=6.9 kbps=6888 enc_kf=1
+
+summary: 398 acquire iterations, frames=398 idle=0 (0.0% idle), access_lost_rebuilds=0
+vfr summary: encoded=244 keyframes=4 skipped=154 (static=0, rate_limited=154)
+encode summary: encoder=AMDh264Encoder frames=244 keyframes=4 avg_encode_ms=6.40 total_out=6.46 MiB
+```
+
+- **试编仲裁**:候选链 [硬件 AMDh264Encoder ×2 → 软件 H264 Encoder MFT],第一个试编通过者获胜(AMD 硬件)
+- **性能**:release 6.40ms/帧(含 BGRA→NV12 转换 + MFT),1080p 实时余量 >2x;debug 构建 94ms(未优化转换),证明性能在转换与构建配置而非编码器
+- **码流验证**:`ffmpeg -i dump.h264 -f null -` 全量解码通过(注入 MF_MT_MPEG_SEQUENCE_HEADER 后)
+- **VFR**:154 次合并、关键帧 2s 节奏;duration 用实际帧间隔,空闲后首帧打 discontinuity 标记
+- 关键工程坑(全部实测踩过):异步 MFT 需 `MF_TRANSFORM_ASYNC_UNLOCK` 解锁(否则 SetInputType 报 0xC00D6D77);解锁后**仍必须走事件泵**(NeedInput 才能喂入、HaveOutput 才能取流);**编码器要求调用方提供输出样本**(NULL 报 E_INVALIDARG);**SPS/PPS 在输出类型属性里**不在码流里,须提取注入
+
+# Step 5 验收样例(2026-10-17):UDP 传输 + 跨机实时画面
+
+## 本机回环(修复版)
+
+```
+发送: frames=171 keyframes=3 packets=6016 sent=6.74 MiB in 6s
+接收: delivered=162 recovered=3 lost=1 dup=0 stale=455 invalid=0 foreign=0 out=5.08 MiB
+ffmpeg -f null 解码: DECODE-OK
+```
+
+- **FEC 实测生效**(recovered=3);stale=完成后到达的校验包(计数验证:大关键帧多块 → 多校验包)
+- 丢 1 帧(回环下 300ms 重组窗口边界的 shutdown 尾帧,产品期调优项)
+
+## 跨机实测(Windows → Ubuntu 192.168.1.180)
+
+```
+发送: frames=827 keyframes=15 packets=28843 sent=32.35 MiB in 30s(时钟窗口活动画面)
+接收: delivered=828 lost=0 recovered=0 dup=0 foreign=0 out=28.27 MiB
+```
+
+- **30 秒实时画面,0 丢包**,Ubuntu 上 `ss-recv | ffplay -f h264 -` 直播"AnyShare Live"窗口(用户目视确认)
+- 会话管理实测:新会话在空闲 2s 后被接管(修复了"新流被当外来流全拒"的真实缺口)
+
+# Step 6 验收样例(2026-10-17):原生播放器跨机直播
+
+```
+发送: frames=413 keyframes=11 packets=22091 sent=25.01 MiB in 24s
+接收(Ubuntu ss-view 原生窗口):
+  viewer: displayed=19 (19 fps window)
+  media: decoded=19 avg_decode_ms=22.0 (ffmpeg pipe)
+  recv: delivered=~400 lost=0 recovered=0 dup=0
+```
+
+- 播放器为自有代码:UDP 接收/重组/背压/窗口/时序;解码经 ffmpeg 子进程(可替换为 VAAPI 硬解)
+- 全程 0 丢包;用户目视实时时钟画面
+
+
+
+
