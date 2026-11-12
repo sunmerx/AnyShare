@@ -226,16 +226,6 @@ class SettingsTab extends StatelessWidget {
               ],
             ),
             _SettingsSection(
-              title: '${t.ui2.settings.screenShare} · ${t.ui2.card.comingSoon}',
-              children: [
-                _ButtonEntry(
-                  label: t.ui2.settings.screenShare,
-                  buttonLabel: '1080p · 60fps · 8 Mbps',
-                  onTap: null,
-                ),
-              ],
-            ),
-            _SettingsSection(
               title: t.settingsTab.general.title,
               children: [
                 _SettingsEntry(

@@ -666,13 +666,17 @@
     },
     "card": {
       "sendFiles": "发送文件",
-      "shareScreen": "共享屏幕",
-      "shareMouse": "键鼠共享",
       "browseDir": "浏览目录",
       "pair": "配对",
-      "tempNoScreen": "临时设备不可投屏",
+      "thisIsMine": "这是我的设备",
       "comingSoon": "即将开放",
       "experimental": "实验性"
+    },
+    "ownerClaim": {
+      "title": "同一归属者",
+      "body": "「{alias}」希望将本机加入其归属者。是否确认?",
+      "success": "归属者已更新",
+      "failed": "对方未确认"
     },
     "blocklist": {
       "title": "黑名单",
@@ -689,7 +693,6 @@
       "local": "本机",
       "ownerName": "归属者名称",
       "sharedDir": "共享目录",
-      "screenShare": "屏幕共享",
       "addDir": "添加目录",
       "writable": "允许写入",
       "removeDir": "移除",
@@ -784,32 +787,6 @@
       "justPair": "仅配对",
       "joinedOwner": "已加入归属者「{name}」",
       "paired": "配对成功"
-    },
-    "screen": {
-      "requestTitle": "投屏请求",
-      "requestBody": "「{alias}」请求共享屏幕到本机。",
-      "accept": "接受",
-      "reject": "拒绝",
-      "sending": "正在共享屏幕到「{alias}」",
-      "waiting": "等待「{alias}」确认投屏…",
-      "receiving": "正在接收「{alias}」的投屏",
-      "stop": "停止",
-      "unsupportedSend": "本平台暂不支持发起投屏",
-      "unsupportedReceive": "本平台暂不支持接收投屏",
-      "errBlocked": "对方已拉黑本设备",
-      "errTempNotAllowed": "对方不允许临时设备共享屏幕",
-      "errBusy": "对方正忙",
-      "errOffline": "无法连接对方(离线或未开启)",
-      "errRejected": "对方拒绝了屏幕共享({code})",
-      "errNoResponse": "对方未响应",
-      "errStartSenderFailed": "启动屏幕共享失败",
-      "errStartReceiverFailed": "启动接收失败",
-      "errNotifyFailed": "无法通知对方开始共享",
-      "errStreamEnded": "屏幕共享会话意外结束",
-      "errNoStream": "对方未开始传输画面",
-      "errReceiveUnsupported": "对方平台暂不支持接收投屏",
-      "errCancelledByPeer": "对方取消了屏幕共享",
-      "errIpv6": "对方地址为 IPv6,暂不支持屏幕共享"
     },
     "transfers": {
       "title": "传输",

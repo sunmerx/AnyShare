@@ -10,6 +10,14 @@ set(BINARY_NAME "anyshare_app")
 # versions of CMake.
 cmake_policy(SET CMP0063 NEW)
 
+# MSVC: treat all sources (including plugin sources) as UTF-8. Without this,
+# a plugin file containing non-ASCII characters trips warning C4819, which the
+# plugin builds turn into an error (C2220) on machines using a non-UTF-8 code
+# page (e.g. 936).
+if(MSVC)
+  add_compile_options(/utf-8)
+endif()
+
 # Define build configuration option.
 get_property(IS_MULTICONFIG GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
 if(IS_MULTICONFIG)

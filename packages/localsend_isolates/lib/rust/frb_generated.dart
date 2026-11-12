@@ -15,7 +15,6 @@ import 'package:localsend_isolates/rust/api/http.dart';
 import 'package:localsend_isolates/rust/api/logging.dart';
 import 'package:localsend_isolates/rust/api/metadata.dart';
 import 'package:localsend_isolates/rust/api/model.dart';
-import 'package:localsend_isolates/rust/api/screen.dart';
 import 'package:localsend_isolates/rust/api/server.dart';
 import 'package:localsend_isolates/rust/api/stream.dart';
 import 'package:localsend_isolates/rust/api/webrtc.dart';
@@ -77,7 +76,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.12.0';
 
   @override
-  int get rustContentHash => 127721355;
+  int get rustContentHash => -1979579466;
 
   static const kDefaultExternalLibraryLoaderConfig = ExternalLibraryLoaderConfig(
     stem: 'rust_lib_localsend_app',
@@ -219,26 +218,6 @@ abstract class RustLibApi extends BaseApi {
 
   Future<void> crateApiServerRsHttpServerStop({required RsHttpServer that});
 
-  Stream<RsScreenEvent> crateApiScreenRsScreenReceiverListen({required RsScreenReceiver that});
-
-  Future<RsScreenSize?> crateApiScreenRsScreenReceiverMonitorSize({required RsScreenReceiver that});
-
-  Future<RsScreenStats?> crateApiScreenRsScreenReceiverStats({required RsScreenReceiver that});
-
-  Future<void> crateApiScreenRsScreenReceiverStop({required RsScreenReceiver that});
-
-  Stream<RsScreenEvent> crateApiScreenRsScreenSenderListen({required RsScreenSender that});
-
-  Future<void> crateApiScreenRsScreenSenderRequestKeyframe({required RsScreenSender that});
-
-  Future<void> crateApiScreenRsScreenSenderSetBitrate({required RsScreenSender that, required int bitrateBps});
-
-  Future<void> crateApiScreenRsScreenSenderSetMaxFps({required RsScreenSender that, required int fps});
-
-  Future<RsScreenStats?> crateApiScreenRsScreenSenderStats({required RsScreenSender that});
-
-  Future<void> crateApiScreenRsScreenSenderStop({required RsScreenSender that});
-
   Future<String> crateApiWebrtcRtcFileReceiverGetFileId({required RtcFileReceiver that});
 
   Stream<Uint8List> crateApiWebrtcRtcFileReceiverReceive({required RtcFileReceiver that});
@@ -302,10 +281,6 @@ abstract class RustLibApi extends BaseApi {
 
   Future<FileMetadata?> crateApiMetadataReadFileMetadata({required String path});
 
-  Future<RsScreenSize> crateApiScreenRsScreenSizeDefault();
-
-  Future<RsScreenStats> crateApiScreenRsScreenStatsDefault();
-
   String crateApiFilenameSanitizeFileName({required String name});
 
   Future<RsDiscovery> crateApiDiscoveryStartDiscovery({
@@ -323,16 +298,6 @@ abstract class RustLibApi extends BaseApi {
     required String certPem,
     required String privateKeyPem,
     required BigInt timeoutMs,
-  });
-
-  Future<RsScreenReceiver> crateApiScreenStartScreenReceiver({required int port, required String keyHex});
-
-  Future<RsScreenSender> crateApiScreenStartScreenSender({
-    required String host,
-    required int port,
-    required int maxWidth,
-    required int maxHeight,
-    required String keyHex,
   });
 
   Future<RsHttpServer> crateApiServerStartServer({
@@ -416,18 +381,6 @@ abstract class RustLibApi extends BaseApi {
   RustArcDecrementStrongCountFnType get rust_arc_decrement_strong_count_RsHttpServer;
 
   CrossPlatformFinalizerArg get rust_arc_decrement_strong_count_RsHttpServerPtr;
-
-  RustArcIncrementStrongCountFnType get rust_arc_increment_strong_count_RsScreenReceiver;
-
-  RustArcDecrementStrongCountFnType get rust_arc_decrement_strong_count_RsScreenReceiver;
-
-  CrossPlatformFinalizerArg get rust_arc_decrement_strong_count_RsScreenReceiverPtr;
-
-  RustArcIncrementStrongCountFnType get rust_arc_increment_strong_count_RsScreenSender;
-
-  RustArcDecrementStrongCountFnType get rust_arc_decrement_strong_count_RsScreenSender;
-
-  CrossPlatformFinalizerArg get rust_arc_decrement_strong_count_RsScreenSenderPtr;
 }
 
 class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
@@ -1320,275 +1273,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   );
 
   @override
-  Stream<RsScreenEvent> crateApiScreenRsScreenReceiverListen({required RsScreenReceiver that}) {
-    final sink = RustStreamSink<RsScreenEvent>();
-    unawaited(
-      handler.executeNormal(
-        NormalTask(
-          callFfi: (port_) {
-            final serializer = SseSerializer(generalizedFrbRustBinding);
-            sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRsScreenReceiver(that, serializer);
-            sse_encode_StreamSink_rs_screen_event_Sse(sink, serializer);
-            pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 29, port: port_);
-          },
-          codec: SseCodec(
-            decodeSuccessData: sse_decode_unit,
-            decodeErrorData: null,
-          ),
-          constMeta: kCrateApiScreenRsScreenReceiverListenConstMeta,
-          argValues: [that, sink],
-          apiImpl: this,
-        ),
-      ),
-    );
-    return sink.stream;
-  }
-
-  TaskConstMeta get kCrateApiScreenRsScreenReceiverListenConstMeta => const TaskConstMeta(
-    debugName: 'RsScreenReceiver_listen',
-    argNames: ['that', 'sink'],
-  );
-
-  @override
-  Future<RsScreenSize?> crateApiScreenRsScreenReceiverMonitorSize({required RsScreenReceiver that}) {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
-          final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRsScreenReceiver(that, serializer);
-          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 30, port: port_);
-        },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_opt_box_autoadd_rs_screen_size,
-          decodeErrorData: null,
-        ),
-        constMeta: kCrateApiScreenRsScreenReceiverMonitorSizeConstMeta,
-        argValues: [that],
-        apiImpl: this,
-      ),
-    );
-  }
-
-  TaskConstMeta get kCrateApiScreenRsScreenReceiverMonitorSizeConstMeta => const TaskConstMeta(
-    debugName: 'RsScreenReceiver_monitor_size',
-    argNames: ['that'],
-  );
-
-  @override
-  Future<RsScreenStats?> crateApiScreenRsScreenReceiverStats({required RsScreenReceiver that}) {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
-          final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRsScreenReceiver(that, serializer);
-          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 31, port: port_);
-        },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_opt_box_autoadd_rs_screen_stats,
-          decodeErrorData: null,
-        ),
-        constMeta: kCrateApiScreenRsScreenReceiverStatsConstMeta,
-        argValues: [that],
-        apiImpl: this,
-      ),
-    );
-  }
-
-  TaskConstMeta get kCrateApiScreenRsScreenReceiverStatsConstMeta => const TaskConstMeta(
-    debugName: 'RsScreenReceiver_stats',
-    argNames: ['that'],
-  );
-
-  @override
-  Future<void> crateApiScreenRsScreenReceiverStop({required RsScreenReceiver that}) {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
-          final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRsScreenReceiver(that, serializer);
-          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 32, port: port_);
-        },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_unit,
-          decodeErrorData: null,
-        ),
-        constMeta: kCrateApiScreenRsScreenReceiverStopConstMeta,
-        argValues: [that],
-        apiImpl: this,
-      ),
-    );
-  }
-
-  TaskConstMeta get kCrateApiScreenRsScreenReceiverStopConstMeta => const TaskConstMeta(
-    debugName: 'RsScreenReceiver_stop',
-    argNames: ['that'],
-  );
-
-  @override
-  Stream<RsScreenEvent> crateApiScreenRsScreenSenderListen({required RsScreenSender that}) {
-    final sink = RustStreamSink<RsScreenEvent>();
-    unawaited(
-      handler.executeNormal(
-        NormalTask(
-          callFfi: (port_) {
-            final serializer = SseSerializer(generalizedFrbRustBinding);
-            sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRsScreenSender(that, serializer);
-            sse_encode_StreamSink_rs_screen_event_Sse(sink, serializer);
-            pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 33, port: port_);
-          },
-          codec: SseCodec(
-            decodeSuccessData: sse_decode_unit,
-            decodeErrorData: null,
-          ),
-          constMeta: kCrateApiScreenRsScreenSenderListenConstMeta,
-          argValues: [that, sink],
-          apiImpl: this,
-        ),
-      ),
-    );
-    return sink.stream;
-  }
-
-  TaskConstMeta get kCrateApiScreenRsScreenSenderListenConstMeta => const TaskConstMeta(
-    debugName: 'RsScreenSender_listen',
-    argNames: ['that', 'sink'],
-  );
-
-  @override
-  Future<void> crateApiScreenRsScreenSenderRequestKeyframe({required RsScreenSender that}) {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
-          final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRsScreenSender(that, serializer);
-          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 34, port: port_);
-        },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_unit,
-          decodeErrorData: null,
-        ),
-        constMeta: kCrateApiScreenRsScreenSenderRequestKeyframeConstMeta,
-        argValues: [that],
-        apiImpl: this,
-      ),
-    );
-  }
-
-  TaskConstMeta get kCrateApiScreenRsScreenSenderRequestKeyframeConstMeta => const TaskConstMeta(
-    debugName: 'RsScreenSender_request_keyframe',
-    argNames: ['that'],
-  );
-
-  @override
-  Future<void> crateApiScreenRsScreenSenderSetBitrate({required RsScreenSender that, required int bitrateBps}) {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
-          final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRsScreenSender(that, serializer);
-          sse_encode_u_32(bitrateBps, serializer);
-          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 35, port: port_);
-        },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_unit,
-          decodeErrorData: null,
-        ),
-        constMeta: kCrateApiScreenRsScreenSenderSetBitrateConstMeta,
-        argValues: [that, bitrateBps],
-        apiImpl: this,
-      ),
-    );
-  }
-
-  TaskConstMeta get kCrateApiScreenRsScreenSenderSetBitrateConstMeta => const TaskConstMeta(
-    debugName: 'RsScreenSender_set_bitrate',
-    argNames: ['that', 'bitrateBps'],
-  );
-
-  @override
-  Future<void> crateApiScreenRsScreenSenderSetMaxFps({required RsScreenSender that, required int fps}) {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
-          final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRsScreenSender(that, serializer);
-          sse_encode_u_32(fps, serializer);
-          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 36, port: port_);
-        },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_unit,
-          decodeErrorData: null,
-        ),
-        constMeta: kCrateApiScreenRsScreenSenderSetMaxFpsConstMeta,
-        argValues: [that, fps],
-        apiImpl: this,
-      ),
-    );
-  }
-
-  TaskConstMeta get kCrateApiScreenRsScreenSenderSetMaxFpsConstMeta => const TaskConstMeta(
-    debugName: 'RsScreenSender_set_max_fps',
-    argNames: ['that', 'fps'],
-  );
-
-  @override
-  Future<RsScreenStats?> crateApiScreenRsScreenSenderStats({required RsScreenSender that}) {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
-          final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRsScreenSender(that, serializer);
-          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 37, port: port_);
-        },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_opt_box_autoadd_rs_screen_stats,
-          decodeErrorData: null,
-        ),
-        constMeta: kCrateApiScreenRsScreenSenderStatsConstMeta,
-        argValues: [that],
-        apiImpl: this,
-      ),
-    );
-  }
-
-  TaskConstMeta get kCrateApiScreenRsScreenSenderStatsConstMeta => const TaskConstMeta(
-    debugName: 'RsScreenSender_stats',
-    argNames: ['that'],
-  );
-
-  @override
-  Future<void> crateApiScreenRsScreenSenderStop({required RsScreenSender that}) {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
-          final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRsScreenSender(that, serializer);
-          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 38, port: port_);
-        },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_unit,
-          decodeErrorData: null,
-        ),
-        constMeta: kCrateApiScreenRsScreenSenderStopConstMeta,
-        argValues: [that],
-        apiImpl: this,
-      ),
-    );
-  }
-
-  TaskConstMeta get kCrateApiScreenRsScreenSenderStopConstMeta => const TaskConstMeta(
-    debugName: 'RsScreenSender_stop',
-    argNames: ['that'],
-  );
-
-  @override
   Future<String> crateApiWebrtcRtcFileReceiverGetFileId({required RtcFileReceiver that}) {
     return handler.executeNormal(
       NormalTask(
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRTCFileReceiver(that, serializer);
-          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 39, port: port_);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 29, port: port_);
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_String,
@@ -1616,7 +1307,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             final serializer = SseSerializer(generalizedFrbRustBinding);
             sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRTCFileReceiver(that, serializer);
             sse_encode_StreamSink_list_prim_u_8_strict_Sse(sink, serializer);
-            pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 40, port: port_);
+            pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 30, port: port_);
           },
           codec: SseCodec(
             decodeSuccessData: sse_decode_unit,
@@ -1644,7 +1335,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRTCFileSender(that, serializer);
           sse_encode_list_prim_u_8_loose(data, serializer);
-          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 41, port: port_);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 31, port: port_);
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_unit,
@@ -1669,7 +1360,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRTCReceiveController(that, serializer);
-          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 42, port: port_);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 32, port: port_);
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_unit,
@@ -1697,7 +1388,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             final serializer = SseSerializer(generalizedFrbRustBinding);
             sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRTCReceiveController(that, serializer);
             sse_encode_StreamSink_rtc_file_error_Sse(sink, serializer);
-            pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 43, port: port_);
+            pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 33, port: port_);
           },
           codec: SseCodec(
             decodeSuccessData: sse_decode_unit,
@@ -1724,7 +1415,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRTCReceiveController(that, serializer);
-          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 44, port: port_);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 34, port: port_);
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_list_file_dto,
@@ -1752,7 +1443,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             final serializer = SseSerializer(generalizedFrbRustBinding);
             sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRTCReceiveController(that, serializer);
             sse_encode_StreamSink_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRTCFileReceiver_Sse(sink, serializer);
-            pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 45, port: port_);
+            pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 35, port: port_);
           },
           codec: SseCodec(
             decodeSuccessData: sse_decode_unit,
@@ -1782,7 +1473,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             final serializer = SseSerializer(generalizedFrbRustBinding);
             sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRTCReceiveController(that, serializer);
             sse_encode_StreamSink_rtc_status_Sse(sink, serializer);
-            pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 46, port: port_);
+            pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 36, port: port_);
           },
           codec: SseCodec(
             decodeSuccessData: sse_decode_unit,
@@ -1810,7 +1501,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRTCReceiveController(that, serializer);
           sse_encode_box_autoadd_rtc_send_file_response(status, serializer);
-          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 47, port: port_);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 37, port: port_);
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_unit,
@@ -1836,7 +1527,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRTCReceiveController(that, serializer);
           sse_encode_String(pin, serializer);
-          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 48, port: port_);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 38, port: port_);
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_unit,
@@ -1862,7 +1553,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRTCReceiveController(that, serializer);
           sse_encode_Set_String_None(selection, serializer);
-          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 49, port: port_);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 39, port: port_);
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_unit,
@@ -1890,7 +1581,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             final serializer = SseSerializer(generalizedFrbRustBinding);
             sse_encode_Auto_RefMut_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRTCSendController(that, serializer);
             sse_encode_StreamSink_rtc_file_error_Sse(sink, serializer);
-            pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 50, port: port_);
+            pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 40, port: port_);
           },
           codec: SseCodec(
             decodeSuccessData: sse_decode_unit,
@@ -1917,7 +1608,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRTCSendController(that, serializer);
-          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 51, port: port_);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 41, port: port_);
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_Set_String_None,
@@ -1945,7 +1636,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             final serializer = SseSerializer(generalizedFrbRustBinding);
             sse_encode_Auto_RefMut_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRTCSendController(that, serializer);
             sse_encode_StreamSink_rtc_status_Sse(sink, serializer);
-            pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 52, port: port_);
+            pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 42, port: port_);
           },
           codec: SseCodec(
             decodeSuccessData: sse_decode_unit,
@@ -1973,7 +1664,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRTCSendController(that, serializer);
           sse_encode_String(fileId, serializer);
-          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 53, port: port_);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 43, port: port_);
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRTCFileSender,
@@ -1999,7 +1690,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRTCSendController(that, serializer);
           sse_encode_String(pin, serializer);
-          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 54, port: port_);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 44, port: port_);
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_unit,
@@ -2038,7 +1729,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
               onConnection,
               serializer,
             );
-            pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 55, port: port_);
+            pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 45, port: port_);
           },
           codec: SseCodec(
             decodeSuccessData: sse_decode_unit,
@@ -2064,7 +1755,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 56)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 46)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRsCancellationToken,
@@ -2099,7 +1790,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_ls_http_client_version(version, serializer);
           sse_encode_opt_String(expectedFingerprint, serializer);
           sse_encode_opt_box_autoadd_u_32(timeoutMs, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 57)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 47)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRsHttpClient,
@@ -2123,7 +1814,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       NormalTask(
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 58, port: port_);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 48, port: port_);
         },
         codec: SseCodec(
           decodeSuccessData:
@@ -2148,7 +1839,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       NormalTask(
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 59, port: port_);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 49, port: port_);
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_unit,
@@ -2172,7 +1863,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       NormalTask(
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 60, port: port_);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 50, port: port_);
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_key_pair,
@@ -2196,7 +1887,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       NormalTask(
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 61, port: port_);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 51, port: port_);
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_security_context,
@@ -2227,7 +1918,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             sse_encode_opt_box_autoadd_i_32(fileDescriptor, serializer);
             sse_encode_opt_list_prim_u_8_strict(bytes, serializer);
             sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRsCancellationToken(cancelToken, serializer);
-            pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 62, port: port_);
+            pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 52, port: port_);
           },
           codec: SseCodec(
             decodeSuccessData: sse_decode_unit,
@@ -2254,7 +1945,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(name, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 63)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 53)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_bool,
@@ -2279,7 +1970,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(path, serializer);
-          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 64, port: port_);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 54, port: port_);
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_opt_box_autoadd_file_metadata,
@@ -2298,61 +1989,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   );
 
   @override
-  Future<RsScreenSize> crateApiScreenRsScreenSizeDefault() {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
-          final serializer = SseSerializer(generalizedFrbRustBinding);
-          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 65, port: port_);
-        },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_rs_screen_size,
-          decodeErrorData: null,
-        ),
-        constMeta: kCrateApiScreenRsScreenSizeDefaultConstMeta,
-        argValues: [],
-        apiImpl: this,
-      ),
-    );
-  }
-
-  TaskConstMeta get kCrateApiScreenRsScreenSizeDefaultConstMeta => const TaskConstMeta(
-    debugName: 'rs_screen_size_default',
-    argNames: [],
-  );
-
-  @override
-  Future<RsScreenStats> crateApiScreenRsScreenStatsDefault() {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
-          final serializer = SseSerializer(generalizedFrbRustBinding);
-          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 66, port: port_);
-        },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_rs_screen_stats,
-          decodeErrorData: null,
-        ),
-        constMeta: kCrateApiScreenRsScreenStatsDefaultConstMeta,
-        argValues: [],
-        apiImpl: this,
-      ),
-    );
-  }
-
-  TaskConstMeta get kCrateApiScreenRsScreenStatsDefaultConstMeta => const TaskConstMeta(
-    debugName: 'rs_screen_stats_default',
-    argNames: [],
-  );
-
-  @override
   String crateApiFilenameSanitizeFileName({required String name}) {
     return handler.executeSync(
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(name, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 67)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 55)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_String,
@@ -2405,7 +2048,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_String(certPem, serializer);
           sse_encode_String(privateKeyPem, serializer);
           sse_encode_u_64(timeoutMs, serializer);
-          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 68, port: port_);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 56, port: port_);
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRsDiscovery,
@@ -2454,67 +2097,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   );
 
   @override
-  Future<RsScreenReceiver> crateApiScreenStartScreenReceiver({required int port, required String keyHex}) {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
-          final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_u_16(port, serializer);
-          sse_encode_String(keyHex, serializer);
-          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 69, port: port_);
-        },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRsScreenReceiver,
-          decodeErrorData: sse_decode_AnyhowException,
-        ),
-        constMeta: kCrateApiScreenStartScreenReceiverConstMeta,
-        argValues: [port, keyHex],
-        apiImpl: this,
-      ),
-    );
-  }
-
-  TaskConstMeta get kCrateApiScreenStartScreenReceiverConstMeta => const TaskConstMeta(
-    debugName: 'start_screen_receiver',
-    argNames: ['port', 'keyHex'],
-  );
-
-  @override
-  Future<RsScreenSender> crateApiScreenStartScreenSender({
-    required String host,
-    required int port,
-    required int maxWidth,
-    required int maxHeight,
-    required String keyHex,
-  }) {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
-          final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_String(host, serializer);
-          sse_encode_u_16(port, serializer);
-          sse_encode_u_32(maxWidth, serializer);
-          sse_encode_u_32(maxHeight, serializer);
-          sse_encode_String(keyHex, serializer);
-          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 70, port: port_);
-        },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRsScreenSender,
-          decodeErrorData: sse_decode_AnyhowException,
-        ),
-        constMeta: kCrateApiScreenStartScreenSenderConstMeta,
-        argValues: [host, port, maxWidth, maxHeight, keyHex],
-        apiImpl: this,
-      ),
-    );
-  }
-
-  TaskConstMeta get kCrateApiScreenStartScreenSenderConstMeta => const TaskConstMeta(
-    debugName: 'start_screen_sender',
-    argNames: ['host', 'port', 'maxWidth', 'maxHeight', 'keyHex'],
-  );
-
-  @override
   Future<RsHttpServer> crateApiServerStartServer({
     required int port,
     TlsConfig? tls,
@@ -2543,7 +2125,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_bool(verifyChecksums, serializer);
           sse_encode_box_autoadd_web_params(web, serializer);
           sse_encode_opt_String(showToken, serializer);
-          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 71, port: port_);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 57, port: port_);
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRsHttpServer,
@@ -2569,7 +2151,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(cert, serializer);
           sse_encode_String(publicKey, serializer);
-          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 72, port: port_);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 58, port: port_);
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_unit,
@@ -2683,18 +2265,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   RustArcDecrementStrongCountFnType get rust_arc_decrement_strong_count_RsHttpServer =>
       wire.rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRsHttpServer;
 
-  RustArcIncrementStrongCountFnType get rust_arc_increment_strong_count_RsScreenReceiver =>
-      wire.rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRsScreenReceiver;
-
-  RustArcDecrementStrongCountFnType get rust_arc_decrement_strong_count_RsScreenReceiver =>
-      wire.rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRsScreenReceiver;
-
-  RustArcIncrementStrongCountFnType get rust_arc_increment_strong_count_RsScreenSender =>
-      wire.rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRsScreenSender;
-
-  RustArcDecrementStrongCountFnType get rust_arc_decrement_strong_count_RsScreenSender =>
-      wire.rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRsScreenSender;
-
   @protected
   AnyhowException dco_decode_AnyhowException(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
@@ -2768,18 +2338,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  RsScreenReceiver dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRsScreenReceiver(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    return RsScreenReceiverImpl.frbInternalDcoDecode(raw as List<dynamic>);
-  }
-
-  @protected
-  RsScreenSender dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRsScreenSender(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    return RsScreenSenderImpl.frbInternalDcoDecode(raw as List<dynamic>);
-  }
-
-  @protected
   Dart2RustStreamSink dco_decode_Auto_RefMut_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerDart2RustStreamSink(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return Dart2RustStreamSinkImpl.frbInternalDcoDecode(raw as List<dynamic>);
@@ -2843,18 +2401,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   RsHttpServer dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRsHttpServer(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return RsHttpServerImpl.frbInternalDcoDecode(raw as List<dynamic>);
-  }
-
-  @protected
-  RsScreenReceiver dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRsScreenReceiver(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    return RsScreenReceiverImpl.frbInternalDcoDecode(raw as List<dynamic>);
-  }
-
-  @protected
-  RsScreenSender dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRsScreenSender(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    return RsScreenSenderImpl.frbInternalDcoDecode(raw as List<dynamic>);
   }
 
   @protected
@@ -2951,18 +2497,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  RsScreenReceiver dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRsScreenReceiver(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    return RsScreenReceiverImpl.frbInternalDcoDecode(raw as List<dynamic>);
-  }
-
-  @protected
-  RsScreenSender dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRsScreenSender(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    return RsScreenSenderImpl.frbInternalDcoDecode(raw as List<dynamic>);
-  }
-
-  @protected
   Set<String> dco_decode_Set_String_None(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return Set.from(dco_decode_list_String(raw));
@@ -2990,12 +2524,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
   @protected
   RustStreamSink<RsHashFileEvent> dco_decode_StreamSink_rs_hash_file_event_Sse(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    throw UnimplementedError();
-  }
-
-  @protected
-  RustStreamSink<RsScreenEvent> dco_decode_StreamSink_rs_screen_event_Sse(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     throw UnimplementedError();
   }
@@ -3150,18 +2678,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   RsHttpClientError dco_decode_box_autoadd_rs_http_client_error(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return dco_decode_rs_http_client_error(raw);
-  }
-
-  @protected
-  RsScreenSize dco_decode_box_autoadd_rs_screen_size(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    return dco_decode_rs_screen_size(raw);
-  }
-
-  @protected
-  RsScreenStats dco_decode_box_autoadd_rs_screen_stats(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    return dco_decode_rs_screen_stats(raw);
   }
 
   @protected
@@ -3411,18 +2927,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   PrepareUploadResponseDto? dco_decode_opt_box_autoadd_prepare_upload_response_dto(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw == null ? null : dco_decode_box_autoadd_prepare_upload_response_dto(raw);
-  }
-
-  @protected
-  RsScreenSize? dco_decode_opt_box_autoadd_rs_screen_size(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    return raw == null ? null : dco_decode_box_autoadd_rs_screen_size(raw);
-  }
-
-  @protected
-  RsScreenStats? dco_decode_opt_box_autoadd_rs_screen_stats(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    return raw == null ? null : dco_decode_box_autoadd_rs_screen_stats(raw);
   }
 
   @protected
@@ -3701,66 +3205,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       default:
         throw Exception('unreachable');
     }
-  }
-
-  @protected
-  RsScreenEvent dco_decode_rs_screen_event(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    switch (raw[0]) {
-      case 0:
-        return RsScreenEvent_Status(
-          state: dco_decode_String(raw[1]),
-        );
-      case 1:
-        return RsScreenEvent_Stats(
-          frames: dco_decode_u_64(raw[1]),
-          keyframes: dco_decode_u_64(raw[2]),
-          fps: dco_decode_f_64(raw[3]),
-          mbps: dco_decode_f_64(raw[4]),
-          packets: dco_decode_u_64(raw[5]),
-          lost: dco_decode_u_64(raw[6]),
-          decodeErrors: dco_decode_u_64(raw[7]),
-        );
-      case 2:
-        return RsScreenEvent_Ended(
-          reason: dco_decode_String(raw[1]),
-        );
-      case 3:
-        return RsScreenEvent_Error(
-          message: dco_decode_String(raw[1]),
-        );
-      case 4:
-        return RsScreenEvent_RequestKeyframe();
-      default:
-        throw Exception('unreachable');
-    }
-  }
-
-  @protected
-  RsScreenSize dco_decode_rs_screen_size(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    final arr = raw as List<dynamic>;
-    if (arr.length != 2) throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
-    return RsScreenSize(
-      width: dco_decode_u_32(arr[0]),
-      height: dco_decode_u_32(arr[1]),
-    );
-  }
-
-  @protected
-  RsScreenStats dco_decode_rs_screen_stats(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    final arr = raw as List<dynamic>;
-    if (arr.length != 7) throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
-    return RsScreenStats(
-      frames: dco_decode_u_64(arr[0]),
-      keyframes: dco_decode_u_64(arr[1]),
-      fps: dco_decode_f_64(arr[2]),
-      mbps: dco_decode_f_64(arr[3]),
-      packets: dco_decode_u_64(arr[4]),
-      lost: dco_decode_u_64(arr[5]),
-      decodeErrors: dco_decode_u_64(arr[6]),
-    );
   }
 
   @protected
@@ -4172,20 +3616,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  RsScreenReceiver sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRsScreenReceiver(
-    SseDeserializer deserializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    return RsScreenReceiverImpl.frbInternalSseDecode(sse_decode_usize(deserializer), sse_decode_i_32(deserializer));
-  }
-
-  @protected
-  RsScreenSender sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRsScreenSender(SseDeserializer deserializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    return RsScreenSenderImpl.frbInternalSseDecode(sse_decode_usize(deserializer), sse_decode_i_32(deserializer));
-  }
-
-  @protected
   Dart2RustStreamSink sse_decode_Auto_RefMut_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerDart2RustStreamSink(
     SseDeserializer deserializer,
   ) {
@@ -4261,18 +3691,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   RsHttpServer sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRsHttpServer(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return RsHttpServerImpl.frbInternalSseDecode(sse_decode_usize(deserializer), sse_decode_i_32(deserializer));
-  }
-
-  @protected
-  RsScreenReceiver sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRsScreenReceiver(SseDeserializer deserializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    return RsScreenReceiverImpl.frbInternalSseDecode(sse_decode_usize(deserializer), sse_decode_i_32(deserializer));
-  }
-
-  @protected
-  RsScreenSender sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRsScreenSender(SseDeserializer deserializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    return RsScreenSenderImpl.frbInternalSseDecode(sse_decode_usize(deserializer), sse_decode_i_32(deserializer));
   }
 
   @protected
@@ -4365,18 +3783,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  RsScreenReceiver sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRsScreenReceiver(SseDeserializer deserializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    return RsScreenReceiverImpl.frbInternalSseDecode(sse_decode_usize(deserializer), sse_decode_i_32(deserializer));
-  }
-
-  @protected
-  RsScreenSender sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRsScreenSender(SseDeserializer deserializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    return RsScreenSenderImpl.frbInternalSseDecode(sse_decode_usize(deserializer), sse_decode_i_32(deserializer));
-  }
-
-  @protected
   Set<String> sse_decode_Set_String_None(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var inner = sse_decode_list_String(deserializer);
@@ -4405,12 +3811,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
   @protected
   RustStreamSink<RsHashFileEvent> sse_decode_StreamSink_rs_hash_file_event_Sse(SseDeserializer deserializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    throw UnimplementedError('Unreachable ()');
-  }
-
-  @protected
-  RustStreamSink<RsScreenEvent> sse_decode_StreamSink_rs_screen_event_Sse(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     throw UnimplementedError('Unreachable ()');
   }
@@ -4567,18 +3967,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   RsHttpClientError sse_decode_box_autoadd_rs_http_client_error(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return (sse_decode_rs_http_client_error(deserializer));
-  }
-
-  @protected
-  RsScreenSize sse_decode_box_autoadd_rs_screen_size(SseDeserializer deserializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    return (sse_decode_rs_screen_size(deserializer));
-  }
-
-  @protected
-  RsScreenStats sse_decode_box_autoadd_rs_screen_stats(SseDeserializer deserializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    return (sse_decode_rs_screen_stats(deserializer));
   }
 
   @protected
@@ -4908,28 +4296,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  RsScreenSize? sse_decode_opt_box_autoadd_rs_screen_size(SseDeserializer deserializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-
-    if (sse_decode_bool(deserializer)) {
-      return (sse_decode_box_autoadd_rs_screen_size(deserializer));
-    } else {
-      return null;
-    }
-  }
-
-  @protected
-  RsScreenStats? sse_decode_opt_box_autoadd_rs_screen_stats(SseDeserializer deserializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-
-    if (sse_decode_bool(deserializer)) {
-      return (sse_decode_box_autoadd_rs_screen_stats(deserializer));
-    } else {
-      return null;
-    }
-  }
-
-  @protected
   TlsConfig? sse_decode_opt_box_autoadd_tls_config(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
 
@@ -5207,74 +4573,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       default:
         throw UnimplementedError('');
     }
-  }
-
-  @protected
-  RsScreenEvent sse_decode_rs_screen_event(SseDeserializer deserializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-
-    var tag_ = sse_decode_i_32(deserializer);
-    switch (tag_) {
-      case 0:
-        var var_state = sse_decode_String(deserializer);
-        return RsScreenEvent_Status(state: var_state);
-      case 1:
-        var var_frames = sse_decode_u_64(deserializer);
-        var var_keyframes = sse_decode_u_64(deserializer);
-        var var_fps = sse_decode_f_64(deserializer);
-        var var_mbps = sse_decode_f_64(deserializer);
-        var var_packets = sse_decode_u_64(deserializer);
-        var var_lost = sse_decode_u_64(deserializer);
-        var var_decodeErrors = sse_decode_u_64(deserializer);
-        return RsScreenEvent_Stats(
-          frames: var_frames,
-          keyframes: var_keyframes,
-          fps: var_fps,
-          mbps: var_mbps,
-          packets: var_packets,
-          lost: var_lost,
-          decodeErrors: var_decodeErrors,
-        );
-      case 2:
-        var var_reason = sse_decode_String(deserializer);
-        return RsScreenEvent_Ended(reason: var_reason);
-      case 3:
-        var var_message = sse_decode_String(deserializer);
-        return RsScreenEvent_Error(message: var_message);
-      case 4:
-        return RsScreenEvent_RequestKeyframe();
-      default:
-        throw UnimplementedError('');
-    }
-  }
-
-  @protected
-  RsScreenSize sse_decode_rs_screen_size(SseDeserializer deserializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    var var_width = sse_decode_u_32(deserializer);
-    var var_height = sse_decode_u_32(deserializer);
-    return RsScreenSize(width: var_width, height: var_height);
-  }
-
-  @protected
-  RsScreenStats sse_decode_rs_screen_stats(SseDeserializer deserializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    var var_frames = sse_decode_u_64(deserializer);
-    var var_keyframes = sse_decode_u_64(deserializer);
-    var var_fps = sse_decode_f_64(deserializer);
-    var var_mbps = sse_decode_f_64(deserializer);
-    var var_packets = sse_decode_u_64(deserializer);
-    var var_lost = sse_decode_u_64(deserializer);
-    var var_decodeErrors = sse_decode_u_64(deserializer);
-    return RsScreenStats(
-      frames: var_frames,
-      keyframes: var_keyframes,
-      fps: var_fps,
-      mbps: var_mbps,
-      packets: var_packets,
-      lost: var_lost,
-      decodeErrors: var_decodeErrors,
-    );
   }
 
   @protected
@@ -5685,24 +4983,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  void sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRsScreenReceiver(
-    RsScreenReceiver self,
-    SseSerializer serializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_usize((self as RsScreenReceiverImpl).frbInternalSseEncode(move: true), serializer);
-  }
-
-  @protected
-  void sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRsScreenSender(
-    RsScreenSender self,
-    SseSerializer serializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_usize((self as RsScreenSenderImpl).frbInternalSseEncode(move: true), serializer);
-  }
-
-  @protected
   void sse_encode_Auto_RefMut_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerDart2RustStreamSink(
     Dart2RustStreamSink self,
     SseSerializer serializer,
@@ -5787,24 +5067,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   void sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRsHttpServer(RsHttpServer self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_usize((self as RsHttpServerImpl).frbInternalSseEncode(move: false), serializer);
-  }
-
-  @protected
-  void sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRsScreenReceiver(
-    RsScreenReceiver self,
-    SseSerializer serializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_usize((self as RsScreenReceiverImpl).frbInternalSseEncode(move: false), serializer);
-  }
-
-  @protected
-  void sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRsScreenSender(
-    RsScreenSender self,
-    SseSerializer serializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_usize((self as RsScreenSenderImpl).frbInternalSseEncode(move: false), serializer);
   }
 
   @protected
@@ -5925,18 +5187,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  void sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRsScreenReceiver(RsScreenReceiver self, SseSerializer serializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_usize((self as RsScreenReceiverImpl).frbInternalSseEncode(move: null), serializer);
-  }
-
-  @protected
-  void sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRsScreenSender(RsScreenSender self, SseSerializer serializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_usize((self as RsScreenSenderImpl).frbInternalSseEncode(move: null), serializer);
-  }
-
-  @protected
   void sse_encode_Set_String_None(Set<String> self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_list_String(self.toList(), serializer);
@@ -5994,20 +5244,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       self.setupAndSerialize(
         codec: SseCodec(
           decodeSuccessData: sse_decode_rs_hash_file_event,
-          decodeErrorData: sse_decode_AnyhowException,
-        ),
-      ),
-      serializer,
-    );
-  }
-
-  @protected
-  void sse_encode_StreamSink_rs_screen_event_Sse(RustStreamSink<RsScreenEvent> self, SseSerializer serializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_String(
-      self.setupAndSerialize(
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_rs_screen_event,
           decodeErrorData: sse_decode_AnyhowException,
         ),
       ),
@@ -6214,18 +5450,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   void sse_encode_box_autoadd_rs_http_client_error(RsHttpClientError self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_rs_http_client_error(self, serializer);
-  }
-
-  @protected
-  void sse_encode_box_autoadd_rs_screen_size(RsScreenSize self, SseSerializer serializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_rs_screen_size(self, serializer);
-  }
-
-  @protected
-  void sse_encode_box_autoadd_rs_screen_stats(RsScreenStats self, SseSerializer serializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_rs_screen_stats(self, serializer);
   }
 
   @protected
@@ -6509,26 +5733,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  void sse_encode_opt_box_autoadd_rs_screen_size(RsScreenSize? self, SseSerializer serializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-
-    sse_encode_bool(self != null, serializer);
-    if (self != null) {
-      sse_encode_box_autoadd_rs_screen_size(self, serializer);
-    }
-  }
-
-  @protected
-  void sse_encode_opt_box_autoadd_rs_screen_stats(RsScreenStats? self, SseSerializer serializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-
-    sse_encode_bool(self != null, serializer);
-    if (self != null) {
-      sse_encode_box_autoadd_rs_screen_stats(self, serializer);
-    }
-  }
-
-  @protected
   void sse_encode_opt_box_autoadd_tls_config(TlsConfig? self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
 
@@ -6744,60 +5948,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         sse_encode_i_32(4, serializer);
         sse_encode_String(field0, serializer);
     }
-  }
-
-  @protected
-  void sse_encode_rs_screen_event(RsScreenEvent self, SseSerializer serializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    switch (self) {
-      case RsScreenEvent_Status(state: final state):
-        sse_encode_i_32(0, serializer);
-        sse_encode_String(state, serializer);
-      case RsScreenEvent_Stats(
-        frames: final frames,
-        keyframes: final keyframes,
-        fps: final fps,
-        mbps: final mbps,
-        packets: final packets,
-        lost: final lost,
-        decodeErrors: final decodeErrors,
-      ):
-        sse_encode_i_32(1, serializer);
-        sse_encode_u_64(frames, serializer);
-        sse_encode_u_64(keyframes, serializer);
-        sse_encode_f_64(fps, serializer);
-        sse_encode_f_64(mbps, serializer);
-        sse_encode_u_64(packets, serializer);
-        sse_encode_u_64(lost, serializer);
-        sse_encode_u_64(decodeErrors, serializer);
-      case RsScreenEvent_Ended(reason: final reason):
-        sse_encode_i_32(2, serializer);
-        sse_encode_String(reason, serializer);
-      case RsScreenEvent_Error(message: final message):
-        sse_encode_i_32(3, serializer);
-        sse_encode_String(message, serializer);
-      case RsScreenEvent_RequestKeyframe():
-        sse_encode_i_32(4, serializer);
-    }
-  }
-
-  @protected
-  void sse_encode_rs_screen_size(RsScreenSize self, SseSerializer serializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_u_32(self.width, serializer);
-    sse_encode_u_32(self.height, serializer);
-  }
-
-  @protected
-  void sse_encode_rs_screen_stats(RsScreenStats self, SseSerializer serializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_u_64(self.frames, serializer);
-    sse_encode_u_64(self.keyframes, serializer);
-    sse_encode_f_64(self.fps, serializer);
-    sse_encode_f_64(self.mbps, serializer);
-    sse_encode_u_64(self.packets, serializer);
-    sse_encode_u_64(self.lost, serializer);
-    sse_encode_u_64(self.decodeErrors, serializer);
   }
 
   @protected
@@ -7463,100 +6613,6 @@ class RsHttpServerImpl extends RustOpaque implements RsHttpServer {
   /// Stops the server.
   /// Returns after the listeners are closed, so the port can be bound again.
   Future<void> stop() => RustLib.instance.api.crateApiServerRsHttpServerStop(
-    that: this,
-  );
-}
-
-@sealed
-class RsScreenReceiverImpl extends RustOpaque implements RsScreenReceiver {
-  // Not to be used by end users
-  RsScreenReceiverImpl.frbInternalDcoDecode(List<dynamic> wire) : super.frbInternalDcoDecode(wire, _kStaticData);
-
-  // Not to be used by end users
-  RsScreenReceiverImpl.frbInternalSseDecode(BigInt ptr, int externalSizeOnNative)
-    : super.frbInternalSseDecode(ptr, externalSizeOnNative, _kStaticData);
-
-  static final _kStaticData = RustArcStaticData(
-    rustArcIncrementStrongCount: RustLib.instance.api.rust_arc_increment_strong_count_RsScreenReceiver,
-    rustArcDecrementStrongCount: RustLib.instance.api.rust_arc_decrement_strong_count_RsScreenReceiver,
-    rustArcDecrementStrongCountPtr: RustLib.instance.api.rust_arc_decrement_strong_count_RsScreenReceiverPtr,
-  );
-
-  /// Emits session events until the session ends (window closed, stopped or
-  /// failed). Can only be listened to once.
-  ///
-  /// Note: this holds the opaque object's read guard for the whole session;
-  /// do not add `&mut self` methods to this type (they would deadlock until
-  /// the session ends).
-  Stream<RsScreenEvent> listen() => RustLib.instance.api.crateApiScreenRsScreenReceiverListen(
-    that: this,
-  );
-
-  /// Physical size of the local monitor (None until the viewer window is
-  /// created). The sender uses it to pick a 1:1 encode resolution.
-  Future<RsScreenSize?> monitorSize() => RustLib.instance.api.crateApiScreenRsScreenReceiverMonitorSize(
-    that: this,
-  );
-
-  Future<RsScreenStats?> stats() => RustLib.instance.api.crateApiScreenRsScreenReceiverStats(
-    that: this,
-  );
-
-  /// Stops the session (closes the window); the join happens on a background
-  /// thread so the caller is never blocked.
-  Future<void> stop() => RustLib.instance.api.crateApiScreenRsScreenReceiverStop(
-    that: this,
-  );
-}
-
-@sealed
-class RsScreenSenderImpl extends RustOpaque implements RsScreenSender {
-  // Not to be used by end users
-  RsScreenSenderImpl.frbInternalDcoDecode(List<dynamic> wire) : super.frbInternalDcoDecode(wire, _kStaticData);
-
-  // Not to be used by end users
-  RsScreenSenderImpl.frbInternalSseDecode(BigInt ptr, int externalSizeOnNative) : super.frbInternalSseDecode(ptr, externalSizeOnNative, _kStaticData);
-
-  static final _kStaticData = RustArcStaticData(
-    rustArcIncrementStrongCount: RustLib.instance.api.rust_arc_increment_strong_count_RsScreenSender,
-    rustArcDecrementStrongCount: RustLib.instance.api.rust_arc_decrement_strong_count_RsScreenSender,
-    rustArcDecrementStrongCountPtr: RustLib.instance.api.rust_arc_decrement_strong_count_RsScreenSenderPtr,
-  );
-
-  /// Emits session events until the session ends. Can only be listened to
-  /// once.
-  ///
-  /// Note: this holds the opaque object's read guard for the whole session;
-  /// do not add `&mut self` methods to this type (they would deadlock until
-  /// the session ends).
-  Stream<RsScreenEvent> listen() => RustLib.instance.api.crateApiScreenRsScreenSenderListen(
-    that: this,
-  );
-
-  /// Asks the encoder for an IDR on the next frame (the receiver's loss
-  /// recovery request, relayed by the app control plane). Safe to call while
-  /// `listen` is running: it only touches the handle.
-  Future<void> requestKeyframe() => RustLib.instance.api.crateApiScreenRsScreenSenderRequestKeyframe(
-    that: this,
-  );
-
-  /// Requests a new encoder bitrate (the receiver's adaptive-quality
-  /// feedback, relayed by the app control plane). Safe to call while
-  /// `listen` runs.
-  Future<void> setBitrate({required int bitrateBps}) =>
-      RustLib.instance.api.crateApiScreenRsScreenSenderSetBitrate(that: this, bitrateBps: bitrateBps);
-
-  /// Requests an encode frame-rate cap. The receiver reports how many frames
-  /// it decodes per second; encoding faster only grows its backlog.
-  Future<void> setMaxFps({required int fps}) => RustLib.instance.api.crateApiScreenRsScreenSenderSetMaxFps(that: this, fps: fps);
-
-  Future<RsScreenStats?> stats() => RustLib.instance.api.crateApiScreenRsScreenSenderStats(
-    that: this,
-  );
-
-  /// Stops the session; the join happens on a background thread so the
-  /// caller is never blocked.
-  Future<void> stop() => RustLib.instance.api.crateApiScreenRsScreenSenderStop(
     that: this,
   );
 }

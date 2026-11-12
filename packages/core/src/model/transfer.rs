@@ -256,9 +256,18 @@ mod tests {
 
     #[test]
     fn formats_nanosecond_timestamp() {
-        let time = SystemTime::UNIX_EPOCH + Duration::from_nanos(123_456_789);
+        // `SystemTime` resolution is platform dependent: Windows keeps 100 ns
+        // ticks, so sub-second values are truncated there while other
+        // platforms keep full nanosecond precision. Both expectations are
+        // exactly representable on the respective platform.
+        let (nanos, expected) = if cfg!(windows) {
+            (123_456_700u64, "1970-01-01T00:00:00.1234567Z")
+        } else {
+            (123_456_789, "1970-01-01T00:00:00.123456789Z")
+        };
+        let time = SystemTime::UNIX_EPOCH + Duration::from_nanos(nanos);
         let formatted = format_timestamp(time).unwrap();
-        assert_eq!(formatted, "1970-01-01T00:00:00.123456789Z");
+        assert_eq!(formatted, expected);
         assert_eq!(parse_timestamp(&formatted), Some(time));
     }
 

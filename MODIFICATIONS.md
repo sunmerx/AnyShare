@@ -60,6 +60,459 @@
 - 网络行为不变(postScreenControl 仍为明文 HTTP);为控制面 TLS 的证书 pinning 准备数据
 - 设计文档:`docs/E2-S0/控制面TLS设计.md`;240 Dart 测试全绿、analyze 0
 
+### G1-step2/3 屏幕控制面 TLS 批次(2026-10-27)
+
+- `packages/core/src/http/screen_proxy.rs`(新增):Rust 终止 53320 的 mTLS(`CustomClientCertVerifier` 接受任意合法自签证书),把请求回环转发给 Dart,并在 `x-anyshare-peer-fingerprint` / `x-anyshare-peer-ip` 注入证书身份与实际来源地址;Dart 的 `bindSecure` 无法接受未预置信任锚的自签客户端证书,故 TLS 放在 Rust
+- `packages/localsend_isolates/rust/src/api/screen_control.rs`(新增)+ FRB:`start_screen_control_proxy` / `RsScreenControlProxy`
+- `app/lib/provider/network/extension_server_provider.dart`:53320 改为「Rust TLS 前端 + Dart 回环处理器」;屏幕路由在安全监听上以证书指纹鉴权,`/screen/offer` 忽略 body 指纹;明文 53318 路由保留一个版本
+- `app/lib/provider/screen/screen_provider.dart`:`postScreenControl` 走 https + 指纹 pin(fail-closed,无预期指纹不发送);`kScreenControlPort=53320`;所有屏幕控制调用按会话指纹发送
+- `app/lib/pages/tabs/{device_list,my_devices}_tab.dart`、`app/lib/config/init.dart`:发起共享补 `peerFingerprint`(诊断入口用 `ANYSHARE_AUTOSHARE_FP`)
+- `app/test/fixtures/screen_tls_{cert,key}.pem`(新增):测试用固定自签证书;`screen_offer_test.dart` 的 stub peer 改为 mTLS,新增证书身份/无身份拒绝/指纹不匹配不发送 3 个用例
+- `packages/core/src/http/screen_proxy.rs`:2 个 Rust 单测(转发证书指纹头、无客户端证书握手失败)
+- 验证:Ubuntu `flutter analyze` 0、243 Dart 测试全绿、`cargo test -p localsend --features full` 全绿、Linux debug 构建 + 53320 mTLS 实测(带证书回显指纹,无证书握手失败)
+
+### G1-step4 数据面密钥启用批次(2026-10-27)
+
+- `app/lib/provider/screen/screen_provider.dart`:发起共享时生成 32 字节随机密钥(`newScreenSessionKey`,64 hex)并随 TLS offer 发送;`WaitingScreenAccept`/即时开始都把同一密钥传给发送引擎;接收端校验 64 hex 后把密钥传给接收引擎
+- `app/lib/provider/network/extension_server_provider.dart`:安全监听接受 `key`;明文 53318 忽略 `key`,旧链路保持明文数据面
+- `app/test/unit/provider/screen_offer_test.dart`:覆盖密钥随 offer 下发、pending 接受路径透传、接收端透传、非法密钥 400、明文忽略密钥;38 个屏幕用例全绿
+- 数据面 AES-256-GCM 由 C1 的 Rust 引擎实现,本批仅打通应用侧分发与传参
+- 验证:Ubuntu `flutter analyze` 0、246 Dart 测试全绿、Linux debug 构建通过;真实双机 `auth_fail=0` 与抓包不可读待人工验收
+
+### G1-step5 关闭旧明文屏幕路由批次(2026-10-27)
+
+- `app/lib/provider/network/extension_server_provider.dart`:53318 上所有 `/api/anyshare/v1/screen/*` 返回 421 `upgrade_required`;屏幕控制只存在于 53320 的双向 TLS 监听
+- `app/test/unit/provider/screen_offer_test.dart`:屏幕用例全部改走安全监听(模拟 Rust 前端注入指纹/来源),新增旧路 421 用例;38 个屏幕用例全绿
+- 旧版本对端发起共享会明确失败,不会静默降级明文
+
+### Android 屏幕接收批次(2026-10-28)
+
+- `packages/screen-stream/src/raw_receiver.rs`(新增,`raw` feature):无窗口的 H.264 透传接收器,复用 UDP 重组/解密,输出 Annex-B 访问单元与 SPS 尺寸;首帧前每秒请求 IDR,并发出每秒统计
+- `packages/localsend_isolates/rust/src/api/screen.rs` + FRB:`start_raw_screen_receiver` / `RsRawScreenReceiver`(Android);Dart `ScreenRawReceiverSession`
+- `app/android/.../ScreenViewFactory.kt`(新增):SurfaceView + MediaCodec(H.264),从首个关键帧解析 SPS/PPS 配置,直接渲染到 surface;`MainActivity` 注册 `anyshare/screen_view`
+- `app/lib/pages/android_screen_viewer_page.dart`(新增):全屏 PlatformView 页面,把 Rust 帧转发给原生解码器;接收端在 Android 上可被选中
+- `app/lib/provider/screen/screen_provider.dart`:`canReceiveScreenShare()` 增加 Android;Android 接收走 raw 会话;`ANYSHARE_SCREEN_CONTROL_PORT` 诊断覆盖(模拟器 NAT)
+- `app/lib/widget/dialogs/screen_offer_dialog.dart` / `extension_server_provider.dart`:接受后正确压入 viewer 页(避免对话框 pop 关掉页面);自动接受同样进入 viewer
+- `app/lib/util/screen_capabilities.dart`:Android 横屏物理尺寸 + 4 档等比例分辨率(原生、75%、50%、37.5%,偶数对齐)
+- `app/lib/provider/persistence_provider.dart`:持久化所选分辨率档位(`ls_screen_resolution_scale`,默认 50%)
+- `app/lib/widget/dialogs/screen_offer_dialog.dart`:Android 接收弹窗提供分辨率下拉框(默认 1170×540/原生 2340×1080 等);`receiverMonitorSize()` 按档位回报给发送端
+- `app/lib/pages/android_screen_viewer_page.dart`:进入投屏默认横屏,退出恢复(无原生窗口)
+- `packages/localsend_isolates/lib/src/screen/screen_session.dart`:接收端统计改为真实每秒帧数(此前每帧上报 `frames=1`,发送端 AIMD 会把帧率上限压到 10fps)
+- 验证:Windows 发送端 → Android 14 模拟器实收,MediaCodec 按所选 1170x540 配置、横屏(`mCurrentOrientation=1`)上屏;246 Dart 测试、analyze 0、APK 构建通过
+- 已知:模拟器需 `redir add udp:53319:53319` + host TCP 转发;键鼠共享尚未实现(Accessibility/输入注入另批)
+
+### 设备列表投屏与同归属者批次(2026-10-29)
+
+- `app/lib/pages/tabs/device_list_tab.dart`:配对卡片不再因 `temp` 单独禁用投屏(接收端信任链/同归属者规则决定);新增“这是我的设备”按钮
+- `app/lib/provider/owner_claim_provider.dart`(新增):向对端 `POST /api/anyshare/v1/owner/claim`,成功后把对端收藏的 `ownerId/ownerName` 改为本机归属者
+- `app/lib/provider/network/extension_server_provider.dart`:新增 claim 端点——对端弹窗确认后,采纳请求方的 owner 身份并更新其收藏,双方成为同一归属者
+- `app/lib/widget/dialogs/owner_claim_dialog.dart`(新增):对端确认弹窗
+- i18n:`ui2.card.thisIsMine`、`ui2.ownerClaim.*`
+- 验证:analyze 0、246 Dart 测试全绿、APK 构建通过
+
+### 跨机链路实测:模拟器网络可达、但组播发现不通(2026-10-30)
+
+用 Android 模拟器(`anyshare-test`)作为第二台设备,实测结果:
+
+- **网络可达**:`ping 10.0.2.2` 与 `ping 192.168.1.178`(Windows 宿主 LAN 地址)均通;`nc` 连 `10.0.2.2:53317`(AnySend 端口)成功 → 模拟器到宿主机的 TCP 通路没问题。
+- **发现不通**:模拟器「我的设备」页只显示自己,宿主 Windows 设备**未被发现** → AnySend 的 UDP 组播发现无法穿过模拟器的 NAT 虚拟网络(组播不跨 NAT)。
+- 结论:模拟器可以当「第二个 App 实例」验证移动端构建与运行,但**不能充当跨机对端**;跨机验收需要:① 同一二层网络上的另一台真机(当前缺 Ubuntu 的 SSH 凭据);或 ② 给远程桌面补一个**手动连接**入口(输入对端 IP + 证书指纹),绕过组播发现;或 ③ 用桥接网络模式启动模拟器(`-net-tap` 等)。
+
+**当前双机验收的完整状态**
+
+| 环节 | 状态 |
+| --- | --- |
+| 移动端原生构建(无原生依赖) | ✅ APK 可构建、可安装、可初始化 |
+| 视频通路(采集 → JPEG → 平台解码) | ✅ Rust 用例覆盖真实屏幕采集到收帧;两端都不需要原生解码器 |
+| 输入通路(协议 → 解码 → 系统注入) | ✅ Windows 用例用 `GetCursorPos` 从操作系统读回验证 |
+| TLS 直连 + 会话令牌 + 一次性授权 | ✅ Rust 用例覆盖;控制面 grant 端点已实现 |
+| 受控端/控制端 UI 入口 | ✅ 已补(本机卡片「允许远程控制」+ 受控端页「本机联调」) |
+| 跨机发现(组播) | ❌ 模拟器 NAT 不通;需真机或手动连接入口 |
+| 跨机端到端(发现 → 配对 → 授权 → 直连 → 画面 → 键鼠) | ⏳ 待上述阻塞解除后人工跑通 |
+
+### RustDesk 采集工具链脚本化(2026-10-30)
+
+新增 `support/scripts/setup-rustdesk-vcpkg.ps1`:安装并校验 RustDesk `scrap` 采集所需的 vcpkg 端口(`libvpx`、`aom`、`libyuv`,三元组 `x64-windows-static`),并可选连带构建 Windows 应用。
+
+- 脚本会按需 bootstrap vcpkg(microsoft/vcpkg),`vcpkg install` 三个端口后校验 `vpx.lib` / `aom.lib` / `yuv.lib` 存在。
+- 构建侧只依赖 `VCPKG_ROOT` 与 `VCPKG_INSTALLED_ROOT` 两个环境变量(`scrap/build.rs` 用 `VCPKG_INSTALLED_ROOT` 优先定位 `installed/<triplet>`),此前只能靠手工拼环境变量才能过编译;`-Build` 会设置这两个变量并调用 flutter 构建。
+- flutter 定位顺序:PATH → `fvm` → `FLUTTER_ROOT`/`FLUTTER_HOME` → `E:\flutter` / `C:\src\flutter`。
+
+`AGENTS.md` 增加「Remote desktop engine (RustDesk)」小节,记录工具链要求与直连会话的形态(双连接 / mTLS 授权 / JPEG 视频)。
+
+### 远程桌面 UI 入口与国际化(2026-10-30)
+
+之前受控端页面(`RemoteDesktopHostPage`)只能从远程桌面页的 AppBar 进入,而远程桌面页又只能从设备列表里的对端进入 → **实际使用中没有任何入口能打开受控端**。本次补上:
+
+- 「我的设备」页的**本机卡片**新增「允许远程控制」按钮 → 打开受控端页面(发布会话授权,供已配对对端经 mTLS 控制通道领取)。
+- 受控端页面新增「本机联调(受控端 + 控制端)」按钮 → 打开 loopback 演示页(同机起受控端与控制端,用于单机跑通画面与键鼠)。
+- 两个远程桌面页面的硬编码英文接入 slang:新增 `ui2.remoteDesktop.{title,hostTitle,allowControl,listeningPort,starting,hint,stop,localTest}`(en + zh-CN),并清掉原先遗留的「启动已安装的 RustDesk 客户端」文案(外部启动器早已移除)。
+
+**验证**:`dart run slang` 重新生成;`flutter analyze` 0;246 个 Dart 测试通过。
+
+### 下线屏幕共享与键鼠共享(2026-11-12)
+
+产品决定下线「屏幕共享」与「键鼠共享」(含远程桌面),相关代码整块移除。
+
+**删除的能力**
+- 屏幕共享:VFR 采集/编码/接收链路、自适应分辨率、FEC/NACK、控制面 TLS 专线(53320)、投屏会话状态与横幅、Android 屏幕接收(MediaCodec/SurfaceView)、无障碍注入服务。
+- 键鼠共享/远程桌面:内嵌 RustDesk 引擎(`packages/remote_desktop`)、`third_party/rustdesk` 子模块、直连会话(TLS 双连接 + 会话令牌)、鼠标/键盘注入、鼠标采集。
+
+**保留**:设备配对(SAS)、信任分级、同归属者(「这是我的设备」)、共享目录、WebRTC 文件传输等与共享无关的能力;以及两项与功能无关的通用修复(`core` 纳秒时间戳测试的平台差异修正、Windows 插件构建的 `/utf-8` 修复)。
+
+**许可影响**:AGPL-3.0 由内嵌 RustDesk(AGPL)触发;随 RustDesk 移除,`LICENSE` 与 README 已回到 Apache-2.0 基线,`THIRD_PARTY_NOTICES.md` 删除。如需继续以 AGPL 分发,请另行确认。
+
+**文档**:`docs/E2-S0/` 保留为历史设计/验收记录,不再对应当前代码。
+
+### 输入平面端到端自证(2026-10-30)
+
+新增 Windows 专属用例 `injects_a_mouse_move_into_the_windows_session`:真实起一个受控端会话,控制端经协议发一个鼠标移动,受控端解码后用 `SetCursorPos` 注入到**当前 Windows 会话**,用例再用 `GetCursorPos` 从系统读回光标位置并断言一致 —— 输入通路(协议 → 解码 → 系统注入)得到真实操作系统层面的验证,而不是只测纯函数。
+
+`remote_desktop` 测试总数 26 项通过(此前 25 项)。
+
+### 移动端构建解锁:远程桌面引擎与 RustDesk 运行时依赖解耦(2026-10-30)
+
+**问题链**:Android 原生插件编译失败 → `hbb_common` → `tokio-native-tls` → `native-tls` → `openssl-sys`(OpenSSL 无 Android 实现);绕开后又撞上 `libsodium-sys`,再往下还有 openh264。逐个在 RustDesk fork 里门控这些原生依赖不可持续(`hbb_common` 本身还是嵌套子模块)。
+
+**解法**:让 `anyshare_remote_desktop` **不再依赖 RustDesk 的 `base` / `hbb_common`**,只保留 `scrap`(采集后端,仅桌面/Windows 启用)。
+- 新增 `packages/remote_desktop/src/message.rs`:自己实现直连会话需要的三个消息(`MouseEvent` / `KeyEvent` / `Message`),**字段号与 RustDesk `message.proto` 一致** → 编码仍与 RustDesk 兼容;protobuf 编解码手写实现(约 150 行 varint + length-delimited),因此**不再需要 `protobuf` / `protobuf-derive` 依赖**(后者离线不可用)。
+- `session.rs` / `viewer.rs` / `lib.rs` 改用本 crate 的 `message` 模块;`Cargo.toml` 去掉 `base`、`hbb_common`、`protobuf` 依赖。
+- 结果:移动端依赖集只剩 `anyhow` / `rustls` / `sha2` / `image` / `tracing` —— **全是纯 Rust**,没有任何原生库。
+
+**验证**
+```
+cargo check -p anyshare_remote_desktop                        # 无 capture feature 亦可编译
+cargo test  -p anyshare_remote_desktop --features capture     # 25 passed
+cargo check -p rust_lib_localsend_app                          # Finished
+flutter build apk --debug                                     # Built(此前在 openssl-sys 处失败)
+adb install + am start + logcat                                # 应用正常初始化,无 content-hash 错误、无缺失 .so
+```
+**遗留**:受控端(Windows)仍用 RustDesk 的 `scrap` 采集 + 本 crate 的 JPEG 编码;RustDesk 协议部分保留在**输入事件**(鼠标/键盘 protobuf 线格式)与采集后端。
+
+### 直连会话视频通路去原生依赖 + Windows 干净构建修复(2026-10-30)
+
+**问题**:控制端必须用 `scrap::VpxDecoder` 解 VP9,而 `scrap` 属于 `capture` feature,因此**控制端也只能跑在装了 libvpx 的桌面上**,Android 当不了控制端。
+
+**改法**:直连会话的视频载荷改为 **JPEG**,两端都不再需要原生解码器。
+- 新增 `packages/remote_desktop/src/frame.rs`:载荷格式为 `[width u32 BE][height u32 BE][JPEG 字节]`(`build_payload` / `split_payload`);`encode_jpeg` 用纯 Rust 的 `image` crate(zune-jpeg 后端);`frame_to_rgba` 处理 BGRA/RGBA 与行填充(stride)。
+- 受控端(`session.rs`):采集帧 → RGBA → JPEG → 直接发帧,不再走 RustDesk 的 VP9 编码器。
+- 控制端(`viewer.rs`):**不再解码**,只转发 JPEG 字节;整块 `capture` 门控移除 → 控制端 API 在 Android/Linux 也可用。RustDesk 的部分保留:采集(scrap)与输入协议(protobuf `MouseEvent`/`KeyEvent`)仍是 RustDesk 的。
+- Dart:远程桌面页改用 `ui.decodeImageFromList`(Flutter 原生 JPEG 解码),不再需要像素格式转换。
+- 依赖:`image` 为纯 Rust 依赖(非可选),`capture` feature 只保留 `dep:scrap`。
+- 代价:直连会话不再是 RustDesk 的 VP9 码流,与上游 RustDesk 客户端不互通(直连会话本来就是 AnyShare 私有协议)。
+
+**顺带修复**
+- `app/windows/CMakeLists.txt`:加 `/utf-8`。`flutter clean` 后重建插件时,`connectivity_plus` 的 `us_plugin.cpp` 因含非 ASCII 字符触发 MSVC `C4819`,被插件的 `/WX` 提升为 `C2220` 错误 → Windows 从干净树构建直接失败(此前靠旧产物侥幸通过)。
+- 帧测试更新:宿主帧断言改为校验载荷头与 JPEG 魔数;控制端帧断言改为校验 JPEG 载荷。
+
+**验证**
+```
+cargo test -p anyshare_remote_desktop --features capture   # 21 passed(含真实采集→JPEG→收帧的端到端用例)
+cargo check -p anyshare_remote_desktop                      # 无 capture feature 亦可编译(控制端跨平台)
+cargo check -p rust_lib_localsend_app                        # Finished
+flutter analyze                                             # No issues found
+flutter test                                                # 246 passed
+flutter build windows --debug                               # Built(干净树重建通过)
+```
+
+### 真机双机验收:首轮排查与两个阻塞项(2026-10-30)
+
+按「Windows 受控端 + 另一台真机控制端」的拓扑开始验收,结果如下。
+
+**环境盘点**
+- Windows 受控端:可用(应用已构建,`build/windows/x64/runner/Debug/anyshare_app.exe`)。
+- Ubuntu 受控/控制端 `192.168.1.5`:SSH 端口可达,但本机保存的密钥 `~/.ssh/anyshare_e2s0` 被拒(`publickey,password`,无口令可用);该机除 22 端口外未开 AnySend 端口(53317/53318/53320),即未运行 AnyShare。**无法作为第二台真机**。
+- 其它候选主机(192.168.1.121/.180/.3/.4)同样不接受该密钥 → 本轮只有 Android 模拟器(`anyshare-test`,x86_64)可作为第二设备。
+
+**发现并修复的问题**
+1. **移动端/桌面端构建被 feature 门控打断**:FRB API(`packages/localsend_isolates/rust/src/api/remote_desktop.rs`)无条件调用 `HostSession::start_with_token` / `start_tls_with_token` 与 `ViewerSession::connect_*`,而这些方法只在 `capture` feature(且非 Android)下存在 → Android/Linux 的插件编译不过。已为无 `capture` 的平台补上同签名的回退实现(运行期返回「需要 capture feature」),使 FRB 桥在所有平台都能编译。
+2. **APK 内置的是过期原生插件**:模拟器启动报 `Content hash on Dart side (1652620099) is different from Rust side (434398902)` —— Dart 侧绑定已重新生成,APK 里的 `.so` 仍是旧的。`flutter clean` + 重新构建后,APK 里**根本没有** `librust_lib_localsend_app.so`。
+
+**未解决的阻塞项(根因已定位)**
+- **Android 原生插件编译失败**:`hbb_common` → `tokio-native-tls` → `native-tls` → `openssl-sys`,OpenSSL 无 Android 支持,`openssl-sys` 的 build script 直接失败。尝试从 `hbb_common` 的 tungstenite 特性里去掉 `native-tls` 确实能去掉 openssl,但会让 `hbb_common` 自身编译失败(`tokio_tungstenite` 的 native-tls 变体被 `proxy.rs` / `websocket.rs` 使用),**已回滚**,vendored 树保持干净。正确修法:在 RustDesk fork 内把 `proxy.rs` / `websocket.rs` 的 `tokio_native_tls` 用法改为按平台门控(Android 走 rustls),而不是动 tungstenite 的特性。
+- **控制端需要原生 VP9 解码器**:`viewer.rs` 用 `scrap::VpxDecoder` 解 VP9,`scrap` 属于 `capture` feature,因此**控制端目前也只能跑在装了 libvpx 的桌面上**。要让 Android 当控制端,要么给 Android 交叉编译 libvpx,要么把直连会话的视频载荷改成 Flutter 可原生解码的格式(RGBA/JPEG)。
+- **APK 现状**:模拟器上的应用处于「原生插件缺失」状态(构建阻塞的直接后果),需等上述编译问题解决后才能做移动端真机验收。
+
+**本轮验证**
+```
+cargo check -p rust_lib_localsend_app            # Finished(回滚后 Windows 构建绿)
+cargo check -p anyshare_remote_desktop          # 无 capture feature 亦可编译(回退实现生效)
+cargo test -p anyshare_remote_desktop --features capture   # 18 passed
+cargo test -p localsend --features full                     # 87 passed
+flutter build apk --debug                      # Dart 侧通过,原生插件阶段失败(openssl-sys)
+flutter analyze / flutter test                  # 0 / 246 passed
+```
+
+### 输入注入修正与滚动支持(2026-10-30)
+
+对照 RustDesk 上游真实语义(`src/server/input_service.rs`、`libs/base/protos/message.proto`)复核,修掉四处**功能性 bug**:
+
+1. **Unicode 键被丢弃**:`key_event_params` 之前把 `unicode` 塞进返回值但 `apply_key_action` 从未使用,导致按键完全无反应。改为:unicode 走 `KEYEVENTF_UNICODE`,字符码写入 `wScan`,`wVk` 置 0;unicode 优先于 scancode。
+2. **绝对坐标归一化是空操作**:原 `normalize()` 写成 `clamped * 65535 / 65535`(恒等于原值),且用 `MOUSEEVENTF_ABSOLUTE` 传像素坐标(该标志要求 0..65535 归一化值)。改为直接 `SetCursorPos(x, y)`,与 RustDesk 服务端 `en.mouse_move_to` 一致。
+3. **滚轮增量取错字段**:RustDesk 的滚轮增量放在事件的 `x`/`y`,不是按钮字段;原实现按 `mask >> 3` 读增量。改为 `MouseAction::Wheel { dx, dy }`,并按 `WHEEL_DELTA`(=120)换算、轨道板不换算。
+4. **`win2win_hotkey` 低位语义**:协议注释为「高字:虚拟键码,低字:unicode」,原实现只取高字。改为高字取虚拟键、低字取 unicode。
+
+同时:
+- 按钮位图按 RustDesk 定义重写(`button_params`):1=左,2=右,4=中,8=后,16=前;未知位图返回 `None` 而非误判为中键。
+- `press` 事件补齐上/下行语义(此前只有 down/up 两态)。
+- 新增滚动支持:FRB `send_mouse_scroll` → Dart `RemoteViewerSession.sendMouseScroll` → 远程桌面页 `PointerScrollEvent` 转发。
+- 非 BMP 字符(emoji)按 UTF-16 代理对编码:`key_events` 对 >0xFFFF 的码点生成高/低两个代理项,`wScan` 只有 16 位,直接截断会得到乱码。
+- `Cargo.toml` 增加 `Win32_UI_WindowsAndMessaging` feature(需要 `SetCursorPos`)。
+- 清理 `remote_desktop` 全部 clippy 警告(unused import / needless mut / 同类型 cast);`third_party/rustdesk` 上游代码的 clippy 报错不处理(不属于本仓库代码)。
+- 测试:`remote_desktop` 18 项通过(新增按钮位图、滚轮换算、hotkey 低字、代理对用例);`core` 87 项全绿;`flutter analyze` 0;246 Dart 测试通过。
+
+### 上游时间戳测试的平台差异修正(2026-10-30)
+
+`core` 的 `model::transfer::tests::formats_nanosecond_timestamp` 在 Windows 上失败:`SystemTime` 在 Windows 是 100ns 粒度,`123_456_789ns` 被截断成 `123_456_700ns`,RFC3339 又裁掉末尾零 → 实际输出 `.1234567`。上游测试硬编码了 Unix/macOS 的纳秒值。改为按平台取期望值(Windows 用 100ns 对齐值),Linux/macOS 行为不变。
+
+### 许可与第三方声明(2026-10-30)
+
+- 因内嵌 RustDesk(AGPL-3.0)源码,整体许可由 Apache-2.0 切换为 **AGPL-3.0 或更高版本**:根 `LICENSE` 替换为 AGPL-3.0 全文,README 许可证与归属声明同步更新
+- 新增 `THIRD_PARTY_NOTICES.md`:登记 RustDesk(子模块 `third_party/rustdesk`,commit `3cb027a`,v1.5.1,AGPL-3.0)与上游 LocalSend(Apache-2.0)
+- 合规提示:发行二进制须提供对应源码(含子模块),网络服务用户同样可获取源码;RustDesk 商标归其作者所有
+- 验证:Windows debug 构建通过(含 TLS 远程桌面链路);`flutter analyze` 0;246 Dart 测试通过;14 项 remote_desktop Rust 测试通过
+
+### 远程桌面(RustDesk 源码内嵌)M3r TLS 直连打通(2026-10-30)
+
+- `viewer.rs`:改为**两条连接**(视频/输入),`SessionIo` trait 抽象流;新增 `connect_tls_with_token`(两条连接各自 TLS 握手 + 指纹 pin)
+- `session.rs`:`serve_video`/`serve_input_channel` 泛型化;新增 `HostSession::start_tls_with_token`(每条连接 TLS + 指纹校验,空指纹=接受任意合法客户端证书)
+- `tls.rs`:Host 侧客户端证书校验器包一层,`root_hint_subjects` 置空 —— core 的校验器只宣告自身证书,导致 rustls 客户端不发送证书
+- 关键修复:accept 出来的 socket 必须恢复阻塞模式(监听 socket 是 non-blocking,否则 TLS 握手报 10035)
+- FRB:`start_remote_host_tls` / `connect_remote_viewer_tls`;Dart:`RemoteHostSession.startTls` / `RemoteViewerSession.connectTls`;受控端与 loopback 页均改走 TLS(证书取自 securityProvider,指纹 pin 用设备指纹)
+- 测试:新增 TLS 直连端到端(自签证书 → 收帧),共 14 项 Rust 测试通过;插件/core `cargo check` 通过;`flutter analyze` 0;246 Dart 测试通过
+
+### 远程桌面(RustDesk 源码内嵌)M3q 通道协议落地(2026-10-30)
+
+- `session.rs`:新增 `KIND_CHANNEL`(首帧声明 `"video"` / `"input"`);Host 接受**两条连接**:
+  - 视频连接:`[KIND_CHANNEL "video"][KIND_AUTH token]` → 只写帧;
+  - 输入连接:`[KIND_CHANNEL "input"][KIND_AUTH token]` → 只读输入帧并注入。
+- 兼容:旧客户端首帧为 `KIND_AUTH` 时仍走原来的单连接(视频+输入)逻辑;无 token 的开发模式行为不变
+- 这样 TLS 不再需要复制流(两条连接各自握手),解除了 `try_clone` 阻塞限制
+- 验证:13 项 Rust 测试通过;插件/core `cargo check` 通过;`flutter analyze` 0;246 Dart 测试通过
+- 待办:Viewer 侧改为两条连接(当前仍是旧单连接,新协议仅 Host 就绪);两条连接各自套 TLS;FRB 传证书/指纹;Dart 走 TLS 直连
+
+### 远程桌面(RustDesk 源码内嵌)M3p 收尾说明(2026-10-30)
+
+- TLS 与会话的“最后一段接线”(帧 IO 泛型化、TLS 会话变体、FRB 传证书/指纹、Dart 走 TLS 直连)的**具体实现形状**已写入 `docs/E2-S0/远程桌面RustDesk内嵌方案.md` 的「剩余接线」小节
+- 关键坑位(已在文档标注):TLS 流无法 `try_clone()`,输入读取必须与视频推流同线程(或做 WouldBlock 超时处理)
+- 当前状态:仓库全绿 —— 13 项 remote_desktop Rust 测试、插件与 core `cargo check` 通过、`flutter analyze` 0、246 Dart 测试通过
+
+### 远程桌面(RustDesk 源码内嵌)M3p TLS 模块(2026-10-30)
+
+- `packages/remote_desktop/src/tls.rs`(新增):rustls **阻塞式** 适配(会话是阻塞 std IO,rustls 无阻塞 API)——`ServerConnection/ClientConnection` + `complete_io(&mut TcpStream)`
+- 复用 core 已公开的校验器:Host 侧 `CustomClientCertVerifier`(强制客户端证书),Viewer 侧 `PinnedServerCertVerifier`(按指纹 pin Host 证书)
+- 依赖:`remote_desktop` 新增 `localsend`(core,feature http)、`rustls`(ring/std/tls12)、`sha2`;测试用 `rcgen` 自签证书
+- 测试:新增 2 项 —— 指纹一致握手成功并互发数据;指纹不一致直接拒连;总计 13 项 Rust 测试通过
+- 过程中修正三处真实问题:依赖路径 `../../core` → `../core`;rustls 证书需 `Vec`;`peer_certificates` 在 `CommonState` 上(Deref 两层),曾因 trait 递归导致栈溢出
+- 待办(机械接线):`read_frame/write_frame` 泛型化为 `impl Read + Write`;`serve_client` 泛型化;新增 `HostSession::start_tls_with_token` / `ViewerSession::connect_tls_with_token`;FRB 传证书与指纹;`connectRemoteDesktop` 走 TLS 直连
+
+### 远程桌面(RustDesk 源码内嵌)M3p TLS 预研结论(2026-10-30)
+
+- `core`:把 `CustomClientCertVerifier`(接受任意合法客户端证书)与 `PinnedServerCertVerifier`(按指纹 pin)改为公开,供远程桌面直连复用
+- 结论:直连 TLS **不能用 native-tls** —— Windows(Schannel)只接受 PKCS#12 身份,现有设备证书是 PEM(PKCS#8),实测握手失败;而 AnyShare 其它 TLS(53317/53320)走 rustls,故直连也应走 rustls
+- 因此直连会话(阻塞式 std IO)需要 rustls 的阻塞适配(`ServerConnection/ClientConnection` + `complete_io(&mut TcpStream)`),这是下一步的具体实现路径
+- 本轮未提交 TLS 实现:已撤销 native-tls 试验代码,保持仓库绿(11 项 Rust 测试通过)
+
+### 远程桌面(RustDesk 源码内嵌)M3o 复核与修复(2026-10-30)
+
+- 复核发现 `session::key_event_message` 在一次批量改写中丢失,导致插件 crate 编译失败;已恢复并改用 `key_event::Union::Unicode`(oneof 内字段不能直接赋值)
+- 教训:批量脚本改写 Rust 源码容易丢失先前改动,后续 Rust 文件统一用编辑工具逐处修改
+- 回归:`cargo test -p anyshare_remote_desktop --features capture` 11 项通过、`cargo test -p rust_lib_localsend_app` 通过、`flutter analyze` 0、246 Dart 测试全绿
+- 已知(与本批无关):`cargo test -p localsend --features full` 中 `model::transfer::tests::formats_nanosecond_timestamp` 失败(未改动 transfer 代码,属既有问题,待单独确认)
+
+### 远程桌面(RustDesk 源码内嵌)M3n(2026-10-30)
+
+- 会话授权加固:授权 120 秒有效 + **一次性领取**(重复领取返回 409 `grant_used`,过期返回 404 `grant_expired`);Host 重新发布会话时重置领取状态
+- 审查:静态常量在 extension 上下文中需用类型名限定(`ExtensionServerService._remoteSessionGrantTtl`)
+- 验证:`flutter analyze` 0、246 Dart 测试全绿
+- 待办:直连流 TLS 加密(最后的安全硬前提)、被连接状态提示、异常断线重连
+
+### 远程桌面(RustDesk 源码内嵌)M3m(2026-10-30)
+
+- `app/lib/pages/remote_desktop_host_page.dart`(新增):受控端入口 —— 生成会话令牌、启动 Rust Host、把授权发布到 mTLS 控制面,并显示监听端口与停止按钮
+- `remote_desktop_page.dart`:AppBar 增加「允许本机被远程控制」入口
+- 验证:`flutter analyze` 0、246 Dart 测试全绿
+- 待办:直连流 TLS 加密;授权有效期/一次性;受控端会话状态提示与自动停止
+
+### 远程桌面(RustDesk 源码内嵌)M3l(2026-10-30)
+
+- `app/lib/provider/remote_desktop_provider.dart`(新增):`connectRemoteDesktop()` —— 先经 mTLS 控制面取会话授权,再用令牌建立直连会话
+- `remote_desktop_page.dart`:支持传入既有 `RemoteViewerSession`(远端)或保持本机 loopback 演示
+- `my_devices_tab.dart`:「远程桌面」按钮改为真实流程(取授权 → 连直连 → 打开 viewer),控制端口用 `kScreenSecurePort`
+- 验证:`flutter analyze` 0、246 Dart 测试全绿
+- 待办:受控端需有“启动远程桌面主机”的入口(当前只有 loopback 页会起 Host 并发布授权);直连流仍未加密
+
+### 远程桌面(RustDesk 源码内嵌)M3k(2026-10-30)
+
+- 控制面新增 `POST /api/anyshare/v1/screen/session-token`:**仅 mTLS 通道可用**,返回当前直连会话的令牌与直连端口
+- `extension_server_provider.dart` 新增 `setRemoteSession(token, port)`,Host 侧发布当前会话凭据
+- `screen_provider.dart` 新增 `ScreenService.requestRemoteSessionGrant(...)`:用已有的双向 TLS + 指纹 pin 取回对端令牌
+- `remote_desktop_page.dart`:Host 启动后把令牌发布到控制面
+- 验证:`flutter analyze` 0、246 Dart 测试全绿、11 项 Rust 测试通过
+- 事故与教训:一次 codegen 后 Rust API 里的 `send_key_event` 丢失,导致 14 个测试编译失败;此后每次 codegen 都要核对生成 API 与 Rust 签名一致
+- 待办:直连流 TLS 加密、真实对端流程串联(发现→取令牌→直连)
+
+### 远程桌面(RustDesk 源码内嵌)M3j(2026-10-30)
+
+- FRB:`start_remote_host(port, quality, token)` / `connect_remote_viewer(host, port, token)` 增加会话令牌参数(空串=开发模式无鉴权)
+- `remote_desktop_session.dart`:`start/connect` 透传 token
+- `remote_desktop_page.dart`:loopback 页用 `Random.secure()` 生成 16 字节令牌并在 Host/Viewer 间共享
+- 验证:`flutter analyze` 0;`cargo test -p anyshare_remote_desktop --features capture` 11 项通过
+- 待办:控制面“交换令牌”端点(真实对端流程)、直连流 TLS 加密
+
+### 远程桌面(RustDesk 源码内嵌)M3i(2026-10-30)
+
+- `session.rs`:新增 `KIND_AUTH` 首帧 + `HostSession::start_with_token(port, quality, token)`;Host 先校验会话令牌再进入采集/编码
+- `viewer.rs`:新增 `ViewerSession::connect_with_token(host, port, token)`,连接后先发令牌帧
+- 令牌计划通过 AnyShare 已有的双向 TLS 控制面(53320)交换,直连会话继承该信任,避免开放无认证 TCP 端口
+- 测试:11 项通过(正确令牌可收帧、错误令牌收不到帧)
+- 待办:FRB/Flutter 侧接入令牌交换与传递;TLS 层加密直连流(目前仅鉴权未加密)
+
+### 远程桌面(RustDesk 源码内嵌)M3h(2026-10-30)
+
+- FRB 新增 `RsRemoteViewer.send_key_event(down, unicode)`;`session.rs` 新增 `key_event_message`(RustDesk `key_event`)
+- `remote_desktop_session.dart` 新增 `sendKeyEvent`
+- `remote_desktop_page.dart`:loopback 页捕获可打印字符(按下/抬起)并转发;宿主侧用 `KEYEVENTF_UNICODE` 注入
+- 验证:`flutter analyze` 0;`cargo check -p rust_lib_localsend_app` 通过;10 项 Rust 测试通过
+- 待办:非打印键(功能键/修饰键)仍需 scancode 通道;直连认证加密;Linux/Android 注入
+
+### 远程桌面(RustDesk 源码内嵌)M3g(2026-10-30)
+
+- FRB 新增 `RsRemoteViewer.send_mouse_event(kind,x,y)`:构造 RustDesk `mouse_event`(move/down/up)并通过直连通道发给 Host
+- `remote_desktop_session.dart`:Dart 封装 `sendMouseEvent`
+- `remote_desktop_page.dart`:loopback 页捕获指针(按下/移动/抬起),按“本机逻辑坐标 → 宿主像素”比例换算后转发
+- 验证:`cargo check -p rust_lib_localsend_app` 通过、`flutter analyze` 0、246 Dart 测试全绿、10 项 Rust 测试通过
+- 待办:直连会话认证/加密、Linux/Android 注入、viewer 端键盘转发
+
+### 远程桌面(RustDesk 源码内嵌)M3f(2026-10-30)
+
+- `inject.rs`:键盘 `SendInput` 注入(优先 scancode + `KEYEVENTF_SCANCODE`,无 scancode 时回退 `KEYEVENTF_UNICODE`);纯函数 `key_event_params` 可单测
+- Host 输入线程:`key_event` 解码后直接注入本机键盘(失败仅告警)
+- 测试:10 项通过(新增键盘注入参数映射用例)
+- 待办:viewer 端需上报自身分辨率以便用 `scale_point` 换算坐标;Linux/Android 注入;直连认证与加密
+
+### 远程桌面(RustDesk 源码内嵌)M3e(2026-10-30)
+
+- `input.rs`:新增 `KeyAction` 与 `decode_key_event`(RustDesk `key_event` oneof:scancode/unicode/win2win 虚拟键)+ `scale_point` 跨分辨率坐标换算
+- Host 输入线程:解析 `key_event` 并记录(键盘注入待接),鼠标事件继续走 `SendInput` 注入
+- 测试:9 项通过(新增键盘解码与坐标换算用例)
+- 待办:键盘 `SendInput` 注入、viewer 端坐标需带分辨率、Linux/Android 注入、直连认证加密
+
+### 远程桌面(RustDesk 源码内嵌)M3d(2026-10-30)
+
+- `packages/remote_desktop/src/inject.rs`(新增):Windows `SendInput` 注入(Move/Down/Up/Wheel/Relative),纯函数 `mouse_event_params` 便于单测
+- Host 输入线程:解码后直接注入本机鼠标,失败仅告警
+- 测试:7 项通过(新增 SendInput 参数映射用例)
+- 待办:`key_event` 键盘注入、Linux/Android 注入、直连认证加密、绝对坐标需按接收端分辨率换算
+
+### 远程桌面(RustDesk 源码内嵌)M3c(2026-10-30)
+
+- `packages/remote_desktop/src/input.rs`(新增):RustDesk `mouse_event` 掩码语义解码(`type=mask&0x7`、`button=mask>>3`),产出 `Move/Down/Up/Wheel/Relative` 动作
+- Host 输入线程改为按解码结果记录,不再直接打印裸字段
+- 测试:6 项通过(新增掩码解码用例)
+- 待办:Windows `SendInput`/`enigo` 实际注入、`key_event` 键盘、直连认证加密
+
+### 远程桌面(RustDesk 源码内嵌)M3b(2026-10-30)
+
+- `viewer.rs`:`send_input(Message)` 通过直连帧通道发送 RustDesk `mouse_event`
+- `session.rs`:Host 为每个客户端起独立输入 reader 线程,按帧解析 `mouse_event`(当前记录日志,尚未注入系统)
+- 测试:5 项通过(viewer 发送鼠标事件后视频帧仍持续解码)
+- 待办:用 RustDesk `enigo`/SendInput 实际注入;键盘事件;直连认证与加密
+
+### 远程桌面(RustDesk 源码内嵌)M3a(2026-10-30)
+
+- `session.rs` 新增 RustDesk `mouse_event` 消息构造(viewer→host 输入面)
+- 测试:`cargo test -p anyshare_remote_desktop --features capture` 5 项通过(含 input 消息编解码)
+- 待办:Host 侧读取输入帧并注入(enigo)、keyboard 事件、viewer 发送端
+
+### 远程桌面(RustDesk 源码内嵌)M2e(2026-10-30)
+
+- `packages/localsend_isolates/lib/src/remote_desktop/remote_desktop_session.dart`(新增):Dart 封装 Host/Viewer/Frame
+- `app/lib/pages/remote_desktop_page.dart`(新增):本机 loopback(Host→Viewer)解码 RGBA → `decodeImageFromPixels` → `RawImage`
+- `my_devices_tab`:新增“远程桌面”入口(临时 loopback 验证页)
+- `flutter analyze` 0;运行期画面待人工验证
+- 审查:页面循环在 dispose 后仍可能 await,已用 `_running`/`mounted` 守卫;直连仍无认证
+
+### 远程桌面(RustDesk 源码内嵌)M2d(2026-10-30)
+
+- `packages/localsend_isolates/rust/src/api/remote_desktop.rs`(新增)+ FRB:`start_remote_host(port,quality)` / `connect_remote_viewer(host,port)` / `next_frame(timeout_ms)` / `stop()`
+- 插件 Cargo:Windows 依赖 `anyshare_remote_desktop` 并启用 `capture`;其他平台仅引入 API(stub)
+- FRB 绑定已生成(`lib/rust/api/remote_desktop.dart`);`cargo check -p rust_lib_localsend_app` 通过
+- 审查:viewer `next_frame` 在 Mutex 内阻塞(最长 timeout);`stop()` 走后台线程避免 UI 卡住;直连仍无认证/加密
+- 待办:Flutter 呈现页面(纹理/`decodeImageFromPixels`)、输入注入、TLS 包装
+
+### 远程桌面(RustDesk 源码内嵌)M2c(2026-10-30)
+
+- `packages/remote_desktop/src/viewer.rs`(新增):直连 viewer —— 读取 RustDesk `Message(video_frame)` → VP9 解码 → I420/I444→RGBA;帧通道满时丢帧而不是断流
+- `session.rs`:Host 端 30fps pacing;移除会吞掉 viewer 输入字节的临时 drain;`encode_to_message` 直接使用 `frame.to()` 的返回值
+- 测试:4 项通过(抓帧 / VP9 编码 / 直连协议解析 / Host→Viewer 解码 RGBA)
+- 审查记录(未修,记入待办):
+  - 直连会话目前**明文且无认证**,只能用于本地验证,禁止默认对外暴露;
+  - Host 的客户端线程未 join(靠 stop 标志退出);
+  - viewer→host 输入仍未解析/注入;
+  - RGBA 转换是 CPU 逐像素,1080p 30fps 成本高,后续应走纹理/YUV;
+  - 暂未实现编码前降采样(分辨率档位对远程桌面未生效)
+- 下一步 M2d:FRB 暴露 Host/Viewer + Flutter 纹理呈现;M3 输入;M4 Android
+
+### 远程桌面(RustDesk 源码内嵌)M2b(2026-10-30)
+
+- `packages/remote_desktop/src/session.rs`(新增):直连会话 Host 侧 —— 采集 → RustDesk VP9 → RustDesk `Message` protobuf(`video_frame`)→ `[kind][len]` 帧格式推给 viewer
+- 输入方向已预留:viewer→host 的帧会被读取(尚未解析与注入)
+- 测试:`cargo test -p anyshare_remote_desktop --features capture` 3 项通过(抓帧 / 编码 / 直连流帧解析)
+- 下一步 M2c:viewer 解码 + FRB 暴露 + UI;M3 输入注入
+
+### 远程桌面(RustDesk 源码内嵌)M2a(2026-10-30)
+
+- `packages/remote_desktop`:`capture_encode_once()` 抓帧 → RustDesk VP9 编码 → 返回 RustDesk `VideoFrame` 载荷
+- 测试:`cargo test -p anyshare_remote_desktop --features capture` 2 项通过(真实抓帧 + 真实编码)
+- 清理:删除外部拉起 RustDesk 的 Dart/Kotlin/持久化残留(改为源码内嵌路线)
+- 验证:Windows `flutter analyze` 0、246 Dart 测试全绿、Android APK 构建通过
+- 下一步 M2b:直连会话(帧流 + 输入)与 FRB 暴露
+
+### 远程桌面(RustDesk 源码内嵌)M1b(2026-10-30)
+
+- vcpkg 安装 `libyuv/libvpx/aom`(x64-windows-static),`scrap` 采集依赖可编译
+- `packages/remote_desktop`:`capture` feature 接入 RustDesk `scrap`;`capture_probe()` 抓取主屏一帧
+- 验证:`cargo test -p anyshare_remote_desktop --features capture` 通过(真实抓帧)
+- 构建需 `VCPKG_ROOT`、`VCPKG_INSTALLED_ROOT`、MSVC/Windows SDK `INCLUDE`
+- 下一步 M2:采集→编码→FRB viewer
+
+### 远程桌面(RustDesk 源码内嵌)M1a(2026-10-30)
+
+- 新增 `packages/remote_desktop` crate(`anyshare_remote_desktop`),加入根 Cargo workspace
+- 依赖 `third_party/rustdesk/libs/{hbb_common,base}`;`scrap` 放到 `capture` feature(Windows 需 vcpkg libyuv)
+- Windows `cargo check -p anyshare_remote_desktop` 通过;`localsend --features full` 仍通过
+- 注意:根 workspace 现在需要初始化 `third_party/rustdesk` 及 `libs/hbb_common` 子模块
+- 下一步 M1b:接入 `scrap`(vcpkg/libyuv 或改用 AnyShare 现有采集),再进入 M2 直连 viewer
+
+### 远程桌面(RustDesk 源码内嵌)启动批次(2026-10-30)
+
+- 决策:源码级 Fork RustDesk,AnyShare 后续整体按 AGPL-3.0 分发
+- `third_party/rustdesk` submodule:固定上游 `3cb027a`(v1.5.1,shallow)
+- 移除外部拉起入口/设备卡“远程桌面”按钮;共享键鼠入口保持关闭
+- 方案文档:`docs/E2-S0/远程桌面RustDesk内嵌方案.md`(模块映射、M1-M5、AGPL 合规、风险)
+- 当前进度:M1(引擎编译)未开始;现有“远程桌面”功能不可用,等待内嵌引擎接入
+
+### 远程桌面(RustDesk)切换批次(2026-10-30)
+
+- 设备列表/我的设备移除“键鼠共享”入口(共享键鼠功能关闭,后端代码暂留)
+- `app/lib/util/remote_desktop.dart`(新增):检测已安装 RustDesk,桌面端用 `rustdesk --connect <id>` 拉起
+- `app/lib/widget/dialogs/rustdesk_id_dialog.dart`(新增)+ `util/rustdesk_launch.dart`:按设备指纹询问/记住 RustDesk ID 并拉起
+- Android `MainActivity` 新增 `anyshare/remote_desktop` 通道:检测 RustDesk 包,启动客户端并把 ID 复制到剪贴板
+- Windows/Linux/Android 设备卡片新增“远程桌面”按钮;RustDesk 负责采集、输入与内网穿透
+- 验证:analyze 0、246 Dart 测试全绿、Windows Release / Android APK / Ubuntu debug+release 构建通过
+
+### 鼠标共享 MVP 批次(2026-10-29)
+
+- `packages/localsend_isolates/rust/src/mouse_capture.rs`(新增):Windows `WH_MOUSE_LL` 全局钩子,坐标归一化到主屏 0..1
+- `packages/localsend_isolates/rust/src/api/mouse.rs` + FRB:`start_mouse_capture` / `RsMouseCapture` 事件流
+- `app/lib/provider/screen/screen_provider.dart`:`ToggleMouseShareAction`;屏幕共享会话中把本地鼠标的点击/拖动/滚轮转发到对端 `POST /input/event`(双向 TLS、会话+证书绑定);会话结束时自动停止
+- `app/android/.../ScreenInputAccessibilityService.kt`(新增)+ manifest/config:通过无障碍手势注入 tap/swipe/scroll
+- `app/lib/util/android_input.dart`、extension server `input/event` 端点:仅接受与当前接收会话证书匹配的请求;未启用无障碍时返回 409 `accessibility_required`
+- 设备卡片“键鼠共享”按钮在已建立发送会话时可用(点击开启/停止)
+- 限制:Android 需要用户手动启用无障碍服务;键盘注入未实现;鼠标移动仅在按键按下到抬起时映射为滑动,单击映射为点按
+- 验证:analyze 0、246 Dart 测试全绿、Windows/Android 构建通过;双机注入待人工验收
+
 ### F1 整帧丢失恢复批次(2026-10-27)
 
 - `packages/screen-stream/src/transport.rs`:`Nack` 支持 `count=0`(整帧全丢,位图为空);`missing_candidates` 扫描 `next_expected..max_frame_seen` 的空洞帧(高水位超前 ≥2,每次最多 2 个);2 个单测

@@ -478,6 +478,7 @@ class PersistenceService {
     await _prefs.setInt(_timeoutKey, timeout);
   }
 
+  /// Android receiver resolution scale (fraction of the native landscape size).
   bool getShareViaLinkAutoAccept() {
     return _prefs.getBool(_shareViaLinkAutoAccept) ?? false;
   }

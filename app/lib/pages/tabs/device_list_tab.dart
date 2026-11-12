@@ -11,12 +11,11 @@ import 'package:localsend_app/provider/local_ip_provider.dart';
 import 'package:localsend_app/provider/network/extension_server_provider.dart';
 import 'package:localsend_app/provider/network/nearby_devices_provider.dart';
 import 'package:localsend_app/provider/network/scan_facade.dart';
+import 'package:localsend_app/provider/owner_claim_provider.dart';
 import 'package:localsend_app/provider/owner_provider.dart';
-import 'package:localsend_app/provider/screen/screen_provider.dart';
 import 'package:localsend_app/provider/settings_provider.dart';
 import 'package:localsend_app/util/device_groups.dart';
 import 'package:localsend_app/util/native/platform_check.dart';
-import 'package:localsend_app/util/screen_capabilities.dart';
 import 'package:localsend_app/util/send_flow.dart';
 import 'package:localsend_app/widget/circular_popup_button.dart';
 import 'package:localsend_app/widget/custom_icon_button.dart';
@@ -145,17 +144,16 @@ class _DeviceListTabState extends State<DeviceListTab> with Refena {
         else
           ...groups.paired.map((entry) {
             final device = findDiscovered(discovered, entry);
-            final isTemp = entry.trustLevel == TrustLevel.temp;
             return Padding(
               padding: const EdgeInsets.only(bottom: 10),
-              child: _pairedCard(context, ref, entry, device, isTemp),
+              child: _pairedCard(context, ref, entry, device),
             );
           }),
       ],
     );
   }
 
-  Widget _pairedCard(BuildContext context, Ref ref, FavoriteDevice entry, Device? device, bool isTemp) {
+  Widget _pairedCard(BuildContext context, Ref ref, FavoriteDevice entry, Device? device) {
     Widget buildCard(String? info, double? progress) {
       return DeviceCard(
         leading: deviceIcon(deviceType: device?.deviceType),
@@ -194,31 +192,6 @@ class _DeviceListTabState extends State<DeviceListTab> with Refena {
             disabledTooltip: t.ui2.deviceList.offlineHint,
           ),
           DeviceActionButton(
-            icon: Icons.screen_share,
-            label: t.ui2.card.shareScreen,
-            // The E2.0 engine is IPv4-only: dial an IPv4 channel, not the
-            // (often IPv6) primary ip.
-            onTap: (device != null && screenShareHostOfWithFallback(device, entry.ip) != null && !isTemp && canSendScreenShare())
-                ? () => ref
-                      .redux(screenProvider)
-                      .dispatchAsync(
-                        StartScreenShareAction(peerIp: screenShareHostOfWithFallback(device, entry.ip)!, peerAlias: device.alias),
-                      )
-                : null,
-            disabledTooltip: isTemp
-                ? t.ui2.card.tempNoScreen
-                : (!canSendScreenShare()
-                      ? t.ui2.screen.unsupportedSend
-                      : (device != null && screenShareHostOf(device) == null)
-                      ? t.ui2.screen.errIpv6
-                      : t.ui2.deviceList.offlineHint),
-          ),
-          DeviceActionButton(
-            icon: Icons.mouse,
-            label: t.ui2.card.shareMouse,
-            disabledTooltip: '${t.ui2.card.experimental} · ${t.ui2.card.comingSoon}',
-          ),
-          DeviceActionButton(
             icon: Icons.folder_open,
             label: t.ui2.card.browseDir,
             onTap: (device != null && device.ip?.isNotEmpty == true)
@@ -226,6 +199,25 @@ class _DeviceListTabState extends State<DeviceListTab> with Refena {
                 : null,
             disabledTooltip: t.ui2.deviceList.offlineHint,
           ),
+          if (entry.ownerId != ref.read(ownerProvider).id)
+            DeviceActionButton(
+              icon: Icons.devices_other,
+              label: t.ui2.card.thisIsMine,
+              onTap: () async {
+                final host = device?.ip ?? entry.ip;
+                if (host.isEmpty) {
+                  return;
+                }
+                final error = await claimDeviceOwner(ref, entry, host);
+                if (!context.mounted) {
+                  return;
+                }
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(error == null ? t.ui2.ownerClaim.success : t.ui2.ownerClaim.failed)),
+                );
+              },
+              disabledTooltip: t.ui2.deviceList.offlineHint,
+            ),
         ],
       );
     }

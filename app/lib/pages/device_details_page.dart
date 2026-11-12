@@ -4,9 +4,7 @@ import 'package:localsend_app/model/persistence/favorite_device.dart';
 import 'package:localsend_app/pages/dir_browse_page.dart';
 import 'package:localsend_app/pages/verify_page.dart';
 import 'package:localsend_app/provider/favorites_provider.dart';
-import 'package:localsend_app/provider/screen/screen_provider.dart';
 import 'package:localsend_app/util/favorites.dart';
-import 'package:localsend_app/util/screen_capabilities.dart';
 import 'package:localsend_app/util/send_flow.dart';
 import 'package:localsend_app/util/system_date_time_formatter.dart';
 import 'package:localsend_app/widget/big_button.dart';
@@ -137,35 +135,7 @@ class _DeviceDetailsPageState extends State<DeviceDetailsPage> with Refena {
                 width: 140,
                 onTap: () async => await sendToDeviceAuto(context, ref, device),
               ),
-              BigButton(
-                icon: Icons.screen_share,
-                label: t.ui2.card.shareScreen,
-                filled: false,
-                width: 140,
-                onTap: () async {
-                  // Mirror the card gating; explain the reason when disabled.
-                  // The E2.0 engine is IPv4-only: dial an IPv4 channel.
-                  final screenHost = screenShareHostOfWithFallback(device, favoriteEntry?.ip ?? '');
-                  final String? reason = !canSendScreenShare()
-                      ? t.ui2.screen.unsupportedSend
-                      : (device.ip?.isNotEmpty != true)
-                      ? t.ui2.deviceList.offlineHint
-                      : (screenHost == null)
-                      ? t.ui2.screen.errIpv6
-                      : (favoriteEntry?.trustLevel == TrustLevel.temp)
-                      ? t.ui2.card.tempNoScreen
-                      : null;
-                  if (reason != null) {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(reason)));
-                    return;
-                  }
-                  await ref
-                      .redux(screenProvider)
-                      .dispatchAsync(
-                        StartScreenShareAction(peerIp: screenHost!, peerAlias: device.alias, peerFingerprint: device.fingerprint),
-                      );
-                },
-              ),
+
               // AnyShare modification (2026-10-18): shared folder browser (E3-3c).
               BigButton(
                 icon: Icons.folder_open,

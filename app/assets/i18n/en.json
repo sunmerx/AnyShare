@@ -669,13 +669,17 @@
     },
     "card": {
       "sendFiles": "Send files",
-      "shareScreen": "Share screen",
-      "shareMouse": "Share mouse & keyboard",
       "browseDir": "Browse shared folder",
       "pair": "Pair",
-      "tempNoScreen": "Temporary devices cannot receive screen shares",
+      "thisIsMine": "This is my device",
       "comingSoon": "Coming soon",
       "experimental": "Experimental"
+    },
+    "ownerClaim": {
+      "title": "Same owner",
+      "body": "\"{alias}\" wants this device to join its owner group. Accept?",
+      "success": "Owner updated",
+      "failed": "The other device did not confirm"
     },
     "blocklist": {
       "title": "Blocklist",
@@ -692,7 +696,6 @@
       "local": "This device",
       "ownerName": "Owner name",
       "sharedDir": "Shared folders",
-      "screenShare": "Screen sharing",
       "addDir": "Add folder",
       "writable": "Allow writes",
       "removeDir": "Remove",
@@ -787,32 +790,6 @@
       "justPair": "Just pair",
       "joinedOwner": "Joined owner \"{name}\"",
       "paired": "Paired successfully"
-    },
-    "screen": {
-      "requestTitle": "Screen share request",
-      "requestBody": "\"{alias}\" wants to share its screen to this device.",
-      "accept": "Accept",
-      "reject": "Reject",
-      "sending": "Sharing screen to \"{alias}\"",
-      "waiting": "Waiting for \"{alias}\" to confirm…",
-      "receiving": "Receiving screen from \"{alias}\"",
-      "stop": "Stop",
-      "unsupportedSend": "Screen sharing cannot be started from this platform yet",
-      "unsupportedReceive": "Screen sharing cannot be received on this platform yet",
-      "errBlocked": "The peer has blocked this device",
-      "errTempNotAllowed": "The peer does not allow temporary devices to share screens",
-      "errBusy": "The peer is busy",
-      "errOffline": "Cannot reach the peer (offline?)",
-      "errRejected": "The peer rejected the screen share ({code})",
-      "errNoResponse": "No response from the peer",
-      "errStartSenderFailed": "Failed to start screen sharing",
-      "errStartReceiverFailed": "Failed to start receiving",
-      "errNotifyFailed": "Could not notify the peer to start",
-      "errStreamEnded": "The screen session ended unexpectedly",
-      "errNoStream": "The peer did not start streaming",
-      "errReceiveUnsupported": "The peer's platform cannot receive screen shares yet",
-      "errCancelledByPeer": "The peer cancelled the screen share",
-      "errIpv6": "The peer address is IPv6; screen sharing is not supported yet"
     },
     "transfers": {
       "title": "Transfers",

@@ -11,7 +11,6 @@ import 'package:localsend_app/provider/network/server/server_provider.dart';
 import 'package:localsend_app/provider/settings_provider.dart';
 import 'package:localsend_app/util/native/platform_check.dart';
 import 'package:localsend_app/util/ui/dynamic_colors.dart';
-import 'package:localsend_app/widget/screen_session_banner.dart';
 import 'package:localsend_app/widget/watcher/life_cycle_watcher.dart';
 import 'package:localsend_app/widget/watcher/shortcut_watcher.dart';
 import 'package:localsend_app/widget/watcher/tray_watcher.dart';
@@ -94,14 +93,7 @@ class AnyShareApp extends StatelessWidget {
               darkTheme: getTheme(colorMode, customColor, Brightness.dark, dynamicColors),
               themeMode: colorMode == ColorMode.oled ? ThemeMode.dark : themeMode,
               builder: (context, child) => WindowBrightnessWatcher(
-                // AnyShare modification (2026-10-18): screen-session banner is
-                // visible on every page (UI-2).
-                child: Column(
-                  children: [
-                    const SafeArea(bottom: false, child: ScreenSessionBanner()),
-                    Expanded(child: child!),
-                  ],
-                ),
+                child: child!,
               ),
               navigatorKey: context.read(navigationProvider).key,
               home: RouterinoHome(

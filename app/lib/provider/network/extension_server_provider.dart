@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:crypto/crypto.dart';
 import 'package:cryptography/cryptography.dart';
 import 'package:localsend_app/model/persistence/favorite_device.dart';
 import 'package:localsend_app/provider/favorites_provider.dart';
@@ -10,24 +9,23 @@ import 'package:localsend_app/provider/network/dir_endpoints.dart';
 import 'package:localsend_app/provider/network/server/server_provider.dart';
 import 'package:localsend_app/provider/owner_provider.dart';
 import 'package:localsend_app/provider/qr_pairing_provider.dart';
-import 'package:localsend_app/provider/screen/screen_provider.dart';
 import 'package:localsend_app/provider/security_provider.dart';
 import 'package:localsend_app/util/sas.dart';
+import 'package:localsend_app/widget/dialogs/owner_claim_dialog.dart';
 import 'package:localsend_app/widget/dialogs/pairing_dialog.dart';
-import 'package:localsend_app/widget/dialogs/screen_offer_dialog.dart';
 import 'package:logging/logging.dart';
 import 'package:refena_flutter/refena_flutter.dart';
 import 'package:routerino/routerino.dart';
 import 'package:uuid/uuid.dart';
 
 /// AnyShare modification (2026-10-12): the AnyShare extension server (design:
-/// docs/扩展协议设计.md §2, as amended — probe-based discovery over plain
-/// HTTP, SAS-bound pairing, TLS deferred).
+/// docs/閹碘晛鐫嶉崡蹇氼唴鐠佹崘顓?md 鎼?, as amended 閳?probe-based discovery over plain
+
 ///
 /// Endpoints under `/api/anyshare/v1/`:
-/// - `GET  /capabilities` → `{ext, sas, fingerprint, alias, ownerName}`
-/// - `POST /pair/register` → `{session, code, eph, alias, ownerName, fingerprint}`
-/// - `POST /pair/confirm` → `{ok, ownerId, ownerName, alias, fingerprint}`
+/// - `GET  /capabilities` 閳?`{ext, sas, fingerprint, alias, ownerName}`
+/// - `POST /pair/register` 閳?`{session, code, eph, alias, ownerName, fingerprint}`
+/// - `POST /pair/confirm` 閳?`{ok, ownerId, ownerName, alias, fingerprint}`
 ///
 /// Runs on the main isolate: pairing traffic is a few tiny requests, well
 /// below the "heavy networking" threshold that requires child isolates.
@@ -35,10 +33,6 @@ final _logger = Logger('ExtensionServer');
 
 const int kExtensionPort = 53318;
 
-/// TLS screen control plane (mutual certificates). Kept separate from the plain
-/// [kExtensionPort] so pairing/directory clients are unaffected; see
-/// docs/E2-S0/控制面TLS设计.md.
-const int kScreenSecurePort = 53320;
 const int kMaxBodyBytes = 64 * 1024;
 const Duration kPendingTtl = Duration(minutes: 5);
 
@@ -57,7 +51,7 @@ class PendingPairing {
   /// Completes when the local user taps "codes match" (true) or
   /// "codes differ" / closes (false). The remote confirm request waits on
   /// this gate, so pairing only finishes if BOTH users accepted the SAS
-  /// comparison — a one-sided accept cannot complete the pairing.
+  /// comparison 閳?a one-sided accept cannot complete the pairing.
   final Completer<bool> userGate = Completer<bool>();
 
   PendingPairing({
@@ -70,6 +64,22 @@ class PendingPairing {
     required this.peerHttps,
     required this.ephKeyPair,
     required this.createdAt,
+  });
+}
+
+/// An incoming "this is my device" claim waiting for the local user.
+class PendingOwnerClaim {
+  final String requesterFingerprint;
+  final String requesterOwnerId;
+  final String requesterOwnerName;
+  final String requesterAlias;
+  final Completer<bool> gate = Completer<bool>();
+
+  PendingOwnerClaim({
+    required this.requesterFingerprint,
+    required this.requesterOwnerId,
+    required this.requesterOwnerName,
+    required this.requesterAlias,
   });
 }
 
@@ -92,51 +102,10 @@ class ExtensionServerService extends ReduxNotifier<ExtensionServerState> {
 
   ExtensionServerService(this.ref);
 
-  /// TLS screen-control listener (see [StartScreenSecureServerAction]).
-  HttpServer? _screenSecureServer;
-
-  /// Closes the TLS screen-control listener (used by tests and shutdown).
-  Future<void> closeScreenSecure() async {
-    await _screenSecureServer?.close(force: true);
-    _screenSecureServer = null;
-  }
-
-  /// Certificate fingerprint of the authenticated client, uppercase hex.
-  /// Identity comes from the TLS layer, never from request bodies.
-  String? _peerFingerprintOf(HttpRequest request) {
-    final certificate = request.certificate;
-    if (certificate == null) {
-      return null;
-    }
-    return sha256.convert(certificate.der).toString().toUpperCase();
-  }
-
-  /// Handles requests on the mutual-TLS screen listener.
-  ///
-  /// Step 2 scope: only the probe endpoint is served. Screen routes move here
-  /// once the client side pins the server certificate (design doc step 3).
-  Future<void> _handleScreenSecure(HttpRequest request) async {
-    final peer = _peerFingerprintOf(request);
-    if (peer == null) {
-      await writeJson(request, {'error': 'tls_required'}, status: 403);
-      return;
-    }
-    final path = request.uri.path;
-    if (request.method == 'GET' && path == '/api/anyshare/v1/screen/tls') {
-      await writeJson(request, {
-        'ok': true,
-        'peer': peer,
-        'local': ref.read(securityProvider).certificateHash,
-      });
-      return;
-    }
-    await writeJson(request, {'error': 'not_found'}, status: 404);
-  }
-
   @override
   ExtensionServerState init() {
     // Starting happens via [StartExtensionServerAction] dispatched from
-    // preInit — dispatching to this provider from inside init() recurses
+    // preInit 閳?dispatching to this provider from inside init() recurses
     // into init() forever (refena initializes the notifier on dispatch).
     return const ExtensionServerState();
   }
@@ -151,6 +120,7 @@ class ExtensionServerService extends ReduxNotifier<ExtensionServerState> {
 
   final Map<String, List<DateTime>> _rateWindow = {};
   final Map<String, DateTime> _rateLockedUntil = {};
+  PendingOwnerClaim? _pendingOwnerClaim;
 }
 
 class StartExtensionServerAction extends AsyncReduxAction<ExtensionServerService, ExtensionServerState> {
@@ -169,7 +139,6 @@ class StartExtensionServerAction extends AsyncReduxAction<ExtensionServerService
       // so peers that discovered us via link-local IPv6 can still pair.
       final server = await HttpServer.bind(InternetAddress.anyIPv6, port, shared: true);
       _logger.info('Extension server listening on $kExtensionPort');
-      // ignore: discarded_futures
       server.listen((request) async {
         try {
           await notifier._handle(request);
@@ -182,52 +151,6 @@ class StartExtensionServerAction extends AsyncReduxAction<ExtensionServerService
       _logger.warning('Extension server could not bind port $kExtensionPort: $e');
       return state;
     }
-  }
-}
-
-/// Starts the TLS screen-control listener (port [kScreenSecurePort]).
-///
-/// This is step 2 of docs/E2-S0/控制面TLS设计.md: the listener itself, with
-/// mandatory client certificates and certificate-derived peer identity. The
-/// screen routes are migrated onto it in a later step; for now it exposes a
-/// single probe endpoint so the mutual-TLS path can be verified end to end
-/// without changing any existing behaviour.
-class StartScreenSecureServerAction extends AsyncReduxAction<ExtensionServerService, ExtensionServerState> {
-  StartScreenSecureServerAction({this.port = kScreenSecurePort});
-
-  /// Ephemeral port (0) for tests.
-  final int port;
-
-  @override
-  Future<ExtensionServerState> reduce() async {
-    final security = notifier.ref.read(securityProvider);
-    try {
-      final context = SecurityContext(withTrustedRoots: false)
-        ..useCertificateChainBytes(utf8.encode(security.certificate))
-        ..usePrivateKeyBytes(utf8.encode(security.privateKey));
-      final server = await HttpServer.bindSecure(
-        InternetAddress.anyIPv6,
-        port,
-        context,
-        requestClientCertificate: true,
-        shared: true,
-      );
-      _logger.info('Screen TLS control listening on ${server.port} (mutual certificates)');
-      // ignore: discarded_futures
-      server.listen((request) async {
-        try {
-          await notifier._handleScreenSecure(request);
-        } catch (e, st) {
-          _logger.fine('Screen TLS request error: $e\n$st');
-        }
-      });
-      notifier._screenSecureServer = server;
-    } catch (e) {
-      // Never block app startup: screen sharing reports an explicit error when
-      // the secure listener is unavailable instead of silently using plain HTTP.
-      _logger.warning('Screen TLS control could not bind port $port: $e');
-    }
-    return state;
   }
 }
 
@@ -265,7 +188,7 @@ class AcceptPendingPairingAction extends AsyncReduxAction<ExtensionServerService
     }
     // Persistence happens ONLY in the confirm handler: it is the single
     // place that also knows the initiator's ownerId/ownerName (required by
-    // the same-owner rule) — accepting here as well would create a
+    // the same-owner rule) 閳?accepting here as well would create a
     // duplicate favorite without the owner link.
     // pending is PRESERVED: the in-flight confirm long-poll still needs it.
     return ExtensionServerState(server: state.server, port: state.port, pending: pending);
@@ -293,6 +216,9 @@ extension ExtensionServerHandler on ExtensionServerService {
 
   Future<void> _handle(HttpRequest request) async {
     final path = request.uri.path;
+    // The TLS listener only serves screen control; everything else stays on
+    // the plaintext extension port.
+
     if (request.method == 'GET' && path == '/api/anyshare/v1/capabilities') {
       await writeJson(request, {
         'ext': 1,
@@ -310,118 +236,61 @@ extension ExtensionServerHandler on ExtensionServerService {
       return;
     }
 
-    if (request.method == 'POST' && path == '/api/anyshare/v1/screen/accept') {
-      // The receiver confirmed a pending offer and is listening now.
-      // Exempt from the shared rate limiter: session callbacks are bursty and
-      // a 429 here would silently break an accepted session.
+    if (request.method == 'POST' && path == '/api/anyshare/v1/owner/claim') {
+      // "This is my device": the requester asks us to join its owner group.
+      // The local user confirms; then both sides share the requester's owner
+      // identity (same-owner trust rule).
+      final body = await readJsonBody(request);
+      if (body == null || body['fingerprint'] is! String || body['ownerId'] is! String || (body['ownerId'] as String).isEmpty) {
+        await writeJson(request, {'error': 'bad_request'}, status: 400);
+        return;
+      }
+      final pending = _pendingOwnerClaim;
+      if (pending != null && !pending.gate.isCompleted) {
+        await writeJson(request, {'error': 'busy'}, status: 409);
+        return;
+      }
+      final claim = PendingOwnerClaim(
+        requesterFingerprint: body['fingerprint'] as String,
+        requesterOwnerId: body['ownerId'] as String,
+        requesterOwnerName: (body['ownerName'] as String?) ?? '',
+        requesterAlias: (body['alias'] as String?) ?? '???',
+      );
+      _pendingOwnerClaim = claim;
+      // ignore: use_build_context_synchronously, unawaited_futures
+      Routerino.context.pushImmediately(() => OwnerClaimDialog(alias: claim.requesterAlias, gate: claim.gate));
+      final bool accepted;
       try {
-        final body = await readJsonBody(request);
-        if (body == null || body['session'] is! String) {
-          await writeJson(request, {'error': 'bad_request'}, status: 400);
-          return;
+        accepted = await claim.gate.future.timeout(const Duration(seconds: 60));
+      } on TimeoutException {
+        _pendingOwnerClaim = null;
+        await writeJson(request, {'error': 'not_confirmed'}, status: 409);
+        return;
+      }
+      _pendingOwnerClaim = null;
+      if (!accepted) {
+        await writeJson(request, {'error': 'not_confirmed'}, status: 409);
+        return;
+      }
+      FavoriteDevice? favorite;
+      for (final entry in ref.read(favoritesProvider)) {
+        if (entry.fingerprint == claim.requesterFingerprint) {
+          favorite = entry;
+          break;
         }
+      }
+      if (favorite != null) {
         await ref
-            .redux(screenProvider)
+            .redux(favoritesProvider)
             .dispatchAsync(
-              IncomingScreenAcceptAction(
-                sessionId: body['session'] as String,
-                port: (body['port'] as num?)?.toInt() ?? kScreenDataPort,
-                maxWidth: (body['width'] as num?)?.toInt(),
-                maxHeight: (body['height'] as num?)?.toInt(),
+              UpdateFavoriteAction(
+                favorite.copyWith(ownerId: claim.requesterOwnerId, ownerName: claim.requesterOwnerName),
               ),
             );
-        await writeJson(request, {'ok': true});
-      } catch (e, st) {
-        _logger.warning('screen/accept failed: $e\n$st');
-        await writeJson(request, {'error': 'internal'}, status: 500);
       }
-      return;
-    }
-
-    if (request.method == 'POST' && path == '/api/anyshare/v1/screen/bitrate') {
-      // The receiver reports loss counters for adaptive quality. Same
-      // session/peer checks as screen/keyframe; the app does the AIMD math.
-      try {
-        final body = await readJsonBody(request);
-        if (body == null || body['session'] is! String) {
-          await writeJson(request, {'error': 'bad_request'}, status: 400);
-          return;
-        }
-        final active = ref.read(screenProvider).active;
-        if (active == null || active.role != ScreenRole.sender) {
-          await writeJson(request, {'error': 'no_session'}, status: 409);
-          return;
-        }
-        final remote = request.connectionInfo?.remoteAddress.address;
-        if (remote != null && _normalizedIp(remote) != _normalizedIp(active.peerIp)) {
-          await writeJson(request, {'error': 'forbidden'}, status: 403);
-          return;
-        }
-        await ref
-            .redux(screenProvider)
-            .dispatchAsync(
-              IncomingScreenBitrateAction(
-                sessionId: body['session'] as String,
-                lost: (body['lost'] as num?)?.toInt(),
-                frames: (body['frames'] as num?)?.toInt(),
-              ),
-            );
-        await writeJson(request, {'ok': true});
-      } catch (e, st) {
-        _logger.warning('screen/bitrate failed: $e\n$st');
-        await writeJson(request, {'error': 'internal'}, status: 500);
-      }
-      return;
-    }
-
-    if (request.method == 'POST' && path == '/api/anyshare/v1/screen/keyframe') {
-      // The receiver detected unrecovered loss and asks us to emit an IDR.
-      // Exempt from the rate limiter (see accept); the app throttles to one
-      // IDR per 500 ms per session and the request must come from the peer
-      // that owns the active sender session.
-      try {
-        final body = await readJsonBody(request);
-        if (body == null || body['session'] is! String) {
-          await writeJson(request, {'error': 'bad_request'}, status: 400);
-          return;
-        }
-        final active = ref.read(screenProvider).active;
-        if (active == null || active.role != ScreenRole.sender) {
-          await writeJson(request, {'error': 'no_session'}, status: 409);
-          return;
-        }
-        final remote = request.connectionInfo?.remoteAddress.address;
-        if (remote != null && _normalizedIp(remote) != _normalizedIp(active.peerIp)) {
-          await writeJson(request, {'error': 'forbidden'}, status: 403);
-          return;
-        }
-        await ref.redux(screenProvider).dispatchAsync(IncomingScreenKeyframeAction(sessionId: body['session'] as String));
-        await writeJson(request, {'ok': true});
-      } catch (e, st) {
-        _logger.warning('screen/keyframe failed: $e\n$st');
-        await writeJson(request, {'error': 'internal'}, status: 500);
-      }
-      return;
-    }
-
-    if (request.method == 'POST' && path == '/api/anyshare/v1/screen/stop') {
-      // Either side ends the session (user stop, denial, window closed, ...).
-      // Also exempt from the rate limiter (see accept).
-      try {
-        final body = await readJsonBody(request);
-        await ref
-            .redux(screenProvider)
-            .dispatchAsync(
-              IncomingScreenStopAction(
-                reason: (body?['reason'] as String?) ?? 'remote_stop',
-                session: body?['session'] as String?,
-              ),
-            );
-        await writeJson(request, {'ok': true});
-      } catch (e, st) {
-        _logger.warning('screen/stop failed: $e\n$st');
-        await writeJson(request, {'error': 'internal'}, status: 500);
-      }
+      // Adopt the requester's owner identity so the same-owner rule matches.
+      ref.redux(ownerProvider).dispatch(SetOwnerIdentityAction(id: claim.requesterOwnerId, name: claim.requesterOwnerName));
+      await writeJson(request, {'ok': true, 'ownerId': claim.requesterOwnerId, 'ownerName': claim.requesterOwnerName});
       return;
     }
 
@@ -438,7 +307,7 @@ extension ExtensionServerHandler on ExtensionServerService {
       }
       // F-PAIR-08: QR-originated registrations must carry the displayer's
       // current one-time token. This is replay protection for honest scanners,
-      // not an auth gate — token-less manual pairing keeps working (SAS
+      // not an auth gate 閳?token-less manual pairing keeps working (SAS
       // confirmation still gates every pairing).
       final qrToken = body['qrToken'];
       if (qrToken != null) {
@@ -500,7 +369,7 @@ extension ExtensionServerHandler on ExtensionServerService {
     if (request.method == 'POST' && path == '/api/anyshare/v1/trust/query') {
       // Lets the SENDER check how the receiver would treat them before a
       // transfer (auto-accept / limited / blocked). Reveals only the policy
-      // toward the queried fingerprint — never ownerId/ownerName.
+      // toward the queried fingerprint 閳?never ownerId/ownerName.
       final body = await readJsonBody(request);
       if (body == null || body['fingerprint'] is! String) {
         await writeJson(request, {'error': 'bad_request'}, status: 400);
@@ -528,44 +397,10 @@ extension ExtensionServerHandler on ExtensionServerService {
       return;
     }
 
-    if (request.method == 'POST' && path == '/api/anyshare/v1/screen/offer') {
-      // E-2 screen share: the sender offers to stream its screen to us.
-      // The trust chain (D2) decides; the response is immediate (auto-accept)
-      // or `pending` while the local user is asked (W3 dialog).
-      final body = await readJsonBody(request);
-      if (body == null || body['fingerprint'] is! String) {
-        await writeJson(request, {'error': 'bad_request'}, status: 400);
-        return;
-      }
-      final action = HandleScreenOfferAction(
-        keyHex: body['key'] as String?,
-        peerIp: request.connectionInfo!.remoteAddress.address.replaceAll('::ffff:', ''),
-        peerFingerprint: body['fingerprint'] as String,
-        peerAlias: (body['alias'] as String?) ?? '???',
-      );
-      try {
-        final (_, result) = await ref.redux(screenProvider).dispatchAsyncWithResult(action);
-        await writeJson(request, result.body, status: result.status);
-        // Pending offers ask the local user (UI-2/W3): show the dialog like
-        // the pairing responder flow does.
-        if (result.status == 409 && result.body['pending'] == true) {
-          final pending = ref.read(screenProvider).pendingOffer;
-          if (pending != null) {
-            // ignore: use_build_context_synchronously, unawaited_futures
-            Routerino.context.pushImmediately(() => ScreenOfferDialog(pending: pending));
-          }
-        }
-      } catch (e, st) {
-        _logger.warning('screen/offer failed: $e\n$st');
-        await writeJson(request, {'error': 'internal'}, status: 500);
-      }
-      return;
-    }
-
     if (request.method == 'POST' && path == '/api/anyshare/v1/pair/confirm') {
       final body = await readJsonBody(request);
       final pending = ref.read(extensionServerProvider).pending;
-      // Note: pending.aborted is NOT rejected here — the gate below resolves
+      // Note: pending.aborted is NOT rejected here 閳?the gate below resolves
       // to false in that case, yielding a distinct `not_confirmed` error.
       if (body == null || pending == null || body['session'] != pending.sessionId) {
         await writeJson(request, {'error': 'no_pending'}, status: 409);
@@ -613,7 +448,7 @@ extension ExtensionServerHandler on ExtensionServerService {
                 alias: pending.peerAlias,
               ).copyWith(
                 // Product decision (2026-10-14): pairing IS the receiver's
-                // confirmation — no per-transfer prompts even at `temp`.
+                // confirmation 閳?no per-transfer prompts even at `temp`.
                 trustLevel: TrustLevel.temp,
                 ownerId: (body['ownerId'] as String?) ?? '',
                 ownerName: (body['ownerName'] as String?) ?? '',
@@ -670,18 +505,3 @@ extension ExtensionServerHandler on ExtensionServerService {
 /// Compares IPs ignoring the IPv6 scope suffix (`fe80::1%3` vs `fe80::1`) and
 /// the IPv4-mapped IPv6 form reported by dual-stack listeners
 /// (`::ffff:127.0.0.1` vs `127.0.0.1`).
-String _normalizedIp(String ip) {
-  var value = ip;
-  final scope = value.indexOf('%');
-  if (scope >= 0) {
-    value = value.substring(0, scope);
-  }
-  const mappedPrefix = '::ffff:';
-  if (value.startsWith(mappedPrefix)) {
-    final tail = value.substring(mappedPrefix.length);
-    if (!tail.contains(':')) {
-      return tail;
-    }
-  }
-  return value;
-}
