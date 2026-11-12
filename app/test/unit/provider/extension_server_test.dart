@@ -69,6 +69,12 @@ void main() {
     return (keyPair, body);
   }
 
+  test('owner claim: malformed request is rejected', () async {
+    final (status, body) = await post('owner/claim', {'ownerId': ''});
+    expect(status, 400);
+    expect(body['error'], 'bad_request');
+  });
+
   test('capabilities reports extension info', () async {
     final (status, body) = await get('capabilities');
     expect(status, 200);

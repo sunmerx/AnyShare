@@ -257,8 +257,19 @@ extension ExtensionServerHandler on ExtensionServerService {
         requesterAlias: (body['alias'] as String?) ?? '???',
       );
       _pendingOwnerClaim = claim;
-      // ignore: use_build_context_synchronously, unawaited_futures
-      Routerino.context.pushImmediately(() => OwnerClaimDialog(alias: claim.requesterAlias, gate: claim.gate));
+      // The dialog is opened from the router's root navigator, not from a
+      // widget context of this request.
+      try {
+        // ignore: use_build_context_synchronously, unawaited_futures
+        Routerino.context.pushImmediately(() => OwnerClaimDialog(alias: claim.requesterAlias, gate: claim.gate));
+      } catch (e) {
+        // No navigator yet (startup) or no UI at all (tests): answer the peer
+        // instead of leaving the request hanging on a dialog that cannot open.
+        _logger.warning('Owner claim dialog could not open: $e');
+        _pendingOwnerClaim = null;
+        await writeJson(request, {'error': 'not_confirmed'}, status: 409);
+        return;
+      }
       final bool accepted;
       try {
         accepted = await claim.gate.future.timeout(const Duration(seconds: 60));

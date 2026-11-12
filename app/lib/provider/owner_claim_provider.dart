@@ -15,13 +15,13 @@ final _logger = Logger('OwnerClaim');
 /// confirmation; on success both sides share this device's owner identity.
 ///
 /// Returns null on success, otherwise a short error code.
-Future<String?> claimDeviceOwner(Ref ref, FavoriteDevice entry, String host) async {
+Future<String?> claimDeviceOwner(Ref ref, FavoriteDevice entry, String host, {int port = kExtensionPort}) async {
   final owner = ref.read(ownerProvider);
   final fingerprint = ref.read(securityProvider).certificateHash;
   final authority = host.contains(':') ? '[${host.replaceAll('%', '%25')}]' : host;
   final client = HttpClient()..connectionTimeout = const Duration(seconds: 5);
   try {
-    final request = await client.postUrl(Uri.parse('http://$authority:$kExtensionPort/api/anyshare/v1/owner/claim'));
+    final request = await client.postUrl(Uri.parse('http://$authority:$port/api/anyshare/v1/owner/claim'));
     request.headers.contentType = ContentType.json;
     request.write(
       jsonEncode({
