@@ -2216,8 +2216,8 @@ class Translations$ui2$blocklist$en {
   /// en: 'Blocklist'
   String get title => 'Blocklist';
 
-  /// en: 'Blocked devices cannot send files, share screens or browse folders'
-  String get subtitle => 'Blocked devices cannot send files, share screens or browse folders';
+  /// en: 'Blocked devices cannot send files or browse folders'
+  String get subtitle => 'Blocked devices cannot send files or browse folders';
 
   /// en: 'No blocked devices'
   String get empty => 'No blocked devices';

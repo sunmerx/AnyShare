@@ -680,7 +680,7 @@
     },
     "blocklist": {
       "title": "黑名单",
-      "subtitle": "被拉黑的设备不能传输文件、投屏或浏览目录",
+      "subtitle": "被拉黑的设备不能传输文件或浏览目录",
       "empty": "没有被拉黑的设备",
       "unblock": "解除拉黑",
       "unblockTitle": "解除拉黑「{alias}」?",

@@ -1879,7 +1879,7 @@ class Translations$ui2$blocklist$zh_CN extends Translations$ui2$blocklist$en {
   @override
   String get title => '黑名单';
   @override
-  String get subtitle => '被拉黑的设备不能传输文件、投屏或浏览目录';
+  String get subtitle => '被拉黑的设备不能传输文件或浏览目录';
   @override
   String get empty => '没有被拉黑的设备';
   @override

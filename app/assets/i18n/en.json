@@ -683,7 +683,7 @@
     },
     "blocklist": {
       "title": "Blocklist",
-      "subtitle": "Blocked devices cannot send files, share screens or browse folders",
+      "subtitle": "Blocked devices cannot send files or browse folders",
       "empty": "No blocked devices",
       "unblock": "Unblock",
       "unblockTitle": "Unblock \"{alias}\"?",
