@@ -1425,4 +1425,66 @@ mod tests {
 
         assert_eq!(response, decoded);
     }
+
+    /// File bytes travel the data channel in CHUNK_SIZE pieces; every length
+    /// around a chunk boundary must split and rejoin without loss.
+    #[tokio::test]
+    async fn send_string_in_chunks_splits_every_boundary_case() {
+        for len in [
+            0usize,
+            1,
+            CHUNK_SIZE - 1,
+            CHUNK_SIZE,
+            CHUNK_SIZE + 1,
+            CHUNK_SIZE * 3,
+        ] {
+            let payload = "x".repeat(len);
+            let mut chunks: Vec<Bytes> = Vec::new();
+
+            let result = send_string_in_chunks((), payload.clone(), |_, chunk| {
+                chunks.push(chunk);
+                async { Ok(()) }
+            })
+            .await;
+
+            assert!(result.is_ok(), "len {len}");
+            assert_eq!(
+                chunks.len(),
+                len.div_ceil(CHUNK_SIZE),
+                "chunk count for len {len}"
+            );
+            assert!(
+                chunks.iter().all(|chunk| chunk.len() <= CHUNK_SIZE),
+                "chunk larger than CHUNK_SIZE for len {len}"
+            );
+            let joined: Vec<u8> = chunks.iter().flat_map(|chunk| chunk.to_vec()).collect();
+            assert_eq!(joined, payload.as_bytes(), "rejoined payload for len {len}");
+        }
+    }
+
+    /// The receiving side collects binary messages until a string message
+    /// terminates the stream, and must return every byte in order.
+    #[tokio::test]
+    async fn receive_string_from_chunks_reassembles_until_a_string_message() {
+        let (tx, mut rx) = mpsc::channel(8);
+        for part in [&b"hello "[..], b"world"] {
+            tx.send(DataChannelMessage {
+                is_string: false,
+                data: Bytes::copy_from_slice(part),
+            })
+            .await
+            .unwrap();
+        }
+        tx.send(DataChannelMessage {
+            is_string: true,
+            data: Bytes::from_static(b"<END>"),
+        })
+        .await
+        .unwrap();
+        drop(tx);
+
+        let received = receive_string_from_chunks(&mut rx).await;
+
+        assert_eq!(&received[..], b"hello world");
+    }
 }
